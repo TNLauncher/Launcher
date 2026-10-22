@@ -52,6 +52,16 @@ pub fn rename(state: &AppState, id: &str, name: &str) -> Result<()> {
     update(state, id, |i| i.name = name.into())
 }
 
+/// Max size of a stored icon; the frontend downscales before sending.
+const MAX_ICON_LEN: usize = 256 * 1024;
+
+pub fn set_icon(state: &AppState, id: &str, icon: &str) -> Result<()> {
+    if !(icon.is_empty() || icon.starts_with("data:image/")) || icon.len() > MAX_ICON_LEN {
+        return Err(AppError::Invalid("Icon must be a small image".into()));
+    }
+    update(state, id, |i| i.icon = icon.into())
+}
+
 pub fn delete(state: &AppState, id: &str) -> Result<()> {
     if state.is_running(id) {
         return Err(AppError::Conflict("Close the game before deleting this instance".into()));

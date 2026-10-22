@@ -54,8 +54,46 @@ pub async fn install(state: &AppState, id: &str, url: &str, file: &str) -> Resul
     http::download(&state.http, url, &path, None).await
 }
 
+/// Icon path declared in `fabric.mod.json` / `quilt.mod.json`: a string or a `{ "size": path }` map.
+fn icon_path(meta: &serde_json::Value) -> Option<String> {
+    match meta {
+        serde_json::Value::String(s) => Some(s.trim_start_matches("./").trim_start_matches('/').into()),
+        serde_json::Value::Object(sizes) => {
+            let (_, largest) = sizes.iter().max_by_key(|(k, _)| k.parse::<u32>().unwrap_or(0))?;
+            icon_path(largest)
+        }
+        _ => None,
+    }
+}
+
+/// The mod's own icon from inside its jar, as `(bytes, mime)`.
+pub fn icon(state: &AppState, id: &str, file: &str) -> Result<(Vec<u8>, &'static str)> {
+    use std::io::Read;
+    let jar = std::fs::File::open(state.paths.mods_dir(id)?.join(safe_file(file)?))?;
+    let mut zip = zip::ZipArchive::new(jar)?;
+    let meta = |zip: &mut zip::ZipArchive<std::fs::File>, name: &str| -> Option<serde_json::Value> {
+        serde_json::from_reader(zip.by_name(name).ok()?).ok()
+    };
+    let path = meta(&mut zip, "fabric.mod.json")
+        .and_then(|m| icon_path(&m["icon"]))
+        .or_else(|| meta(&mut zip, "quilt.mod.json").and_then(|m| icon_path(&m["quilt_loader"]["metadata"]["icon"])))
+        .ok_or_else(|| AppError::NotFound("Mod has no icon".into()))?;
+    let mut bytes = Vec::new();
+    zip.by_name(&path)?.read_to_end(&mut bytes)?;
+    let mime = if path.ends_with(".jpg") || path.ends_with(".jpeg") { "image/jpeg" } else { "image/png" };
+    Ok((bytes, mime))
+}
+
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn picks_largest_icon() {
+        let v = serde_json::json!({ "16": "a.png", "128": "./b.png", "32": "c.png" });
+        assert_eq!(super::icon_path(&v).as_deref(), Some("b.png"));
+        assert_eq!(super::icon_path(&serde_json::json!("assets/x/icon.png")).as_deref(), Some("assets/x/icon.png"));
+        assert_eq!(super::icon_path(&serde_json::Value::Null), None);
+    }
+
     #[test]
     fn rejects_path_traversal() {
         assert!(super::safe_file("../evil.jar").is_err());

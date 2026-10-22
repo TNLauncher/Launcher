@@ -21,6 +21,8 @@ pub struct Instance {
     /// Unix seconds, 0 = never.
     pub last_played: u64,
     pub play_seconds: u64,
+    /// `data:image/...` URL picked by the user; empty = loader icon.
+    pub icon: String,
 }
 
 #[derive(Debug, Clone, Serialize)]

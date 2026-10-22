@@ -21,6 +21,12 @@ pub fn rename_instance(state: State<'_, AppState>, id: String, name: String) -> 
     instances::rename(&state, &id, &name)
 }
 
+/// `icon` is a `data:image/...` URL, or empty to reset.
+#[tauri::command]
+pub fn set_instance_icon(state: State<'_, AppState>, id: String, icon: String) -> Result<()> {
+    instances::set_icon(&state, &id, &icon)
+}
+
 #[tauri::command]
 pub fn delete_instance(state: State<'_, AppState>, id: String) -> Result<()> {
     instances::delete(&state, &id)

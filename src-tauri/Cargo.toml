@@ -25,6 +25,7 @@ futures = "0.3"
 md-5 = "0.10"
 zip = { version = "2", default-features = false, features = ["deflate"] }
 discord-rich-presence = "1.1"
+percent-encoding = "2"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["fs", "time", "macros", "rt-multi-thread"] }

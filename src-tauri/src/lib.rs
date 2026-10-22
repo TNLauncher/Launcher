@@ -22,6 +22,23 @@ use tauri::Manager;
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        // `modicon://localhost/<instance id>/<jar file>` -> the icon packed inside that mod jar.
+        .register_asynchronous_uri_scheme_protocol("modicon", |ctx, req, responder| {
+            let app = ctx.app_handle().clone();
+            tauri::async_runtime::spawn_blocking(move || {
+                let path = percent_encoding::percent_decode_str(req.uri().path()).decode_utf8_lossy().into_owned();
+                let icon = path
+                    .trim_start_matches('/')
+                    .split_once('/')
+                    .ok_or(())
+                    .and_then(|(id, file)| services::mods::icon(&app.state::<state::AppState>(), id, file).map_err(|_| ()));
+                let res = match icon {
+                    Ok((bytes, mime)) => tauri::http::Response::builder().header("Content-Type", mime).body(bytes),
+                    Err(()) => tauri::http::Response::builder().status(404).body(Vec::new()),
+                };
+                responder.respond(res.expect("static response parts"));
+            });
+        })
         .setup(|app| {
             let root = app.path().app_data_dir()?;
             app.manage(state::AppState::new(root)?);
@@ -37,6 +54,7 @@ pub fn run() {
             commands::instances::create_instance,
             commands::instances::import_modpack,
             commands::instances::rename_instance,
+            commands::instances::set_instance_icon,
             commands::instances::delete_instance,
             commands::instances::open_instance_dir,
             commands::game::launch,
