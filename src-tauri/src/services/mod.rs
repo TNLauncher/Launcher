@@ -4,6 +4,7 @@ pub mod account;
 pub mod discord;
 pub mod instances;
 pub mod launcher;
+pub mod modpacks;
 pub mod mods;
 
 /// Unix time in seconds.

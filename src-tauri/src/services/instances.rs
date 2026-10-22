@@ -15,19 +15,28 @@ pub fn get(state: &AppState, id: &str) -> Result<Instance> {
 
 pub async fn create(state: &AppState, name: &str, version: &str, loader: Loader) -> Result<Instance> {
     let loader_version = loader::latest(&state.http, version, loader).await?;
+    let instance = new(name, version, loader, loader_version);
+    add(state, &instance)?;
+    Ok(instance)
+}
+
+/// An instance with a fresh id; nothing is stored until `add`.
+pub fn new(name: &str, version: &str, loader: Loader, loader_version: String) -> Instance {
     let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_nanos();
     let name = name.trim();
-    let instance = Instance {
+    Instance {
         id: format!("{nanos:x}"),
         name: if name.is_empty() { version.into() } else { name.into() },
         version: version.into(),
         loader,
         loader_version,
         ..Default::default()
-    };
+    }
+}
+
+pub fn add(state: &AppState, instance: &Instance) -> Result<()> {
     std::fs::create_dir_all(state.paths.mods_dir(&instance.id)?)?;
-    storage::update_instances(state, |list| list.push(instance.clone()))?;
-    Ok(instance)
+    storage::update_instances(state, |list| list.push(instance.clone()))
 }
 
 pub fn update(state: &AppState, id: &str, f: impl FnOnce(&mut Instance)) -> Result<()> {

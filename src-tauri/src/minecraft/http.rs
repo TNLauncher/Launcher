@@ -22,7 +22,7 @@ pub async fn get_json(c: &reqwest::Client, url: &str) -> Result<Value> {
     Ok(r.json().await?)
 }
 
-async fn fetch_bytes(c: &reqwest::Client, url: &str) -> Result<Vec<u8>> {
+pub async fn fetch_bytes(c: &reqwest::Client, url: &str) -> Result<Vec<u8>> {
     let r = c.get(url).send().await?;
     if !r.status().is_success() {
         return Err(AppError::Status { url: url.into(), status: r.status().as_u16() });

@@ -35,6 +35,7 @@ pub fn run() {
             commands::account::microsoft_login,
             commands::account::microsoft_logout,
             commands::instances::create_instance,
+            commands::instances::import_modpack,
             commands::instances::rename_instance,
             commands::instances::delete_instance,
             commands::instances::open_instance_dir,
