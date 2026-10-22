@@ -1,5 +1,5 @@
 // Typed wrappers for every command registered in src-tauri/src/lib.rs.
-import { Channel } from "@tauri-apps/api/core";
+import { Channel, convertFileSrc } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { call } from "./ipc";
 import type { DeviceCode, GameExit, Instance, LaunchEvent, Loader, ModFile, Settings, Snapshot } from "@/types";
@@ -21,6 +21,8 @@ export const launcher = {
   /** Downloads a Modrinth `.mrpack` and creates an instance from it. */
   importModpack: (url: string) => call<Instance>("import_modpack", { url }),
   renameInstance: (id: string, name: string) => call<void>("rename_instance", { id, name }),
+  /** `icon` is a `data:image/...` URL, or "" to reset. */
+  setInstanceIcon: (id: string, icon: string) => call<void>("set_instance_icon", { id, icon }),
   deleteInstance: (id: string) => call<void>("delete_instance", { id }),
   openInstanceDir: (id: string, mods = false) => call<void>("open_instance_dir", { id, mods }),
 
@@ -35,6 +37,8 @@ export const launcher = {
   listMods: (id: string) => call<ModFile[]>("list_mods", { id }),
   toggleMod: (id: string, file: string) => call<void>("toggle_mod", { id, file }),
   deleteMod: (id: string, file: string) => call<void>("delete_mod", { id, file }),
+  /** URL of the icon packed inside a mod jar; 404s when the mod has none. */
+  modIconUrl: (id: string, file: string) => convertFileSrc(`${id}/${file}`, "modicon"),
   installMod: (id: string, url: string, file: string) => call<void>("install_mod", { id, url, file }),
 
   /** GET through Rust: no CORS in the webview. */

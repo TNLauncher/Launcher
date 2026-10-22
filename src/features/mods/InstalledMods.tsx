@@ -58,7 +58,15 @@ export function InstalledMods({ instance, picker }: { instance: Instance; picker
           shown.map((m) => (
             <div key={m.file} className={`mod ${m.enabled ? "" : "off"}`}>
               <div className="mod-main">
-                <div className="mod-icon"><Icon name="extension" /></div>
+                <div className="mod-icon">
+                  <Icon name="extension" />
+                  <img
+                    src={launcher.modIconUrl(instance.id, m.file)}
+                    alt=""
+                    loading="lazy"
+                    onError={(e) => e.currentTarget.remove()}
+                  />
+                </div>
                 <div className="mod-text">
                   <div className="mod-name">
                     {displayName(m.file)}

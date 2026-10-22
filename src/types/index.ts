@@ -23,6 +23,8 @@ export interface Instance {
   /** Unix seconds, 0 = never. */
   lastPlayed: number;
   playSeconds: number;
+  /** `data:image/...` URL; empty = loader icon. */
+  icon: string;
 }
 
 export interface ModFile {

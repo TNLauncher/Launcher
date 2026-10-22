@@ -21,7 +21,7 @@ export function InstanceTiles() {
       <div className="tiles">
         {recent.slice(0, 3).map((i) => (
           <button key={i.id} className="tile" aria-pressed={i.id === selected?.id} onClick={() => select(i.id)}>
-            <span className="tile-icon"><Icon name={LOADER_ICON[i.loader]} /></span>
+            <span className="tile-icon">{i.icon ? <img src={i.icon} alt="" /> : <Icon name={LOADER_ICON[i.loader]} />}</span>
             <span className="tile-text">
               <span className="tile-name">{i.name}</span>
               <span className="tile-sub">{i.version} · {LOADERS[i.loader]}</span>

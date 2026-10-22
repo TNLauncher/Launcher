@@ -18,6 +18,9 @@
 .mod-icon { width: 32px; height: 32px; border-radius: 8px; background: rgb(255 255 255 / 0.08); border: 1px solid var(--border); display: grid; place-items: center; color: var(--muted); flex-shrink: 0; overflow: hidden; }
 .mod-icon .icon { font-size: 18px; }
 .mod-icon img { width: 100%; height: 100%; object-fit: cover; }
+/* Installed mods stack the jar icon over the fallback glyph; a missing icon removes the img. */
+.mod-icon:has(> .icon + img) { position: relative; }
+.mod-icon > .icon + img { position: absolute; inset: 0; }
 .mod-text { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .mod-name { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; font-weight: 600; }
 .mod-name .by { font-weight: 400; color: var(--muted); }
