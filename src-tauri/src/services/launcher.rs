@@ -1,4 +1,4 @@
-//! Install → spawn → watch. Progress streams over a Channel; game exit is a global event.
+//! Install → spawn → watch. Progress streams over a Channel; game output and exit are global events.
 use super::discord::{Discord, Presence};
 use super::{instances, now};
 use crate::error::{AppError, Result};
@@ -7,10 +7,18 @@ use crate::models::{AfterLaunch, Loader};
 use crate::state::AppState;
 use crate::storage;
 use serde::Serialize;
+use std::fs::File;
+use std::io::{BufRead, BufReader, Read, Write};
 use std::path::PathBuf;
+use std::process::Stdio;
+use std::sync::Arc;
+use std::thread::JoinHandle;
 use tauri::{ipc::Channel, AppHandle, Emitter, Manager};
 
 pub const GAME_EXIT_EVENT: &str = "game-exit";
+pub const GAME_LOG_EVENT: &str = "game-log";
+/// The console only needs the recent tail of a long session's log.
+const LOG_TAIL_BYTES: u64 = 4 << 20;
 
 #[derive(Clone, Serialize)]
 #[serde(tag = "event", content = "data", rename_all = "camelCase")]
@@ -24,6 +32,14 @@ pub enum LaunchEvent {
 pub struct GameExit {
     pub id: String,
     pub code: Option<i32>,
+}
+
+/// One line of game stdout/stderr.
+#[derive(Clone, Serialize)]
+pub struct GameLog<'a> {
+    pub id: &'a str,
+    pub line: &'a str,
+    pub err: bool,
 }
 
 /// Marks an instance busy for as long as it lives; dropping it frees the instance.
@@ -84,7 +100,7 @@ pub async fn launch(app: &AppHandle, id: &str, on_event: Channel<LaunchEvent>) -
     let classpath = install::install(&state.http, root, &v, &natives, &progress).await?;
 
     progress(Stage::Starting, 0, 0);
-    let log = std::fs::File::create(game_dir.join("launcher.log"))?;
+    let log = Arc::new(File::create(game_dir.join("launcher.log"))?);
     let mut cmd = command::build(
         &v,
         &command::LaunchOptions {
@@ -101,10 +117,16 @@ pub async fn launch(app: &AppHandle, id: &str, on_event: Channel<LaunchEvent>) -
             fullscreen: settings.fullscreen,
         },
     );
-    cmd.stdout(log.try_clone()?).stderr(log);
+    cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
     let mut child = cmd
         .spawn()
         .map_err(|e| AppError::Unsupported(format!("Could not start Java ({}): {e}", java.display())))?;
+
+    let readers = [
+        pipe(app, id, child.stdout.take().expect("piped"), log.clone(), false),
+        pipe(app, id, child.stderr.take().expect("piped"), log, true),
+    ];
+    state.games.lock().unwrap().insert(id.to_string(), child);
 
     let started = now();
     instances::update(&state, id, |i| i.last_played = started)?;
@@ -121,8 +143,12 @@ pub async fn launch(app: &AppHandle, id: &str, on_event: Channel<LaunchEvent>) -
 
     let (app, id) = (app.clone(), id.to_string());
     std::thread::spawn(move || {
-        let code = child.wait().ok().and_then(|s| s.code());
+        // Pipes close when the game exits; waiting on them first leaves the child free for `stop`.
+        // ponytail: a grandchild that inherits the pipes keeps this open, track the pid if that shows up.
+        readers.into_iter().for_each(|r| drop(r.join()));
         let state = app.state::<AppState>();
+        let child = state.games.lock().unwrap().remove(&id);
+        let code = child.and_then(|mut c| c.wait().ok()).and_then(|s| s.code());
         let _ = instances::update(&state, &id, |i| i.play_seconds += now().saturating_sub(started));
         drop(guard);
         if let Some(w) = app.get_webview_window("main") {
@@ -131,6 +157,49 @@ pub async fn launch(app: &AppHandle, id: &str, on_event: Channel<LaunchEvent>) -
         let _ = app.emit(GAME_EXIT_EVENT, GameExit { id, code });
     });
     Ok(())
+}
+
+/// Tees one output stream into `launcher.log` and the `game-log` event, line by line.
+fn pipe(app: &AppHandle, id: &str, src: impl Read + Send + 'static, log: Arc<File>, err: bool) -> JoinHandle<()> {
+    let (app, id) = (app.clone(), id.to_string());
+    std::thread::spawn(move || {
+        let mut reader = BufReader::new(src);
+        let mut buf = Vec::new();
+        while matches!(reader.read_until(b'\n', &mut buf), Ok(n) if n > 0) {
+            let _ = (&*log).write_all(&buf);
+            let line = String::from_utf8_lossy(&buf);
+            let line = line.trim_end_matches(['\r', '\n']);
+            let _ = app.emit(GAME_LOG_EVENT, GameLog { id: &id, line, err });
+            buf.clear();
+        }
+    })
+}
+
+/// Kills the running game of an instance.
+pub fn stop(state: &AppState, id: &str) -> Result<()> {
+    let mut games = state.games.lock().unwrap();
+    let child = games.get_mut(id).ok_or_else(|| AppError::NotFound("This instance is not running".into()))?;
+    Ok(child.kill()?)
+}
+
+/// Tail of the last session's `launcher.log`; empty if the instance never ran.
+pub fn read_log(state: &AppState, id: &str) -> Result<String> {
+    let mut file = match File::open(state.paths.instance_dir(id)?.join("launcher.log")) {
+        Ok(f) => f,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(String::new()),
+        Err(e) => return Err(e.into()),
+    };
+    let len = file.metadata()?.len();
+    let mut bytes = Vec::new();
+    if len > LOG_TAIL_BYTES {
+        use std::io::Seek;
+        file.seek(std::io::SeekFrom::Start(len - LOG_TAIL_BYTES))?;
+    }
+    file.read_to_end(&mut bytes)?;
+    let text = String::from_utf8_lossy(&bytes);
+    // A cut tail starts mid-line; drop the fragment.
+    let text = if len > LOG_TAIL_BYTES { text.split_once('\n').map_or("", |(_, t)| t) } else { &text };
+    Ok(text.to_string())
 }
 
 fn apply_after_launch(app: &AppHandle, action: AfterLaunch) {

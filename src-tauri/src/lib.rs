@@ -58,6 +58,8 @@ pub fn run() {
             commands::instances::delete_instance,
             commands::instances::open_instance_dir,
             commands::game::launch,
+            commands::game::stop_game,
+            commands::game::read_game_log,
             commands::mods::list_mods,
             commands::mods::toggle_mod,
             commands::mods::delete_mod,

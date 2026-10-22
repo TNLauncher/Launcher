@@ -1,6 +1,7 @@
 use crate::error::{AppError, Result};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
+use std::process::Child;
 use std::sync::Mutex;
 
 /// Shared backend state, registered with `app.manage` and injected into commands.
@@ -11,6 +12,8 @@ pub struct AppState {
     pub store_lock: Mutex<()>,
     /// Instance ids that are currently installing or running.
     pub running: Mutex<HashSet<String>>,
+    /// Live game processes by instance id; held so the UI can stop them.
+    pub games: Mutex<HashMap<String, Child>>,
 }
 
 impl AppState {
@@ -21,6 +24,7 @@ impl AppState {
             http: http_client()?,
             store_lock: Mutex::new(()),
             running: Mutex::new(HashSet::new()),
+            games: Mutex::new(HashMap::new()),
         })
     }
 
