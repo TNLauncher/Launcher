@@ -26,7 +26,9 @@ pub async fn ensure(c: &reqwest::Client, root: &Path, version: &Value, progress:
     let dir = root.join("runtime").join(component);
     // ponytail: Linux/Windows layout; macOS runtimes live under jre.bundle/Contents/Home.
     let java = dir.join("bin").join(if cfg!(windows) { "java.exe" } else { "java" });
-    if java.exists() {
+    // Written last, so a runtime interrupted mid-install is redone instead of reused.
+    let done = dir.join(".installed");
+    if done.exists() {
         return Ok(java);
     }
     progress(Stage::Java, 0, 0);
@@ -69,5 +71,6 @@ pub async fn ensure(c: &reqwest::Client, root: &Path, version: &Value, progress:
     #[cfg(not(unix))]
     let _ = (executables, links);
 
+    std::fs::write(done, "")?;
     Ok(java)
 }
