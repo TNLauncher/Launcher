@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+<defs>
+<linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#26272B"/><stop offset="1" stop-color="#121214"/></linearGradient>
+<radialGradient id="halo" cx=".5" cy=".42" r=".5"><stop offset="0" stop-color="#9FB0BC" stop-opacity=".16"/><stop offset="1" stop-color="#9FB0BC" stop-opacity="0"/></radialGradient>
+<linearGradient id="lit" gradientUnits="userSpaceOnUse" x1="0" y1="136" x2="0" y2="344"><stop offset="0" stop-color="#AEBDC7"/><stop offset="1" stop-color="#4A535B"/></linearGradient>
+<linearGradient id="shade" gradientUnits="userSpaceOnUse" x1="0" y1="136" x2="0" y2="344"><stop offset="0" stop-color="#6C7A85"/><stop offset="1" stop-color="#2E3439"/></linearGradient>
+<linearGradient id="far" gradientUnits="userSpaceOnUse" x1="0" y1="188" x2="0" y2="344"><stop offset="0" stop-color="#4E5961"/><stop offset="1" stop-color="#26292D"/></linearGradient>
+<linearGradient id="fog" gradientUnits="userSpaceOnUse" x1="0" y1="240" x2="0" y2="344"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient><mask id="m"><rect width="512" height="512" fill="url(#fog)"/></mask>
+<filter id="glow" x="-20%" y="-300%" width="140%" height="700%"><feGaussianBlur stdDeviation="7"/></filter>
+</defs>
+<rect width="512" height="512" rx="114" fill="url(#bg)"/>
+<rect width="512" height="512" rx="114" fill="url(#halo)"/>
+<g mask="url(#m)"><rect x="269" y="240" width="26" height="104" fill="url(#far)" opacity="1"/><rect x="295" y="214" width="26" height="130" fill="url(#far)" opacity="1"/><rect x="321" y="188" width="26" height="156" fill="url(#far)" opacity="1"/><rect x="347" y="214" width="26" height="130" fill="url(#far)" opacity="1"/><rect x="373" y="240" width="26" height="104" fill="url(#far)" opacity="1"/><rect x="399" y="292" width="26" height="52" fill="url(#far)" opacity="1"/><rect x="87" y="318" width="26" height="26" fill="url(#lit)" opacity="1"/><rect x="113" y="292" width="26" height="52" fill="url(#lit)" opacity="1"/><rect x="139" y="266" width="26" height="78" fill="url(#lit)" opacity="1"/><rect x="165" y="266" width="26" height="78" fill="url(#lit)" opacity="1"/><rect x="191" y="214" width="26" height="130" fill="url(#lit)" opacity="1"/><rect x="217" y="162" width="26" height="182" fill="url(#lit)" opacity="1"/><rect x="243" y="136" width="26" height="208" fill="url(#lit)" opacity="1"/><rect x="269" y="188" width="26" height="156" fill="url(#shade)" opacity="1"/><rect x="295" y="214" width="26" height="130" fill="url(#shade)" opacity="1"/><rect x="321" y="240" width="26" height="104" fill="url(#shade)" opacity="1"/><rect x="347" y="266" width="26" height="78" fill="url(#shade)" opacity="1"/><rect x="373" y="292" width="26" height="52" fill="url(#shade)" opacity="1"/><rect x="399" y="318" width="26" height="26" fill="url(#shade)" opacity="1"/><rect x="191" y="214" width="26" height="26" fill="#F5F5F7"/><rect x="217" y="162" width="26" height="52" fill="#F5F5F7"/><rect x="243" y="136" width="26" height="52" fill="#F5F5F7"/><rect x="269" y="188" width="26" height="26" fill="#C9D3DA"/></g>
+<rect x="184" y="378" width="144" height="10" rx="5" fill="#409CFF" opacity=".7" filter="url(#glow)"/>
+<rect x="184" y="378" width="144" height="10" rx="5" fill="#409CFF"/>
+<rect x="1" y="1" width="510" height="510" rx="113" fill="none" stroke="#fff" stroke-opacity=".08" stroke-width="2"/>
+</svg>

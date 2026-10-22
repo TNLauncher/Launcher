@@ -1,0 +1,104 @@
+/* Shared controls */
+.btn {
+  height: 32px; padding: 0 14px; border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  background: var(--btn); border: 1px solid rgb(255 255 255 / 0.06); box-shadow: var(--highlight);
+  font-size: 12px; font-weight: 500; white-space: nowrap;
+  transition: background 160ms var(--ease), transform 80ms var(--ease);
+}
+.btn:hover { background: var(--btn-hover); }
+.btn:active { transform: scale(0.98); }
+.btn .icon { font-size: 16px; }
+.btn.primary { background: var(--accent-fill); border-color: transparent; color: #fff; }
+.btn.primary:hover { background: var(--accent); }
+.btn.primary:active { background: var(--accent-press); }
+.btn.danger { color: var(--critical); }
+.btn.small { height: 28px; padding: 0 12px; }
+.btn:disabled { opacity: 0.6; pointer-events: none; }
+.icon-btn {
+  width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center;
+  background: rgb(255 255 255 / 0.08); border: 1px solid rgb(255 255 255 / 0.06); color: var(--icon);
+  transition: background 160ms var(--ease);
+}
+.icon-btn:hover { background: var(--btn-hover); color: var(--fg); }
+.icon-btn.danger:hover { background: rgb(255 69 58 / 0.18); color: var(--critical); }
+.icon-btn .icon { font-size: 16px; }
+.link { padding: 0; color: var(--link); font-size: 12px; font-weight: 500; }
+.link:hover { text-decoration: underline; text-underline-offset: 2px; }
+.link.end { align-self: flex-end; }
+
+.input, .select, textarea.input {
+  height: 32px; padding: 0 12px; border-radius: 8px;
+  background: var(--card); border: 1px solid var(--border); box-shadow: var(--highlight);
+  font-size: 12px; outline: none; transition: border-color 160ms var(--ease), background 160ms var(--ease);
+}
+.input:focus, .select:focus { border-color: var(--accent); background: rgb(255 255 255 / 0.08); }
+.input::placeholder { color: var(--subtle); }
+textarea.input { height: auto; padding: 10px 12px; resize: vertical; font-family: var(--mono); font-size: 11px; line-height: 1.6; }
+.select {
+  appearance: none; cursor: pointer; padding-right: 30px;
+  background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position: calc(100% - 15px) 14px, calc(100% - 11px) 14px;
+  background-size: 4px 4px; background-repeat: no-repeat;
+}
+.select option { background: var(--popover); }
+.search { position: relative; display: flex; align-items: center; }
+.search .icon { position: absolute; left: 10px; font-size: 17px; color: var(--subtle); pointer-events: none; }
+.search .input { padding-left: 34px; width: 100%; }
+
+.pill {
+  height: 28px; padding: 0 12px; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px;
+  background: var(--btn); color: var(--muted); font-size: 12px; white-space: nowrap;
+  transition: background 160ms var(--ease), color 160ms var(--ease);
+}
+.pill:hover { background: var(--btn-hover); color: var(--fg); }
+.pill[aria-pressed="true"] { background: var(--accent-fill); color: #fff; font-weight: 500; }
+.pill .mono { opacity: 0.75; }
+
+.chip {
+  display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 999px;
+  background: var(--btn); border: 1px solid rgb(255 255 255 / 0.06);
+  font-family: var(--mono); font-size: 11px; color: var(--muted); white-space: nowrap;
+}
+.chip .icon { font-size: 15px; }
+.chip.tag { border-radius: 4px; padding: 2px 6px; background: rgb(255 255 255 / 0.08); }
+.chip.warn { background: rgb(255 159 10 / 0.15); border-color: rgb(255 159 10 / 0.3); color: var(--warning); font-family: inherit; font-weight: 500; }
+.dot { width: 6px; height: 6px; border-radius: 50%; background: var(--subtle); flex-shrink: 0; }
+.dot.green { background: var(--green); }
+.dot.blue { background: var(--accent); }
+.dot.orange { background: var(--warning); }
+.dot.red { background: var(--critical); }
+
+.switch { position: relative; width: 36px; height: 20px; flex-shrink: 0; cursor: pointer; }
+.switch input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.switch span { position: absolute; inset: 0; border-radius: 999px; background: rgb(255 255 255 / 0.18); transition: background 160ms var(--ease); pointer-events: none; }
+.switch span::after {
+  content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 3px rgb(0 0 0 / 0.35); transition: transform 200ms var(--ease);
+}
+.switch input:checked + span { background: var(--accent-fill); }
+.switch input:checked + span::after { transform: translateX(16px); }
+.switch input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.banner {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 10px 12px; border-radius: 8px;
+  background: rgb(217 58 48 / 0.15); border: 1px solid rgb(255 69 58 / 0.3); color: var(--critical);
+}
+.banner .msg { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.banner .msg .icon { font-size: 18px; }
+.banner .msg span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; -webkit-user-select: text; user-select: text; cursor: auto; }
+.banner .actions { display: flex; gap: 16px; flex-shrink: 0; }
+.banner .actions button { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); }
+.banner .actions button:hover { color: var(--fg); }
+.banner .actions .icon { font-size: 15px; }
+
+.empty { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 48px 16px; text-align: center; color: var(--muted); }
+.empty .icon { font-size: 32px; color: var(--subtle); }
+.skeleton { background: linear-gradient(90deg, var(--card) 25%, rgb(255 255 255 / 0.1) 50%, var(--card) 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; border-radius: 12px; }
+@keyframes shimmer { to { background-position: -200% 0; } }
+
+.section-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
+.btn.primary.destructive { background: var(--critical-fill); }
+.btn.primary.destructive:hover { background: var(--critical); }
+.inline-input { height: 26px; padding: 0 8px; font-weight: 500; font-size: 13px; width: 220px; }

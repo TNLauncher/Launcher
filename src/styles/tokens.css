@@ -1,0 +1,33 @@
+/* Fabric Graphite tokens (~/.config/fabric/DESIGN.md) */
+:root {
+  --lowest: #121214;
+  --view: #161618;
+  --window: #1C1C1E;
+  --sidebar: #202023;
+  --header: #232326;
+  --popover: #2C2C2E;
+  --fg: #F5F5F7;
+  --muted: rgb(245 245 247 / 0.64);
+  --subtle: rgb(245 245 247 / 0.52); /* 0.45 in DESIGN.md fails AA on #161618 */
+  --icon: rgb(245 245 247 / 0.85);
+  --panel: rgb(99 99 102 / 0.16);
+  --card: rgb(255 255 255 / 0.06);
+  --card-hover: rgb(255 255 255 / 0.10);
+  --card-border: rgb(255 255 255 / 0.08);
+  --border: rgb(255 255 255 / 0.10);
+  --btn: rgb(255 255 255 / 0.10);
+  --btn-hover: rgb(255 255 255 / 0.16);
+  --highlight: inset 0 1px 0 rgb(255 255 255 / 0.07);
+  --lift: 0 16px 36px rgb(0 0 0 / 0.45);
+  --accent: #0A84FF;
+  --accent-fill: #0071E3;
+  --accent-press: #005BB5;
+  --link: #409CFF;
+  --green: #30D158;
+  --warning: #FF9F0A;
+  --critical: #FF453A;
+  --critical-fill: #D93A30;
+  --ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --mono: "JetBrains Mono", "JetBrainsMono Nerd Font", monospace;
+  color-scheme: dark;
+}

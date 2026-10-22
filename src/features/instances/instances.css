@@ -1,0 +1,31 @@
+/* Instances */
+.page { padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; background: var(--view); min-height: 100%; }
+.toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; border-radius: 8px; background: var(--window); border: 1px solid var(--card-border); }
+.toolbar-left { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1; }
+.toolbar .search { width: 256px; flex-shrink: 0; }
+.vsep { width: 1px; height: 16px; background: var(--border); flex-shrink: 0; }
+.pills { display: flex; gap: 6px; overflow-x: auto; }
+.toolbar-right { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+.rows { display: flex; flex-direction: column; gap: 8px; }
+.row {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px; border-radius: 12px;
+  background: var(--card); border: 1px solid var(--card-border); box-shadow: var(--highlight);
+  transition: background 160ms var(--ease);
+}
+.row:hover { background: var(--card-hover); }
+.row-main { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.row-icon { position: relative; width: 48px; height: 48px; border-radius: 8px; background: rgb(255 255 255 / 0.04); border: 1px solid var(--card-border); display: grid; place-items: center; color: var(--muted); flex-shrink: 0; }
+.row-icon .icon { font-size: 24px; }
+.row-icon .dot { position: absolute; right: 4px; bottom: 4px; width: 8px; height: 8px; }
+.row-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.row-title { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.row-title strong { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.row-actions .group { display: flex; gap: 4px; }
+.page-foot { display: flex; justify-content: space-between; gap: 16px; padding: 0 4px; font-size: 11px; color: var(--subtle); }
+.page-foot b { color: var(--fg); font-weight: 600; }
+
+
+@media (max-width: 1100px) {
+  .toolbar .search { width: 180px; }
+}
