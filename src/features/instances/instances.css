@@ -28,3 +28,5 @@
 @media (max-width: 1100px) {
   .toolbar .search { width: 180px; }
 }
+.modpack-dialog { width: 560px; }
+.modpack-list { display: flex; flex-direction: column; gap: 8px; max-height: 420px; overflow-y: auto; }

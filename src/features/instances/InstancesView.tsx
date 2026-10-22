@@ -7,6 +7,7 @@ import { useLauncher } from "@/store/LauncherContext";
 import { useUi } from "@/store/UiContext";
 import type { Instance, Loader } from "@/types";
 import { InstanceRow } from "./InstanceRow";
+import { ModpackDialog } from "./ModpackDialog";
 import "./instances.css";
 import { Select } from "@/components/ui/Select";
 
@@ -24,6 +25,7 @@ export function InstancesView() {
   const [query, setQuery] = useState("");
   const [loader, setLoader] = useState<"all" | Loader>("all");
   const [sort, setSort] = useState<Sort>("played");
+  const [importing, setImporting] = useState(false);
   const all = snapshot?.instances ?? [];
 
   const counts = useMemo(() => {
@@ -64,6 +66,10 @@ export function InstancesView() {
                 { value: "name", label: "Name" },
                 { value: "time", label: "Play time" },
               ]} />
+            <button className="btn" onClick={() => setImporting(true)}>
+              <Icon name="travel_explore" />
+              Modrinth modpack
+            </button>
             <button className="btn" onClick={openNewInstance}>
               <Icon name="add" />
               Create instance
@@ -91,6 +97,7 @@ export function InstancesView() {
           <span className="mono selectable">{snapshot?.dataDir}</span>
         </div>
       </div>
+      {importing && <ModpackDialog onClose={() => setImporting(false)} />}
     </section>
   );
 }

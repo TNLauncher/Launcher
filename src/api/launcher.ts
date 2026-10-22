@@ -18,6 +18,8 @@ export const launcher = {
 
   createInstance: (name: string, version: string, loader: Loader) =>
     call<Instance>("create_instance", { name, version, loader }),
+  /** Downloads a Modrinth `.mrpack` and creates an instance from it. */
+  importModpack: (url: string) => call<Instance>("import_modpack", { url }),
   renameInstance: (id: string, name: string) => call<void>("rename_instance", { id, name }),
   deleteInstance: (id: string) => call<void>("delete_instance", { id }),
   openInstanceDir: (id: string, mods = false) => call<void>("open_instance_dir", { id, mods }),
