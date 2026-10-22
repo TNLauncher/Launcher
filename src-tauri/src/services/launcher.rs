@@ -2,8 +2,8 @@
 use super::discord::{Discord, Presence};
 use super::{instances, now};
 use crate::error::{AppError, Result};
-use crate::minecraft::{command, install, java, version, Stage};
-use crate::models::AfterLaunch;
+use crate::minecraft::{command, install, java, loader, version, Stage};
+use crate::models::{AfterLaunch, Loader};
 use crate::state::AppState;
 use crate::storage;
 use serde::Serialize;
@@ -58,7 +58,13 @@ pub async fn launch(app: &AppHandle, id: &str, on_event: Channel<LaunchEvent>) -
     let guard = RunningGuard::acquire(app, id)?;
     let state = app.state::<AppState>();
     let settings = storage::load_settings(&state);
-    let inst = instances::get(&state, id)?;
+    let mut inst = instances::get(&state, id)?;
+    // Instances saved without a loader version would hit `/loader/{game}//profile/json`.
+    if inst.loader != Loader::Vanilla && inst.loader_version.is_empty() {
+        let v = loader::latest(&state.http, &inst.version, inst.loader).await?;
+        instances::update(&state, id, |i| i.loader_version = v.clone())?;
+        inst.loader_version = v;
+    }
     app.state::<Discord>().set(Presence::Launching { name: inst.name.clone() });
     let root = &state.paths.root;
     let game_dir = state.paths.instance_dir(id)?;
