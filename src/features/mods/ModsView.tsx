@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Icon } from "@/components/ui/Icon";
 import { useLauncher, useRecentInstances } from "@/store/LauncherContext";
@@ -11,10 +11,12 @@ import "./mods.css";
 export function ModsView() {
   const { selected } = useLauncher();
   const { openNewInstance } = useUi();
-  const modded = useRecentInstances().filter((i) => i.loader !== "vanilla");
+  const recent = useRecentInstances();
+  const modded = useMemo(() => recent.filter((i) => i.loader !== "vanilla"), [recent]);
   const [pickedId, setPickedId] = useState<string>();
   // Bumped after installs so the installed list reloads.
   const [revision, setRevision] = useState(0);
+  const onInstalled = useCallback(() => setRevision((r) => r + 1), []);
 
   const instance = useMemo(
     () => modded.find((i) => i.id === pickedId) ?? modded.find((i) => i.id === selected?.id) ?? modded[0],
@@ -46,7 +48,7 @@ export function ModsView() {
             </select>
           }
         />
-        <ModBrowser key={instance.id} instance={instance} onInstalled={() => setRevision((r) => r + 1)} />
+        <ModBrowser key={instance.id} instance={instance} onInstalled={onInstalled} />
       </div>
     </section>
   );

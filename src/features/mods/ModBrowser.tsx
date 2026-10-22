@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { memo, useCallback, useEffect, useState } from "react";
 import { installWithDependencies, searchMods, type ModHit } from "@/api/modrinth";
 import { Banner } from "@/components/ui/Banner";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -41,16 +41,20 @@ export function ModBrowser({ instance, onInstalled }: { instance: Instance; onIn
     };
   }, [version, loader, debounced, category]);
 
-  async function install(projectId: string) {
-    setInstalls((s) => ({ ...s, [projectId]: { status: "installing" } }));
-    try {
-      await installWithDependencies(projectId, instance);
-      setInstalls((s) => ({ ...s, [projectId]: { status: "installed" } }));
-      onInstalled();
-    } catch (e) {
-      setInstalls((s) => ({ ...s, [projectId]: { status: "failed", error: errorMessage(e) } }));
-    }
-  }
+  // Stable so memoized cards skip re-rendering while the user types in the search box.
+  const install = useCallback(
+    async (projectId: string) => {
+      setInstalls((s) => ({ ...s, [projectId]: { status: "installing" } }));
+      try {
+        await installWithDependencies(projectId, instance);
+        setInstalls((s) => ({ ...s, [projectId]: { status: "installed" } }));
+        onInstalled();
+      } catch (e) {
+        setInstalls((s) => ({ ...s, [projectId]: { status: "failed", error: errorMessage(e) } }));
+      }
+    },
+    [instance, onInstalled]
+  );
 
   return (
     <div className="pane">
@@ -78,14 +82,24 @@ export function ModBrowser({ instance, onInstalled }: { instance: Instance; onIn
             No mods found for {instance.version} · {LOADERS[instance.loader]}.
           </EmptyState>
         ) : (
-          hits.map((h) => <ModCard key={h.project_id} hit={h} instance={instance} state={installs[h.project_id]} onInstall={install} />)
+          hits.map((h) => <ModCard key={h.project_id} hit={h} loader={loader} state={installs[h.project_id]} onInstall={install} />)
         )}
       </div>
     </div>
   );
 }
 
-function ModCard({ hit, instance, state, onInstall }: { hit: ModHit; instance: Instance; state?: InstallState; onInstall(id: string): void }) {
+const ModCard = memo(function ModCard({
+  hit,
+  loader,
+  state,
+  onInstall,
+}: {
+  hit: ModHit;
+  loader: Loader;
+  state?: InstallState;
+  onInstall(id: string): void;
+}) {
   const loaders = hit.categories.filter((c): c is Loader => c in LOADERS).map((c) => LOADERS[c]);
   return (
     <div className="card">
@@ -118,8 +132,8 @@ function ModCard({ hit, instance, state, onInstall }: { hit: ModHit; instance: I
       </div>
       <div className="card-foot mono">
         <span><Icon name="download" />{compact(hit.downloads)}</span>
-        <span className="chip">{loaders.join(", ") || LOADERS[instance.loader]}</span>
+        <span className="chip">{loaders.join(", ") || LOADERS[loader]}</span>
       </div>
     </div>
   );
-}
+});
