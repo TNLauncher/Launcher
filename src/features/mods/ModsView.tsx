@@ -6,6 +6,7 @@ import { useUi } from "@/store/UiContext";
 import { InstalledMods } from "./InstalledMods";
 import { ModBrowser } from "./ModBrowser";
 import "./mods.css";
+import { Select } from "@/components/ui/Select";
 
 /** Two panes for one modded instance: installed jars and Modrinth search. */
 export function ModsView() {
@@ -43,9 +44,8 @@ export function ModsView() {
           key={`${instance.id}:${revision}`}
           instance={instance}
           picker={
-            <select className="select" aria-label="Instance" value={instance.id} onChange={(e) => setPickedId(e.target.value)}>
-              {modded.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
-            </select>
+            <Select label="Instance" value={instance.id} onChange={setPickedId}
+              options={modded.map((i) => ({ value: i.id, label: i.name }))} />
           }
         />
         <ModBrowser key={instance.id} instance={instance} onInstalled={onInstalled} />

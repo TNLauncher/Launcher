@@ -1,6 +1,7 @@
 import { Icon } from "@/components/ui/Icon";
 import { STAGE_LABEL } from "@/lib/format";
 import { useLauncher, useProgress, useRecentInstances } from "@/store/LauncherContext";
+import { Select } from "@/components/ui/Select";
 
 export function LaunchDock() {
   const { selected: inst, select, launch, busyId, error, isRunning, snapshot } = useLauncher();
@@ -23,9 +24,8 @@ export function LaunchDock() {
   return (
     <footer className="dock">
       <div className="dock-left">
-        <select className="select" aria-label="Instance" value={inst?.id ?? ""} disabled={!inst} onChange={(e) => select(e.target.value)}>
-          {instances.length ? instances.map((i) => <option key={i.id} value={i.id}>{i.name}</option>) : <option>No instances</option>}
-        </select>
+        <Select label="Instance" value={inst?.id ?? ""} onChange={select} placeholder="No instances"
+          options={instances.map((i) => ({ value: i.id, label: i.name }))} />
         <span className="chip"><Icon name="memory" />{ramGb} GB</span>
       </div>
 

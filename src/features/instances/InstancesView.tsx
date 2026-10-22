@@ -8,6 +8,7 @@ import { useUi } from "@/store/UiContext";
 import type { Instance, Loader } from "@/types";
 import { InstanceRow } from "./InstanceRow";
 import "./instances.css";
+import { Select } from "@/components/ui/Select";
 
 type Sort = "played" | "name" | "time";
 const SORTERS: Record<Sort, (a: Instance, b: Instance) => number> = {
@@ -57,11 +58,12 @@ export function InstancesView() {
             </div>
           </div>
           <div className="toolbar-right">
-            <select className="select" aria-label="Sort" value={sort} onChange={(e) => setSort(e.target.value as Sort)}>
-              <option value="played">Last played</option>
-              <option value="name">Name</option>
-              <option value="time">Play time</option>
-            </select>
+            <Select label="Sort" value={sort} onChange={setSort}
+              options={[
+                { value: "played", label: "Last played" },
+                { value: "name", label: "Name" },
+                { value: "time", label: "Play time" },
+              ]} />
             <button className="btn" onClick={openNewInstance}>
               <Icon name="add" />
               Create instance

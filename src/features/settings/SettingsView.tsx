@@ -5,8 +5,9 @@ import { Switch } from "@/components/ui/Switch";
 import { errorMessage } from "@/lib/format";
 import { useLauncher } from "@/store/LauncherContext";
 import { launcher } from "@/api/launcher";
-import type { AfterLaunch, DeviceCode, Settings } from "@/types";
+import type { DeviceCode, Settings } from "@/types";
 import "./settings.css";
+import { Select } from "@/components/ui/Select";
 
 // Keep in sync with Settings::default() in src-tauri/src/models/settings.rs.
 const DEFAULT_JVM_ARGS =
@@ -130,12 +131,12 @@ export function SettingsView() {
         <Group icon="tune" title="Launcher">
           <Row label="After launch" hint="What the launcher does once the game starts.">
             <div className="setting-control end">
-              <select className="select" aria-label="After launch"
-                value={form.afterLaunch} onChange={(e) => update({ afterLaunch: e.target.value as AfterLaunch })}>
-                <option value="hide">Hide while playing</option>
-                <option value="keep">Keep open</option>
-                <option value="close">Close launcher</option>
-              </select>
+              <Select label="After launch" value={form.afterLaunch} onChange={(afterLaunch) => update({ afterLaunch })}
+                options={[
+                  { value: "hide", label: "Hide while playing" },
+                  { value: "keep", label: "Keep open" },
+                  { value: "close", label: "Close launcher" },
+                ]} />
             </div>
           </Row>
         </Group>

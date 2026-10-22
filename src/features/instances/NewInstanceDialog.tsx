@@ -6,6 +6,7 @@ import { errorMessage, LOADERS } from "@/lib/format";
 import { useLauncher } from "@/store/LauncherContext";
 import { useUi } from "@/store/UiContext";
 import type { Loader } from "@/types";
+import { Select } from "@/components/ui/Select";
 
 /** Mounted only while open, so every opening starts from fresh state. */
 export function NewInstanceDialog() {
@@ -56,15 +57,9 @@ export function NewInstanceDialog() {
         <div className="field">
           <span>Minecraft version</span>
           <div className="row-inline">
-            <select className="select" style={{ flex: 1 }} value={chosen} disabled={!versions} onChange={(e) => setVersion(e.target.value)} aria-label="Minecraft version">
-              {!versions && <option>Loading versions…</option>}
-              {shown.map((v) => (
-                <option key={v.id} value={v.id}>
-                  {v.id}
-                  {v.type === "snapshot" ? " (snapshot)" : ""}
-                </option>
-              ))}
-            </select>
+            <Select label="Minecraft version" style={{ flex: 1 }} value={chosen} onChange={setVersion}
+              placeholder={versions ? "No versions" : "Loading versions…"}
+              options={shown.map((v) => ({ value: v.id, label: v.id, hint: v.type === "snapshot" ? "snapshot" : undefined }))} />
             <label className="check">
               <input type="checkbox" checked={snapshots} onChange={(e) => setSnapshots(e.target.checked)} />
               Snapshots

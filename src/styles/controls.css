@@ -36,12 +36,38 @@
 .input::placeholder { color: var(--subtle); }
 textarea.input { height: auto; padding: 10px 12px; resize: vertical; font-family: var(--mono); font-size: 11px; line-height: 1.6; }
 .select {
-  appearance: none; cursor: pointer; padding-right: 30px;
-  background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
-  background-position: calc(100% - 15px) 14px, calc(100% - 11px) 14px;
-  background-size: 4px 4px; background-repeat: no-repeat;
+  display: inline-flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 0 8px 0 12px; min-width: 0; text-align: left; font-weight: 500;
 }
-.select option { background: var(--popover); }
+.select:hover:not(:disabled) { background-color: var(--card-hover); }
+.select[aria-expanded="true"] { border-color: var(--accent); }
+.select:disabled { opacity: 0.55; cursor: default; }
+.select .icon { font-size: 16px; color: var(--muted); flex-shrink: 0; transition: color 160ms var(--ease); }
+.select:hover .icon, .select[aria-expanded="true"] .icon { color: var(--fg); }
+.select-value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.select-list {
+  position: fixed; z-index: 100; margin: 0; padding: 4px; list-style: none;
+  max-width: 360px; overflow-y: auto; overscroll-behavior: contain;
+  border-radius: 10px; background: var(--popover); border: 1px solid var(--border);
+  box-shadow: var(--lift), var(--highlight); font-size: 12px;
+  transform-origin: top center; animation: select-in 140ms var(--ease);
+}
+.select-list.up { transform-origin: bottom center; }
+.select-list li {
+  display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 12px 0 6px;
+  border-radius: 6px; white-space: nowrap; cursor: pointer;
+}
+.select-list li[data-active] { background: var(--accent-fill); color: #fff; }
+.select-check { font-size: 15px; visibility: hidden; }
+.select-list li[aria-selected="true"] .select-check { visibility: visible; }
+.select-list li[aria-selected="true"]:not([data-active]) .select-check { color: var(--accent); }
+.select-hint { margin-left: auto; padding-left: 16px; color: var(--subtle); font-size: 11px; }
+.select-list li[data-active] .select-hint { color: rgb(255 255 255 / 0.72); }
+@keyframes select-in { from { opacity: 0; transform: scale(0.96) translateY(-2px); } }
+.select-list.up { animation-name: select-in-up; }
+@keyframes select-in-up { from { opacity: 0; transform: scale(0.96) translateY(2px); } }
+@media (prefers-reduced-motion: reduce) { .select-list { animation: none; } }
 .search { position: relative; display: flex; align-items: center; }
 .search .icon { position: absolute; left: 10px; font-size: 17px; color: var(--subtle); pointer-events: none; }
 .search .input { padding-left: 34px; width: 100%; }
