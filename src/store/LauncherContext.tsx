@@ -1,10 +1,9 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { launcher } from "@/api/launcher";
 import { errorMessage } from "@/lib/format";
 import type { Instance, Settings, Snapshot, Stage } from "@/types";
 
-export interface Busy {
-  id: string;
+export interface Progress {
   stage: Stage;
   done: number;
   total: number;
@@ -22,8 +21,8 @@ interface LauncherValue {
   select(id: string): void;
   refresh(): Promise<void>;
   launch(id: string): Promise<void>;
-  /** Set while an instance is installing/starting. */
-  busy: Busy | null;
+  /** Id of the instance installing/starting; its progress is in `useProgress()`. */
+  busyId: string | null;
   error: LaunchError | null;
   clearError(): void;
   saveSettings(settings: Settings): Promise<void>;
@@ -31,6 +30,9 @@ interface LauncherValue {
 }
 
 const LauncherContext = createContext<LauncherValue | null>(null);
+// Separate so per-file download ticks re-render only progress consumers, not the whole app.
+const ProgressContext = createContext<Progress | null>(null);
+const STARTING: Progress = { stage: "resolving", done: 0, total: 0 };
 const SELECTED_KEY = "selected";
 
 function readSelected(): string {
@@ -44,7 +46,9 @@ function readSelected(): string {
 export function LauncherProvider({ children }: { children: ReactNode }) {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [selectedId, setSelectedId] = useState(readSelected);
-  const [busy, setBusy] = useState<Busy | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [progress, setProgress] = useState<Progress | null>(null);
+  const frame = useRef(0);
   const [error, setError] = useState<LaunchError | null>(null);
 
   const refresh = useCallback(async () => setSnapshot(await launcher.getState()), []);
@@ -62,15 +66,26 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
     async (id: string) => {
       setError(null);
       select(id);
-      setBusy({ id, stage: "resolving", done: 0, total: 0 });
+      setBusyId(id);
+      setProgress(STARTING);
+      // Backend reports every downloaded file (thousands for assets): commit at most once per frame.
+      let latest = STARTING;
       try {
         await launcher.launch(id, (e) => {
-          if (e.event === "progress") setBusy({ id, ...e.data });
+          if (e.event !== "progress") return;
+          latest = e.data;
+          frame.current ||= requestAnimationFrame(() => {
+            frame.current = 0;
+            setProgress(latest);
+          });
         });
       } catch (e) {
         setError({ id, message: errorMessage(e) });
       } finally {
-        setBusy(null);
+        cancelAnimationFrame(frame.current);
+        frame.current = 0;
+        setBusyId(null);
+        setProgress(null);
         await refresh();
       }
     },
@@ -81,6 +96,8 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
     setSnapshot((s) => (s ? { ...s, settings } : s));
     await launcher.saveSettings(settings);
   }, []);
+
+  const clearError = useCallback(() => setError(null), []);
 
   useEffect(() => {
     refresh();
@@ -101,15 +118,19 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
       select,
       refresh,
       launch,
-      busy,
+      busyId,
       error,
-      clearError: () => setError(null),
+      clearError,
       saveSettings,
       isRunning: (id) => snapshot?.running.includes(id) ?? false,
     };
-  }, [snapshot, selectedId, select, refresh, launch, busy, error, saveSettings]);
+  }, [snapshot, selectedId, select, refresh, launch, busyId, error, clearError, saveSettings]);
 
-  return <LauncherContext.Provider value={value}>{children}</LauncherContext.Provider>;
+  return (
+    <LauncherContext.Provider value={value}>
+      <ProgressContext.Provider value={progress}>{children}</ProgressContext.Provider>
+    </LauncherContext.Provider>
+  );
 }
 
 export function useLauncher(): LauncherValue {
@@ -117,6 +138,9 @@ export function useLauncher(): LauncherValue {
   if (!ctx) throw new Error("useLauncher must be used inside <LauncherProvider>");
   return ctx;
 }
+
+/** Progress of the running install/launch, null when idle. */
+export const useProgress = () => useContext(ProgressContext);
 
 /** Instances sorted by most recently played. */
 export function useRecentInstances(): Instance[] {

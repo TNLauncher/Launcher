@@ -7,12 +7,12 @@ import { useLauncher } from "@/store/LauncherContext";
 import type { Instance } from "@/types";
 
 export function InstanceRow({ instance: i }: { instance: Instance }) {
-  const { launch, busy, isRunning, refresh, snapshot } = useLauncher();
+  const { launch, busyId, isRunning, refresh, snapshot } = useLauncher();
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [rowError, setRowError] = useState("");
   const running = isRunning(i.id);
-  const starting = busy?.id === i.id;
+  const starting = busyId === i.id;
 
   const run = (action: () => Promise<unknown>) =>
     action()
@@ -78,7 +78,7 @@ export function InstanceRow({ instance: i }: { instance: Instance }) {
       </div>
 
       <div className="row-actions">
-        <button className="btn" disabled={running || !!busy} onClick={() => launch(i.id)}>
+        <button className="btn" disabled={running || !!busyId} onClick={() => launch(i.id)}>
           <Icon name={starting ? "progress_activity" : "play_arrow"} fill spin={starting} />
           {running ? "Running" : starting ? "Starting" : "Launch"}
         </button>
