@@ -46,6 +46,7 @@ textarea.input { height: auto; padding: 10px 12px; resize: vertical; font-family
 .search .icon { position: absolute; left: 10px; font-size: 17px; color: var(--subtle); pointer-events: none; }
 .search .input { padding-left: 34px; width: 100%; }
 
+.pills { display: flex; gap: 6px; overflow-x: auto; }
 .pill {
   height: 28px; padding: 0 12px; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px;
   background: var(--btn); color: var(--muted); font-size: 12px; white-space: nowrap;

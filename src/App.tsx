@@ -1,32 +1,37 @@
+import { lazy, Suspense, type ComponentType } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Titlebar } from "@/components/layout/Titlebar";
 import { HomeView } from "@/features/home/HomeView";
-import { InstancesView } from "@/features/instances/InstancesView";
-import { NewInstanceDialog } from "@/features/instances/NewInstanceDialog";
-import { ModsView } from "@/features/mods/ModsView";
-import { SettingsView } from "@/features/settings/SettingsView";
 import { LauncherProvider } from "@/store/LauncherContext";
 import { UiProvider, useUi, type View } from "@/store/UiContext";
 import "@/components/layout/layout.css";
 
-const VIEWS: Record<View, () => React.JSX.Element> = {
+// Home is the first screen and stays in the main chunk; the rest load on first visit.
+const VIEWS: Record<View, ComponentType> = {
   home: HomeView,
-  instances: InstancesView,
-  mods: ModsView,
-  settings: SettingsView,
+  instances: lazy(() => import("@/features/instances/InstancesView").then((m) => ({ default: m.InstancesView }))),
+  mods: lazy(() => import("@/features/mods/ModsView").then((m) => ({ default: m.ModsView }))),
+  settings: lazy(() => import("@/features/settings/SettingsView").then((m) => ({ default: m.SettingsView }))),
 };
+const NewInstanceDialog = lazy(() => import("@/features/instances/NewInstanceDialog").then((m) => ({ default: m.NewInstanceDialog })));
 
 function Shell() {
-  const { view } = useUi();
+  const { view, newInstanceOpen } = useUi();
   const Current = VIEWS[view];
   return (
     <>
       <Sidebar />
       <Titlebar />
       <main>
-        <Current />
+        <Suspense>
+          <Current />
+        </Suspense>
       </main>
-      <NewInstanceDialog />
+      {newInstanceOpen && (
+        <Suspense>
+          <NewInstanceDialog />
+        </Suspense>
+      )}
     </>
   );
 }

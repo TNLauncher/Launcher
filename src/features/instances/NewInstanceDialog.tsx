@@ -7,8 +7,9 @@ import { useLauncher } from "@/store/LauncherContext";
 import { useUi } from "@/store/UiContext";
 import type { Loader } from "@/types";
 
+/** Mounted only while open, so every opening starts from fresh state. */
 export function NewInstanceDialog() {
-  const { newInstanceOpen, closeNewInstance } = useUi();
+  const { closeNewInstance } = useUi();
   const { refresh, select } = useLauncher();
   const ref = useRef<HTMLDialogElement>(null);
   const [versions, setVersions] = useState<ManifestVersion[] | null>(null);
@@ -20,17 +21,9 @@ export function NewInstanceDialog() {
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
-    const d = ref.current;
-    if (!d) return;
-    if (newInstanceOpen && !d.open) {
-      setName("");
-      setLoader("vanilla");
-      setError("");
-      d.showModal();
-      getVersions().then(setVersions, (e) => setError(`Could not load versions: ${errorMessage(e)}`));
-    }
-    if (!newInstanceOpen && d.open) d.close();
-  }, [newInstanceOpen]);
+    ref.current?.showModal();
+    getVersions().then(setVersions, (e) => setError(`Could not load versions: ${errorMessage(e)}`));
+  }, []);
 
   const shown = (versions ?? []).filter((v) => v.type === "release" || (snapshots && v.type === "snapshot"));
   const chosen = shown.some((v) => v.id === version) ? version : (shown[0]?.id ?? "");

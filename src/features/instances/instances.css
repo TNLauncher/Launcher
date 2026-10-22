@@ -4,7 +4,6 @@
 .toolbar-left { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1; }
 .toolbar .search { width: 256px; flex-shrink: 0; }
 .vsep { width: 1px; height: 16px; background: var(--border); flex-shrink: 0; }
-.pills { display: flex; gap: 6px; overflow-x: auto; }
 .toolbar-right { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
 .rows { display: flex; flex-direction: column; gap: 8px; }
 .row {
