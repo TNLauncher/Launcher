@@ -11,6 +11,7 @@ const VIEWS: Record<View, ComponentType> = {
   home: HomeView,
   instances: lazy(() => import("@/features/instances/InstancesView").then((m) => ({ default: m.InstancesView }))),
   mods: lazy(() => import("@/features/mods/ModsView").then((m) => ({ default: m.ModsView }))),
+  console: lazy(() => import("@/features/console/ConsoleView").then((m) => ({ default: m.ConsoleView }))),
   settings: lazy(() => import("@/features/settings/SettingsView").then((m) => ({ default: m.SettingsView }))),
 };
 const NewInstanceDialog = lazy(() => import("@/features/instances/NewInstanceDialog").then((m) => ({ default: m.NewInstanceDialog })));

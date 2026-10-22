@@ -2,7 +2,7 @@
 import { Channel, convertFileSrc } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { call } from "./ipc";
-import type { DeviceCode, GameExit, Instance, LaunchEvent, Loader, ModFile, Settings, Snapshot } from "@/types";
+import type { DeviceCode, GameExit, GameLog, Instance, LaunchEvent, Loader, ModFile, Settings, Snapshot } from "@/types";
 
 export const launcher = {
   getState: () => call<Snapshot>("get_state"),
@@ -33,6 +33,11 @@ export const launcher = {
     return call<void>("launch", { id, onEvent: channel });
   },
   onGameExit: (cb: (e: GameExit) => void): Promise<UnlistenFn> => listen<GameExit>("game-exit", (e) => cb(e.payload)),
+  /** Every line the game prints, from any running instance. */
+  onGameLog: (cb: (e: GameLog) => void): Promise<UnlistenFn> => listen<GameLog>("game-log", (e) => cb(e.payload)),
+  stopGame: (id: string) => call<void>("stop_game", { id }),
+  /** The last session's `launcher.log` (its tail if huge); "" if never launched. */
+  readGameLog: (id: string) => call<string>("read_game_log", { id }),
 
   listMods: (id: string) => call<ModFile[]>("list_mods", { id }),
   toggleMod: (id: string, file: string) => call<void>("toggle_mod", { id, file }),

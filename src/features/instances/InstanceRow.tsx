@@ -4,6 +4,7 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Icon } from "@/components/ui/Icon";
 import { errorMessage, lastPlayed, LOADER_ICON, loaderLabel, playTime, plural } from "@/lib/format";
 import { useLauncher } from "@/store/LauncherContext";
+import { useUi } from "@/store/UiContext";
 import type { Instance } from "@/types";
 
 const ICON_PX = 128;
@@ -22,7 +23,8 @@ async function toIcon(file: File): Promise<string> {
 }
 
 export function InstanceRow({ instance: i }: { instance: Instance }) {
-  const { launch, busyId, isRunning, refresh, snapshot } = useLauncher();
+  const { launch, busyId, isRunning, refresh, snapshot, select } = useLauncher();
+  const { navigate } = useUi();
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [rowError, setRowError] = useState("");
@@ -108,6 +110,9 @@ export function InstanceRow({ instance: i }: { instance: Instance }) {
           {running ? "Running" : starting ? "Starting" : "Launch"}
         </button>
         <div className="group">
+          <button className="icon-btn" title="Console" onClick={() => (select(i.id), navigate("console"))}>
+            <Icon name="terminal" />
+          </button>
           <button className="icon-btn" title="Open folder" onClick={() => run(() => launcher.openInstanceDir(i.id))}>
             <Icon name="folder_open" />
           </button>

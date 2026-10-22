@@ -121,7 +121,7 @@ textarea.input { height: auto; padding: 10px 12px; resize: vertical; font-family
 .banner .actions .icon { font-size: 15px; }
 
 .empty { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 48px 16px; text-align: center; color: var(--muted); }
-.empty .icon { font-size: 32px; color: var(--subtle); }
+.empty > .icon { font-size: 32px; color: var(--subtle); }
 .skeleton { background: linear-gradient(90deg, var(--card) 25%, rgb(255 255 255 / 0.1) 50%, var(--card) 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; border-radius: 12px; }
 @keyframes shimmer { to { background-position: -200% 0; } }
 

@@ -2,7 +2,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Icon } from "@/components/ui/Icon";
 import { useUi, type View } from "@/store/UiContext";
 
-const TITLES: Record<View, string> = { home: "Home", instances: "Instances", mods: "Mods", settings: "Settings" };
+const TITLES: Record<View, string> = { home: "Home", instances: "Instances", mods: "Mods", console: "Console", settings: "Settings" };
 
 // Window has `decorations: false`; drag and buttons are ours (needs core:window:* permissions).
 const appWindow = getCurrentWindow();

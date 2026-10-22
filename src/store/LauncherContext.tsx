@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { launcher } from "@/api/launcher";
+import { gameLogs } from "./gameLogs";
 import { errorMessage } from "@/lib/format";
 import type { Instance, Settings, Snapshot, Stage } from "@/types";
 
@@ -68,6 +69,7 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
       select(id);
       setBusyId(id);
       setProgress(STARTING);
+      gameLogs.reset(id);
       // Backend reports every downloaded file (thousands for assets): commit at most once per frame.
       let latest = STARTING;
       try {
@@ -101,11 +103,14 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     refresh();
-    const unlisten = launcher.onGameExit(({ id, code }) => {
-      if (code) setError({ id, message: `Game exited with code ${code}. See launcher.log in the instance folder.` });
-      refresh();
-    });
-    return () => void unlisten.then((f) => f());
+    const unlisten = [
+      gameLogs.listen(),
+      launcher.onGameExit(({ id, code }) => {
+        if (!gameLogs.exited(id, code) && code) setError({ id, message: `Game crashed with exit code ${code}. Its log is in Console.` });
+        refresh();
+      }),
+    ];
+    return () => unlisten.forEach((u) => void u.then((f) => f()));
   }, [refresh]);
 
   const value = useMemo<LauncherValue>(() => {

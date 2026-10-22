@@ -58,3 +58,10 @@ export interface GameExit {
   id: string;
   code: number | null;
 }
+
+export interface GameLog {
+  id: string;
+  line: string;
+  /** Came from stderr. */
+  err: boolean;
+}

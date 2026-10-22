@@ -2,10 +2,12 @@ import { Icon } from "@/components/ui/Icon";
 import { STAGE_LABEL } from "@/lib/format";
 import { useLauncher, useProgress, useRecentInstances } from "@/store/LauncherContext";
 import { Select } from "@/components/ui/Select";
+import { useUi } from "@/store/UiContext";
 
 export function LaunchDock() {
   const { selected: inst, select, launch, busyId, error, isRunning, snapshot } = useLauncher();
   const progress = useProgress();
+  const { navigate } = useUi();
   const instances = useRecentInstances();
   const running = !!inst && isRunning(inst.id);
   const preparing = !!inst && !!progress && busyId === inst.id;
@@ -27,6 +29,9 @@ export function LaunchDock() {
         <Select label="Instance" value={inst?.id ?? ""} onChange={select} placeholder="No instances"
           options={instances.map((i) => ({ value: i.id, label: i.name }))} />
         <span className="chip"><Icon name="memory" />{ramGb} GB</span>
+        <button className="icon-btn" title="Console" aria-label="Open console" disabled={!inst} onClick={() => navigate("console")}>
+          <Icon name="terminal" />
+        </button>
       </div>
 
       <div className="status">
