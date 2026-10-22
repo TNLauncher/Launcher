@@ -1,8 +1,9 @@
 use crate::error::Result;
-use crate::models::{Instance, Loader};
-use crate::services::{instances, modpacks};
+use crate::models::{ContentKind, Instance, Loader};
+use crate::services::modpacks::{self, ImportProgress};
+use crate::services::instances;
 use crate::state::AppState;
-use tauri::{AppHandle, State};
+use tauri::{ipc::Channel, AppHandle, State};
 use tauri_plugin_opener::OpenerExt;
 
 #[tauri::command]
@@ -12,8 +13,17 @@ pub async fn create_instance(state: State<'_, AppState>, name: String, version: 
 
 /// Creates an instance from a Modrinth `.mrpack` URL.
 #[tauri::command]
-pub async fn import_modpack(state: State<'_, AppState>, url: String) -> Result<Instance> {
-    modpacks::import(&state, &url).await
+pub async fn import_modpack(
+    state: State<'_, AppState>,
+    url: String,
+    project_id: String,
+    version_number: String,
+    on_progress: Channel<ImportProgress>,
+) -> Result<Instance> {
+    modpacks::import(&state, &url, &project_id, &version_number, &|p| {
+        let _ = on_progress.send(p);
+    })
+    .await
 }
 
 #[tauri::command]
@@ -32,10 +42,13 @@ pub fn delete_instance(state: State<'_, AppState>, id: String) -> Result<()> {
     instances::delete(&state, &id)
 }
 
-/// Opens the instance folder (or its `mods` subfolder) in the file manager.
+/// Opens the instance folder (or one of its content folders) in the file manager.
 #[tauri::command]
-pub fn open_instance_dir(app: AppHandle, state: State<'_, AppState>, id: String, mods: bool) -> Result<()> {
-    let dir = if mods { state.paths.mods_dir(&id)? } else { state.paths.instance_dir(&id)? };
+pub fn open_instance_dir(app: AppHandle, state: State<'_, AppState>, id: String, kind: Option<ContentKind>) -> Result<()> {
+    let dir = match kind {
+        Some(kind) => state.paths.content_dir(&id, kind)?,
+        None => state.paths.instance_dir(&id)?,
+    };
     std::fs::create_dir_all(&dir)?;
     app.opener()
         .open_path(dir.to_string_lossy(), None::<&str>)

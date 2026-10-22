@@ -5,7 +5,7 @@ use crate::minecraft::http::{self, Job};
 use crate::models::{Instance, Loader};
 use crate::services::instances;
 use crate::state::AppState;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::Cursor;
 use std::path::{Component, Path, PathBuf};
@@ -13,6 +13,13 @@ use std::path::{Component, Path, PathBuf};
 const PACK_HOST: &str = "https://cdn.modrinth.com/";
 /// Hosts the mrpack spec allows pack files to come from.
 const FILE_HOSTS: [&str; 4] = [PACK_HOST, "https://github.com/", "https://raw.githubusercontent.com/", "https://gitlab.com/"];
+
+/// Files downloaded so far; streamed to the UI.
+#[derive(Clone, Serialize)]
+pub struct ImportProgress {
+    pub done: usize,
+    pub total: usize,
+}
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -90,7 +97,14 @@ fn extract_overrides(bytes: &[u8], dir: &Path) -> Result<()> {
     Ok(())
 }
 
-pub async fn import(state: &AppState, url: &str) -> Result<Instance> {
+/// `project_id` / `version_number` are stored on the instance so its page can show where it came from.
+pub async fn import(
+    state: &AppState,
+    url: &str,
+    project_id: &str,
+    version_number: &str,
+    progress: &(dyn Fn(ImportProgress) + Sync),
+) -> Result<Instance> {
     if !url.starts_with(PACK_HOST) {
         return Err(AppError::Invalid("Only Modrinth modpacks are allowed".into()));
     }
@@ -102,11 +116,17 @@ pub async fn import(state: &AppState, url: &str) -> Result<Instance> {
     };
     let version = index.dependencies.get("minecraft").ok_or_else(|| AppError::Invalid("Modpack has no Minecraft version".into()))?;
     let (loader, loader_version) = loader_of(&index.dependencies)?;
-    let instance = instances::new(&index.name, version, loader, loader_version);
+    let instance = Instance {
+        modpack_id: project_id.into(),
+        modpack_version: version_number.into(),
+        ..instances::new(&index.name, version, loader, loader_version)
+    };
     let dir = state.paths.instance_dir(&instance.id)?;
 
     let result = async {
-        http::download_all(&state.http, jobs(&dir, &index.files)?, &|_, _| {}).await?;
+        let jobs = jobs(&dir, &index.files)?;
+        progress(ImportProgress { done: 0, total: jobs.len() });
+        http::download_all(&state.http, jobs, &|done, total| progress(ImportProgress { done, total })).await?;
         extract_overrides(&bytes, &dir)?;
         instances::add(state, &instance)
     }

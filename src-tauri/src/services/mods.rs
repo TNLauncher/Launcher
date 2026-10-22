@@ -1,8 +1,11 @@
-//! Mod jars inside an instance. Disabled mods are renamed to `*.jar.disabled`.
+//! Content files inside an instance: mod jars, resource and shader pack zips.
+//! Disabled files are renamed to `*.disabled`, which Minecraft and the loaders skip.
 use crate::error::{AppError, Result};
 use crate::minecraft::http;
-use crate::models::ModFile;
+use crate::models::{ContentKind, ModFile};
 use crate::state::AppState;
+use sha1::{Digest, Sha1};
+use std::collections::HashMap;
 
 const DISABLED: &str = ".disabled";
 const ALLOWED_DOWNLOAD_HOST: &str = "https://cdn.modrinth.com/";
@@ -15,23 +18,39 @@ fn safe_file(name: &str) -> Result<&str> {
     Ok(name)
 }
 
-pub fn list(state: &AppState, id: &str) -> Result<Vec<ModFile>> {
-    let dir = state.paths.mods_dir(id)?;
+pub fn list(state: &AppState, id: &str, kind: ContentKind) -> Result<Vec<ModFile>> {
+    let dir = state.paths.content_dir(id, kind)?;
     let Ok(entries) = std::fs::read_dir(dir) else { return Ok(vec![]) };
-    let mut mods: Vec<ModFile> = entries
+    let disabled_ext = format!("{}{DISABLED}", kind.ext());
+    let mut files: Vec<ModFile> = entries
         .filter_map(|e| e.ok())
+        .filter(|e| e.file_type().is_ok_and(|t| t.is_file()))
         .filter_map(|e| {
             let file = e.file_name().to_string_lossy().to_string();
-            let enabled = file.ends_with(".jar");
-            (enabled || file.ends_with(".jar.disabled")).then(|| ModFile { size: e.metadata().map(|m| m.len()).unwrap_or(0), file, enabled })
+            let enabled = file.ends_with(kind.ext());
+            (enabled || file.ends_with(&disabled_ext)).then(|| ModFile { size: e.metadata().map(|m| m.len()).unwrap_or(0), file, enabled })
         })
         .collect();
-    mods.sort_by_key(|m| m.file.to_lowercase());
-    Ok(mods)
+    files.sort_by_key(|m| m.file.to_lowercase());
+    Ok(files)
 }
 
-pub fn toggle(state: &AppState, id: &str, file: &str) -> Result<()> {
-    let dir = state.paths.mods_dir(id)?;
+/// SHA-1 of every listed file, keyed by file name: Modrinth identifies projects by it.
+pub fn hashes(state: &AppState, id: &str, kind: ContentKind) -> Result<HashMap<String, String>> {
+    let dir = state.paths.content_dir(id, kind)?;
+    list(state, id, kind)?
+        .into_iter()
+        .map(|f| {
+            let mut hasher = Sha1::new();
+            std::io::copy(&mut std::fs::File::open(dir.join(&f.file))?, &mut hasher)?;
+            let hex = hasher.finalize().iter().map(|b| format!("{b:02x}")).collect();
+            Ok((f.file, hex))
+        })
+        .collect()
+}
+
+pub fn toggle(state: &AppState, id: &str, kind: ContentKind, file: &str) -> Result<()> {
+    let dir = state.paths.content_dir(id, kind)?;
     let file = safe_file(file)?;
     let target = match file.strip_suffix(DISABLED) {
         Some(enabled) => enabled.to_string(),
@@ -41,16 +60,16 @@ pub fn toggle(state: &AppState, id: &str, file: &str) -> Result<()> {
     Ok(())
 }
 
-pub fn delete(state: &AppState, id: &str, file: &str) -> Result<()> {
-    std::fs::remove_file(state.paths.mods_dir(id)?.join(safe_file(file)?))?;
+pub fn delete(state: &AppState, id: &str, kind: ContentKind, file: &str) -> Result<()> {
+    std::fs::remove_file(state.paths.content_dir(id, kind)?.join(safe_file(file)?))?;
     Ok(())
 }
 
-pub async fn install(state: &AppState, id: &str, url: &str, file: &str) -> Result<()> {
+pub async fn install(state: &AppState, id: &str, kind: ContentKind, url: &str, file: &str) -> Result<()> {
     if !url.starts_with(ALLOWED_DOWNLOAD_HOST) {
         return Err(AppError::Invalid("Only Modrinth downloads are allowed".into()));
     }
-    let path = state.paths.mods_dir(id)?.join(safe_file(file)?);
+    let path = state.paths.content_dir(id, kind)?.join(safe_file(file)?);
     http::download(&state.http, url, &path, None).await
 }
 
@@ -92,6 +111,24 @@ mod tests {
         assert_eq!(super::icon_path(&v).as_deref(), Some("b.png"));
         assert_eq!(super::icon_path(&serde_json::json!("assets/x/icon.png")).as_deref(), Some("assets/x/icon.png"));
         assert_eq!(super::icon_path(&serde_json::Value::Null), None);
+    }
+
+    #[test]
+    fn lists_and_hashes_by_kind() {
+        use crate::models::ContentKind;
+        let root = std::env::temp_dir().join(format!("tn-content-{}", std::process::id()));
+        let state = crate::state::AppState::new(root.clone()).unwrap();
+        let dir = state.paths.content_dir("inst", ContentKind::Resourcepack).unwrap();
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("a.zip"), "abc").unwrap();
+        std::fs::write(dir.join("b.zip.disabled"), "abc").unwrap();
+        std::fs::write(dir.join("notes.txt"), "x").unwrap();
+
+        let files = super::list(&state, "inst", ContentKind::Resourcepack).unwrap();
+        assert_eq!(files.iter().map(|f| (f.file.as_str(), f.enabled)).collect::<Vec<_>>(), [("a.zip", true), ("b.zip.disabled", false)]);
+        assert_eq!(super::hashes(&state, "inst", ContentKind::Resourcepack).unwrap()["a.zip"], "a9993e364706816aba3e25717850c26c9cd0d89d");
+        assert!(super::list(&state, "inst", ContentKind::Mod).unwrap().is_empty());
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

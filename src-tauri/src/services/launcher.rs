@@ -131,7 +131,7 @@ pub async fn launch(app: &AppHandle, id: &str, on_event: Channel<LaunchEvent>) -
     let started = now();
     instances::update(&state, id, |i| i.last_played = started)?;
     let _ = on_event.send(LaunchEvent::Started);
-    let mods = super::mods::list(&state, id).map(|m| m.iter().filter(|m| m.enabled).count()).unwrap_or(0);
+    let mods = super::mods::list(&state, id, crate::models::ContentKind::Mod).map(|m| m.iter().filter(|m| m.enabled).count()).unwrap_or(0);
     app.state::<Discord>().set(Presence::Playing {
         name: inst.name.clone(),
         version: inst.version.clone(),

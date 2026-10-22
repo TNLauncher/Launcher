@@ -30,6 +30,7 @@ pub fn new(name: &str, version: &str, loader: Loader, loader_version: String) ->
         version: version.into(),
         loader,
         loader_version,
+        created: super::now(),
         ..Default::default()
     }
 }

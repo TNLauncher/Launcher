@@ -1,4 +1,5 @@
 use crate::error::{AppError, Result};
+use crate::models::ContentKind;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::process::Child;
@@ -62,6 +63,9 @@ impl Paths {
         Ok(self.root.join("instances").join(id))
     }
     pub fn mods_dir(&self, id: &str) -> Result<PathBuf> {
-        Ok(self.instance_dir(id)?.join("mods"))
+        self.content_dir(id, ContentKind::Mod)
+    }
+    pub fn content_dir(&self, id: &str, kind: ContentKind) -> Result<PathBuf> {
+        Ok(self.instance_dir(id)?.join(kind.dir()))
     }
 }
