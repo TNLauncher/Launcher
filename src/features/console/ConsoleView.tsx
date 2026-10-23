@@ -1,14 +1,14 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { launcher } from "@/api/launcher";
-import { EmptyState } from "@/components/ui/EmptyState";
-import { Icon } from "@/components/ui/Icon";
-import { Select } from "@/components/ui/Select";
+import { View } from "@/components/layout/View";
+import { Button, Dot, EmptyState, Icon, IconButton, Pill, PillGroup, SearchInput, Select, type Tone } from "@/components/ui";
+import { cx } from "@/lib/cx";
 import { compact, errorMessage, STAGE_LABEL } from "@/lib/format";
 import { gameLogs, useGameLog, type Level, type LogLine, type Session } from "@/store/gameLogs";
 import { useLauncher, useProgress, useRecentInstances } from "@/store/LauncherContext";
 import { useUi } from "@/store/UiContext";
 import type { Instance } from "@/types";
-import "./console.css";
+import s from "./console.module.css";
 
 type Filter = "all" | "warn" | "error";
 /** Folded stack trace (`hidden` frames), or with `open` the point to collapse an expanded one. */
@@ -26,11 +26,11 @@ export function ConsoleView() {
   const { openNewInstance } = useUi();
   if (!selected) {
     return (
-      <section className="view console">
-        <EmptyState icon="terminal" action={<button className="btn primary" onClick={openNewInstance}><Icon name="add" />Create instance</button>}>
+      <View className={s.console}>
+        <EmptyState icon="terminal" action={<Button variant="primary" icon="add" onClick={openNewInstance}>Create instance</Button>}>
           Game output appears here once you have an instance to launch.
         </EmptyState>
-      </section>
+      </View>
     );
   }
   return <Console key={selected.id} instance={selected} />;
@@ -94,14 +94,14 @@ function Console({ instance }: { instance: Instance }) {
 
   const filtered = filter !== "all" || !!query.trim();
   return (
-    <section className="view console">
+    <View className={s.console}>
       <Toolbar instance={instance} log={log} filter={filter} setFilter={setFilter} query={query} setQuery={setQuery}
         counts={counts} total={lines?.filter((l) => !l.cont).length ?? 0} items={items} />
-      {loadError && <p className="console-load-error">Could not read the last log: {loadError}</p>}
+      {loadError && <p className={s.consoleLoadError}>Could not read the last log: {loadError}</p>}
       <LogBody instance={instance} items={items} rev={rev} query={query.trim()} filtered={filtered} log={log}
         onToggle={toggleFold}
         onClear={() => [setFilter("all"), setQuery("")]} />
-    </section>
+    </View>
   );
 }
 
@@ -155,49 +155,40 @@ function Toolbar({ instance, log, filter, setFilter, query, setQuery, counts, to
   ];
 
   return (
-    <header className="console-bar">
-      <div className="console-bar-row">
-        <div className="console-session">
-          <Select label="Instance" value={instance.id} onChange={select}
+    <header className={s.consoleBar}>
+      <div className={s.consoleBarRow}>
+        <div className={s.consoleSession}>
+          <Select label="Instance" variant="pill" value={instance.id} onChange={select}
             options={instances.map((i) => ({ value: i.id, label: i.name, hint: i.version }))} />
           <SessionState instance={instance} log={log} error={actionError} />
         </div>
-        <div className="console-actions">
-          <button className="icon-btn" title={copied ? "Copied" : "Copy visible lines"} aria-label="Copy visible lines" disabled={!items.length} onClick={copy}>
-            <Icon name={copied ? "check" : "content_copy"} />
-          </button>
-          <button className="icon-btn" title="Open instance folder" aria-label="Open instance folder" onClick={() => act(() => launcher.openInstanceDir(instance.id))}>
-            <Icon name="folder_open" />
-          </button>
+        <div className={s.consoleActions}>
+          <IconButton icon={copied ? "check" : "content_copy"} label="Copy visible lines" title={copied ? "Copied" : undefined} disabled={!items.length} onClick={copy} />
+          <IconButton icon="folder_open" label="Open instance folder" onClick={() => act(() => launcher.openInstanceDir(instance.id))} />
           {running ? (
-            <button className="btn stop" disabled={log?.stopping} onClick={() => act(() => gameLogs.stop(instance.id))}>
-              <Icon name="stop" fill />
+            <Button variant="danger" icon="stop" className={s.runBtn} disabled={log?.stopping} onClick={() => act(() => gameLogs.stop(instance.id))}>
               {log?.stopping ? "Stopping" : "Stop"}
-            </button>
+            </Button>
           ) : (
-            <button className="btn primary" disabled={!!busyId} onClick={() => launch(instance.id)}>
-              <Icon name={busyId === instance.id ? "progress_activity" : "play_arrow"} fill spin={busyId === instance.id} />
+            <Button variant="primary" icon="play_arrow" className={s.runBtn} loading={busyId === instance.id} disabled={!!busyId} onClick={() => launch(instance.id)}>
               {busyId === instance.id ? "Starting" : "Launch"}
-            </button>
+            </Button>
           )}
         </div>
       </div>
-      <div className="console-bar-row">
-        <div className="pills" role="group" aria-label="Level">
+      <div className={s.consoleBarRow}>
+        <PillGroup label="Level">
           {pills.map((p) => (
-            <button key={p.value} className={`pill ${p.value}${p.count ? " has" : ""}`} aria-pressed={filter === p.value} onClick={() => setFilter(p.value)}>
+            <Pill key={p.value} tone={p.value === "all" ? undefined : p.value} pressed={filter === p.value} onClick={() => setFilter(p.value)} count={p.count ? compact(p.count) : 0}>
               {p.label}
-              <span className="mono">{compact(p.count)}</span>
-            </button>
+            </Pill>
           ))}
-        </div>
-        <label className="search console-search">
-          <Icon name="search" />
-          <input ref={search} className="input" type="search" placeholder="Filter lines" aria-label="Filter lines"
-            value={query} onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => e.key === "Escape" && setQuery("")} />
+        </PillGroup>
+        <SearchInput ref={search} className={s.consoleSearch} type="search" label="Filter lines"
+          value={query} onChange={setQuery}
+          onKeyDown={(e) => e.key === "Escape" && setQuery("")}>
           <kbd className="mono">Ctrl F</kbd>
-        </label>
+        </SearchInput>
       </div>
     </header>
   );
@@ -208,20 +199,20 @@ function SessionState({ instance, log, error }: { instance: Instance; log: Sessi
   const progress = useProgress();
   const running = isRunning(instance.id);
 
-  let [label, tone] = ["Not running", ""];
+  let [label, tone]: [string, Tone] = ["Not running", "neutral"];
   if (error) [label, tone] = [error, "red"];
   else if (busyId === instance.id && progress) [label, tone] = [`Preparing · ${STAGE_LABEL[progress.stage]}`, "orange"];
   else if (running && log?.stopping) [label, tone] = ["Stopping…", "orange"];
   else if (running) return <Running since={instance.lastPlayed} />;
-  else if (log?.exit?.stopped) [label, tone] = ["Stopped", ""];
+  else if (log?.exit?.stopped) [label, tone] = ["Stopped", "neutral"];
   else if (log?.exit?.code === 0) [label, tone] = ["Exited normally", "green"];
   else if (log?.exit?.code) [label, tone] = [`Crashed · exit code ${log.exit.code}`, "red"];
-  else if (log?.exit) [label, tone] = ["Exited", ""];
-  else if (log?.lines.length) [label, tone] = ["Last session", ""];
+  else if (log?.exit) [label, tone] = ["Exited", "neutral"];
+  else if (log?.lines.length) [label, tone] = ["Last session", "neutral"];
 
   return (
-    <span className={`session-state ${tone}`} role="status">
-      <span className={`dot ${tone}`} />
+    <span className={cx(s.sessionState, tone !== "neutral" && s[tone])} role="status">
+      <Dot tone={tone} />
       <span title={label}>{label}</span>
     </span>
   );
@@ -233,12 +224,12 @@ function Running({ since }: { since: number }) {
     const t = setInterval(() => setNow(Date.now() / 1000), 1000);
     return () => clearInterval(t);
   }, []);
-  const s = Math.max(0, Math.floor(now - since));
-  const hms = [Math.floor(s / 3600), Math.floor(s / 60) % 60, s % 60].map((v) => String(v).padStart(2, "0"));
+  const sec = Math.max(0, Math.floor(now - since));
+  const hms = [Math.floor(sec / 3600), Math.floor(sec / 60) % 60, sec % 60].map((v) => String(v).padStart(2, "0"));
   return (
-    <span className="session-state blue live" role="status">
-      <span className="dot blue" />
-      Running <span className="mono">{s < 3600 ? hms.slice(1).join(":") : hms.join(":")}</span>
+    <span className={cx(s.sessionState, s.live)} role="status">
+      <Dot tone="blue" className={s.liveDot} />
+      Running <span className="mono">{sec < 3600 ? hms.slice(1).join(":") : hms.join(":")}</span>
     </span>
   );
 }
@@ -310,23 +301,23 @@ function LogBody({ instance, log, items, rev, query, filtered, onToggle, onClear
     let empty = <EmptyState icon="terminal">No output yet. Launch {instance.name} and its log streams here live.</EmptyState>;
     if (filtered && log?.lines.length) {
       empty = (
-        <EmptyState icon="filter_alt_off" action={<button className="btn" onClick={onClear}>Show all lines</button>}>
+        <EmptyState icon="filter_alt_off" action={<Button onClick={onClear}>Show all lines</Button>}>
           No lines match this filter.
         </EmptyState>
       );
     } else if (busyId === instance.id) {
       empty = <EmptyState icon="hourglass_top">Waiting for the game to start…</EmptyState>;
     }
-    return <div className="console-body">{empty}</div>;
+    return <div className={s.consoleBody}>{empty}</div>;
   }
 
   const fresh = following ? 0 : lastN - seen;
   return (
-    <div className="console-body">
-      <div className="log selectable" ref={scroller} onScroll={onScroll} role="log" aria-label={`${instance.name} game output`}>
+    <div className={s.consoleBody}>
+      <div className={cx(s.log, "selectable")} ref={scroller} onScroll={onScroll} role="log" aria-label={`${instance.name} game output`}>
         {items.map((it) =>
           "fold" in it ? (
-            <button key={`f${it.fold}`} className="log-fold" aria-expanded={!!it.open} onClick={() => onToggle(it.fold)}>
+            <button key={`f${it.fold}`} className={s.logFold} aria-expanded={!!it.open} onClick={() => onToggle(it.fold)}>
               <Icon name={it.open ? "unfold_less" : "unfold_more"} />
               {it.open ? "Collapse trace" : `${it.hidden} more ${it.hidden === 1 ? "line" : "lines"}`}
             </button>
@@ -335,16 +326,15 @@ function LogBody({ instance, log, items, rev, query, filtered, onToggle, onClear
           )
         )}
       </div>
-      <div className="rail" aria-hidden="true">
+      <div className={s.rail} aria-hidden="true">
         {ticks.map((t) => (
-          <button key={t.n} tabIndex={-1} className={`tick ${t.level}`} style={{ top: `${t.top}%` }} onClick={() => jump(t.n)} />
+          <button key={t.n} tabIndex={-1} className={cx(s.tick, s[t.level])} style={{ top: `${t.top}%` }} onClick={() => jump(t.n)} />
         ))}
       </div>
       {!following && (
-        <button className="btn follow" onClick={follow}>
-          <Icon name="arrow_downward" />
+        <Button icon="arrow_downward" className={s.follow} onClick={follow}>
           {fresh > 0 ? `${compact(fresh)} new ${fresh === 1 ? "line" : "lines"}` : "Jump to latest"}
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -352,11 +342,11 @@ function LogBody({ instance, log, items, rev, query, filtered, onToggle, onClear
 
 function Line({ line: l, query, flash }: { line: LogLine; query: string; flash: boolean }) {
   return (
-    <div className={`ln ${l.level}${l.cont ? " cont" : ""}${flash ? " flash" : ""}`} data-n={l.n}>
-      <span className="ln-n">{l.n}</span>
-      <span className="ln-time">{l.time}</span>
-      <span className="ln-origin" title={l.origin || undefined}>{l.origin}</span>
-      <span className="ln-text">{query ? <Marked text={l.text} query={query} /> : l.text || " "}</span>
+    <div className={cx(s.ln, s[l.level], l.cont && s.cont, flash && s.flash)} data-n={l.n}>
+      <span className={s.lnN}>{l.n}</span>
+      <span className={s.lnTime}>{l.time}</span>
+      <span className={s.lnOrigin} title={l.origin || undefined}>{l.origin}</span>
+      <span className={s.lnText}>{query ? <Marked text={l.text} query={query} /> : l.text || " "}</span>
     </div>
   );
 }

@@ -10,4 +10,8 @@
 .pill[aria-pressed="true"] { background: var(--accent-fill); color: #fff; font-weight: 500; }
 .pill :global(.icon) { font-size: 16px; }
 .count { opacity: 0.75; }
+.warn[aria-pressed="true"] { background: rgb(255 159 10 / 0.18); color: var(--warning); }
+.error[aria-pressed="true"] { background: rgb(255 69 58 / 0.18); color: var(--critical); }
+.warn .count:not([data-zero]) { color: var(--warning); }
+.error .count:not([data-zero]) { color: var(--critical); }
 }

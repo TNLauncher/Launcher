@@ -1,4 +1,4 @@
-import type { InputHTMLAttributes, Ref, TextareaHTMLAttributes } from "react";
+import type { InputHTMLAttributes, ReactNode, Ref, TextareaHTMLAttributes } from "react";
 import { cx } from "@/lib/cx";
 import { Icon } from "./Icon";
 import s from "./Input.module.css";
@@ -22,14 +22,17 @@ interface SearchProps extends Omit<InputProps, "onChange" | "value"> {
   /** Accessible name; also the placeholder unless one is given. */
   label: string;
   icon?: string;
+  /** Trailing adornment, e.g. a shortcut hint. */
+  children?: ReactNode;
 }
 
 /** Text input with a leading search glyph. */
-export function SearchInput({ value, onChange, label, icon = "search", placeholder, className, ...rest }: SearchProps) {
+export function SearchInput({ value, onChange, label, icon = "search", placeholder, className, children, ...rest }: SearchProps) {
   return (
     <label className={cx(s.search, className)}>
       <Icon name={icon} />
       <Input aria-label={label} placeholder={placeholder ?? label} value={value} onChange={(e) => onChange(e.target.value)} {...rest} />
+      {children}
     </label>
   );
 }

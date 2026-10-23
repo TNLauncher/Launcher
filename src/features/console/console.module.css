@@ -1,5 +1,5 @@
 /* Console */
-.view.console { height: 100%; display: flex; flex-direction: column; background: var(--view); }
+.console { height: 100%; display: flex; flex-direction: column; background: var(--view); }
 
 .console-bar {
   display: flex; flex-direction: column; gap: 10px; padding: 12px 16px;
@@ -7,13 +7,9 @@
 }
 .console-bar-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; }
 .console-session { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.console-session .select { max-width: 240px; border-radius: 999px; background-color: var(--btn); }
 .console-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-.console-actions .btn { margin-left: 6px; min-width: 96px; }
-.icon-btn:disabled { opacity: 0.45; pointer-events: none; }
+.run-btn { margin-left: 6px; min-width: 96px; }
 
-.btn.stop { background: rgb(255 69 58 / 0.14); border-color: rgb(255 69 58 / 0.28); color: var(--critical); }
-.btn.stop:hover { background: rgb(255 69 58 / 0.22); }
 
 .session-state {
   display: inline-flex; align-items: center; gap: 8px; min-width: 0; padding: 4px 12px; border-radius: 999px;
@@ -26,31 +22,26 @@
 .session-state.live { color: var(--fg); }
 .session-state .mono { color: var(--muted); }
 /* The only motion on this screen that isn't feedback: the game is alive. */
-.live .dot { position: relative; }
-.live .dot::after {
+.live-dot { position: relative; }
+.live-dot::after {
   content: ""; position: absolute; inset: 0; border-radius: 50%; background: var(--accent);
   animation: live 1.8s var(--ease) infinite;
 }
 @keyframes live { from { transform: scale(1); opacity: 0.7; } to { transform: scale(3.2); opacity: 0; } }
 
-.pill.warn[aria-pressed="true"] { background: rgb(255 159 10 / 0.18); color: var(--warning); }
-.pill.error[aria-pressed="true"] { background: rgb(255 69 58 / 0.18); color: var(--critical); }
-.pill.warn.has .mono { color: var(--warning); }
-.pill.error.has .mono { color: var(--critical); }
 
 .console-search { width: 280px; flex-shrink: 0; }
-.console-search .input { padding-right: 64px; }
-.console-search .input::-webkit-search-cancel-button { display: none; }
+.console-search input { padding-right: 64px; }
 .console-search kbd {
   position: absolute; right: 8px; padding: 1px 6px; border-radius: 4px; font-size: 10px;
   color: var(--subtle); background: rgb(255 255 255 / 0.06); border: 1px solid var(--card-border); pointer-events: none;
 }
-.console-search .input:focus ~ kbd, .console-search .input:not(:placeholder-shown) ~ kbd { opacity: 0; }
+.console-search input:focus ~ kbd, .console-search input:not(:placeholder-shown) ~ kbd { opacity: 0; }
 
 .console-load-error { margin: 0; padding: 8px 16px; font-size: 12px; color: var(--critical); background: rgb(255 69 58 / 0.08); }
 
 .console-body { position: relative; flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 12px; }
-.console-body > .empty { grid-column: 1 / -1; align-self: center; }
+.console-body > :only-child { grid-column: 1 / -1; align-self: center; }
 
 .log {
   overflow-y: auto; overscroll-behavior: contain; padding: 8px 0 32px;
@@ -88,7 +79,7 @@
   transition: background 160ms var(--ease);
 }
 .log-fold:hover { background: rgb(64 156 255 / 0.12); }
-.log-fold .icon { font-size: 15px; }
+.log-fold :global(.icon) { font-size: 15px; }
 
 .rail { position: relative; background: var(--lowest); border-left: 1px solid var(--card-border); }
 .tick {
@@ -99,12 +90,12 @@
 .tick.error { background: var(--critical); }
 .tick:hover { transform: scaleY(2); opacity: 1; }
 
-.btn.follow {
+.follow {
   position: absolute; left: 50%; bottom: 16px; translate: -50% 0;
   background: var(--popover); border-color: var(--border); box-shadow: var(--lift), var(--highlight);
   animation: follow-in 200ms var(--ease);
 }
-.btn.follow:hover { background: #38383B; }
+.follow:hover { background: #38383B; }
 @keyframes follow-in { from { opacity: 0; transform: translateY(6px); } }
 
 @media (max-width: 1100px) {
@@ -113,5 +104,5 @@
   .console-search { width: 200px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .live .dot::after, .btn.follow, .ln.flash { animation: none; }
+  .live-dot::after, .follow, .ln.flash { animation: none; }
 }
