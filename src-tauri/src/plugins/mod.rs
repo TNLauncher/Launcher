@@ -4,6 +4,7 @@
 //! Rust stays the source of truth: it owns the disk and checks every request against the manifest.
 
 pub mod api;
+pub mod data;
 pub mod host;
 pub mod js;
 
@@ -51,6 +52,33 @@ pub struct Contributes {
     /// Pages added to the sidebar.
     #[serde(default)]
     pub pages: Vec<PageSpec>,
+    /// Tabs added to every instance page; the frame gets `tn.context.instance`.
+    #[serde(default)]
+    pub instance_tabs: Vec<PageSpec>,
+    /// Options the user sets in Settings; the plugin reads them with `tn.settings.get()`.
+    #[serde(default)]
+    pub settings: Vec<SettingSpec>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SettingSpec {
+    /// `[A-Za-z0-9_-]`.
+    pub key: String,
+    pub label: String,
+    #[serde(default)]
+    pub hint: String,
+    #[serde(rename = "type")]
+    pub kind: SettingKind,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SettingKind {
+    Text,
+    /// Shown masked, e.g. an API key.
+    Secret,
+    Toggle,
 }
 
 /// What the UI builds a source's filters from.
@@ -83,6 +111,9 @@ pub struct Permissions {
     /// URL prefixes the launcher may download files from on the plugin's behalf.
     #[serde(default)]
     pub downloads: Vec<String>,
+    /// Read the instance list (`tn.instances`) and game start/exit events.
+    #[serde(default)]
+    pub instances: bool,
 }
 
 pub struct Plugin {
@@ -161,6 +192,9 @@ fn read_manifest(folder: &Path) -> Result<Manifest> {
     if m.id.is_empty() || !m.id.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-') {
         return Err(AppError::Plugin(format!("Bad plugin id: {}", m.id)));
     }
+    if let Some(s) = m.contributes.settings.iter().find(|s| s.key.is_empty() || !s.key.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')) {
+        return Err(AppError::Plugin(format!("Bad setting key: {}", s.key)));
+    }
     if !folder.join(&m.main).is_file() {
         return Err(AppError::Plugin(format!("{} is missing", m.main)));
     }
@@ -191,6 +225,8 @@ pub struct PluginEntry {
     pub permissions: Permissions,
     pub source: Option<SourceInfo>,
     pub pages: Vec<PageSpec>,
+    pub instance_tabs: Vec<PageSpec>,
+    pub settings: Vec<SettingSpec>,
     /// Why the plugin did not load; it is then off.
     pub error: Option<String>,
 }
@@ -210,6 +246,8 @@ pub fn list(state: &AppState) -> Vec<PluginEntry> {
             permissions: m.permissions.clone(),
             source: m.contributes.source.as_ref().map(|s| SourceInfo { id: m.id.clone(), name: m.name.clone(), sorts: s.sorts.clone(), categories: s.categories.clone() }),
             pages: m.contributes.pages.clone(),
+            instance_tabs: m.contributes.instance_tabs.clone(),
+            settings: m.contributes.settings.clone(),
             error: None,
         }
     });
@@ -224,6 +262,8 @@ pub fn list(state: &AppState) -> Vec<PluginEntry> {
         permissions: Permissions::default(),
         source: None,
         pages: vec![],
+        instance_tabs: vec![],
+        settings: vec![],
         error: Some(f.error.clone()),
     });
     loaded.chain(failed).collect()

@@ -61,6 +61,10 @@ impl Paths {
     pub fn plugins_dir(&self) -> PathBuf {
         self.root.join("plugins")
     }
+    /// What a plugin stores (`storage.json`) and its settings (`settings.json`). Ids are checked at load.
+    pub fn plugin_data_dir(&self, id: &str) -> PathBuf {
+        self.root.join("plugin-data").join(id)
+    }
     pub fn plugins_file(&self) -> PathBuf {
         self.root.join("disabled-plugins.json")
     }

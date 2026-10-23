@@ -103,6 +103,8 @@ pub fn run() {
             commands::plugins::set_plugin_enabled,
             commands::plugins::open_plugins_dir,
             commands::plugins::plugin_host_ready,
+            commands::plugins::plugin_settings,
+            commands::plugins::set_plugin_setting,
             commands::plugins::plugin_reply,
             commands::plugins::plugin_request,
             commands::plugins::source_search,

@@ -6,11 +6,11 @@ use crate::state::AppState;
 use serde::{de::DeserializeOwned, Serialize};
 use std::path::Path;
 
-fn read<T: DeserializeOwned + Default>(path: &Path) -> T {
+pub(crate) fn read<T: DeserializeOwned + Default>(path: &Path) -> T {
     std::fs::read(path).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default()
 }
 
-fn write<T: Serialize>(path: &Path, value: &T) -> Result<()> {
+pub(crate) fn write<T: Serialize>(path: &Path, value: &T) -> Result<()> {
     let tmp = path.with_extension("tmp");
     std::fs::write(&tmp, serde_json::to_vec_pretty(value)?)?;
     std::fs::rename(tmp, path)?;

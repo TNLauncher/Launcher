@@ -23,6 +23,17 @@ pub fn open_plugins_dir(app: tauri::AppHandle, state: State<'_, AppState>) -> Re
     app.opener().open_path(dir.to_string_lossy(), None::<&str>).map_err(|e| crate::error::AppError::Unsupported(e.to_string()))
 }
 
+/// Current values of a plugin's declared settings.
+#[tauri::command]
+pub fn plugin_settings(state: State<'_, AppState>, id: String) -> Result<serde_json::Map<String, Value>> {
+    Ok(plugins::data::settings(&state, state.plugins.get(&id)?))
+}
+
+#[tauri::command]
+pub fn set_plugin_setting(state: State<'_, AppState>, id: String, key: String, value: Value) -> Result<()> {
+    plugins::data::set_setting(&state, state.plugins.get(&id)?, &key, value)
+}
+
 /// The frontend listens for `plugin-call` events now.
 #[tauri::command]
 pub fn plugin_host_ready(state: State<'_, AppState>) {

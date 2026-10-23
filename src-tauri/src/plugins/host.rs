@@ -108,6 +108,18 @@ pub fn host_allowed(hosts: &[String], url: &str) -> bool {
         })
 }
 
+fn str_param(params: &Value, name: &str) -> Result<String> {
+    params.get(name).and_then(Value::as_str).map(String::from).ok_or_else(|| AppError::Invalid(format!("Missing {name}")))
+}
+
+fn key(params: &Value) -> Result<String> {
+    let k = str_param(params, "key")?;
+    if k.is_empty() || k.len() > 256 {
+        return Err(AppError::Invalid("Bad storage key".into()));
+    }
+    Ok(k)
+}
+
 #[derive(Deserialize)]
 struct FetchInit {
     url: String,
@@ -145,6 +157,24 @@ pub async fn request(state: &AppState, plugin: &str, method: &str, params: Value
                 return Err(AppError::Plugin(format!("Response from {} is too big", init.url)));
             }
             Ok(json!({ "status": status, "contentType": content_type, "body": String::from_utf8_lossy(&bytes) }))
+        }
+        "storage.get" => Ok(super::data::storage_get(state, &plugin, &key(&params)?)),
+        "storage.set" => {
+            super::data::storage_set(state, &plugin, &key(&params)?, params.get("value").cloned().unwrap_or(Value::Null))?;
+            Ok(Value::Null)
+        }
+        "settings.get" => Ok(Value::Object(super::data::settings(state, &plugin))),
+        "instances.list" | "instances.get" if !m.permissions.instances => Err(AppError::Plugin(format!("{} may not read instances", m.name))),
+        "instances.list" => Ok(serde_json::to_value(crate::services::instances::list(state))?),
+        "instances.get" => Ok(serde_json::to_value(crate::services::instances::get(state, &str_param(&params, "id")?)?)?),
+        // A link the user follows: web pages only, opened in the system browser.
+        "open" => {
+            let url = str_param(&params, "url")?;
+            if !(url.starts_with("https://") || url.starts_with("http://")) {
+                return Err(AppError::Plugin(format!("{} may only open web links", m.name)));
+            }
+            tauri_plugin_opener::open_url(&url, None::<&str>).map_err(|e| AppError::Unsupported(e.to_string()))?;
+            Ok(Value::Null)
         }
         "log" => {
             eprintln!("[plugin {}] {}", m.id, params.as_str().unwrap_or(&params.to_string()));

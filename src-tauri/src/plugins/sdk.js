@@ -4,6 +4,7 @@
   const pending = new Map();
   let next = 1;
   let source = null;
+  const listeners = new Map();
   const post = (msg) => parent.postMessage({ tn: 1, ...msg }, "*");
   const message = (err) => String((err && err.message) || err);
 
@@ -24,6 +25,14 @@
       pending.delete(m.id);
       if (m.ok) p.resolve(m.value);
       else p.reject(new Error(m.error));
+    } else if (m.type === "event") {
+      for (const cb of listeners.get(m.name) || []) {
+        try {
+          cb(m.payload);
+        } catch (err) {
+          console.error(err);
+        }
+      }
     } else if (m.type === "call") {
       try {
         const fn = source && source[m.method];
@@ -38,6 +47,29 @@
 
   const tn = Object.freeze({
     apiVersion: 1,
+    /** Where this frame is shown: `instance` is set in instance tabs. */
+    context: Object.freeze({ instance: new URLSearchParams(location.search).get("instance") }),
+    storage: Object.freeze({
+      get: (key) => request("storage.get", { key }),
+      /** `null` or `undefined` removes the key. */
+      set: (key, value) => request("storage.set", { key, value: value === undefined ? null : value }),
+    }),
+    settings: Object.freeze({ get: () => request("settings.get", null) }),
+    instances: Object.freeze({
+      list: () => request("instances.list", null),
+      get: (id) => request("instances.get", { id }),
+    }),
+    events: Object.freeze({
+      /** Returns a function that stops listening. */
+      on(name, cb) {
+        const set = listeners.get(name) || new Set();
+        set.add(cb);
+        listeners.set(name, set);
+        return () => set.delete(cb);
+      },
+    }),
+    /** Opens a web page in the system browser. */
+    open: (url) => request("open", { url: String(url) }),
     sources: Object.freeze({
       register(impl) {
         if (source) throw new Error("A content source is already registered");
