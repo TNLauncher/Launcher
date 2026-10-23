@@ -2,7 +2,7 @@
 import { Channel, convertFileSrc } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { call } from "./ipc";
-import type { ContentKind, DeviceCode, GameExit, GameLog, ImportProgress, Instance, LaunchEvent, Loader, ModFile, Settings, Snapshot } from "@/types";
+import type { ContentKind, DeviceCode, GameExit, GameLog, ImportProgress, Instance, LaunchEvent, Loader, ModFile, Screenshot, Settings, Snapshot } from "@/types";
 
 export const launcher = {
   getState: () => call<Snapshot>("get_state"),
@@ -28,8 +28,12 @@ export const launcher = {
   /** `icon` is a `data:image/...` URL, or "" to reset. */
   setInstanceIcon: (id: string, icon: string) => call<void>("set_instance_icon", { id, icon }),
   deleteInstance: (id: string) => call<void>("delete_instance", { id }),
-  /** Opens the instance folder, or one of its content folders. */
-  openInstanceDir: (id: string, kind?: ContentKind) => call<void>("open_instance_dir", { id, kind }),
+  /** Opens the instance folder, or a folder inside it (`mods`, `screenshots`...). */
+  openInstanceDir: (id: string, folder?: string) => call<void>("open_instance_dir", { id, folder }),
+  /** Newest first. */
+  listScreenshots: (id: string) => call<Screenshot[]>("list_screenshots", { id }),
+  deleteScreenshot: (id: string, file: string) => call<void>("delete_screenshot", { id, file }),
+  screenshotUrl: (id: string, file: string) => convertFileSrc(`screenshot/${id}/${file}`, "instance"),
 
   /** Resolves once the game process has started; progress arrives through `onEvent`. */
   launch: (id: string, onEvent: (e: LaunchEvent) => void) => {
@@ -47,10 +51,11 @@ export const launcher = {
   listContent: (id: string, kind: ContentKind) => call<ModFile[]>("list_content", { id, kind }),
   /** SHA-1 per file name. */
   hashContent: (id: string, kind: ContentKind) => call<Record<string, string>>("hash_content", { id, kind }),
+  /** Mods are renamed to `.disabled`; packs are switched in `options.txt`, shaders in Iris' config. */
   toggleContent: (id: string, kind: ContentKind, file: string) => call<void>("toggle_content", { id, kind, file }),
   deleteContent: (id: string, kind: ContentKind, file: string) => call<void>("delete_content", { id, kind, file }),
   /** URL of the icon packed inside a mod jar; 404s when the mod has none. */
-  modIconUrl: (id: string, file: string) => convertFileSrc(`${id}/${file}`, "modicon"),
+  modIconUrl: (id: string, file: string) => convertFileSrc(`modicon/${id}/${file}`, "instance"),
   installContent: (id: string, kind: ContentKind, url: string, file: string) => call<void>("install_content", { id, kind, url, file }),
 
   /** GET (or POST `body`) through Rust: no CORS in the webview. */

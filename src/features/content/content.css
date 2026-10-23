@@ -1,5 +1,4 @@
 /* Instance content: installed files beside the Modrinth browser */
-.content .tabs { margin-bottom: 16px; }
 .content-split {
   display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px;
   height: max(440px, calc(100vh - 150px));
@@ -18,6 +17,8 @@
 .identifying .icon { font-size: 14px; }
 .cpane-list { flex: 1; overflow-y: auto; padding: 0 8px 10px; display: flex; flex-direction: column; gap: 2px; transition: opacity 160ms var(--ease); }
 .cpane-list.stale { opacity: 0.55; }
+fieldset.cpane-list { margin: 0; border: 0; min-width: 0; }
+fieldset.cpane-list:disabled .citem-actions { opacity: 0.5; }
 .cpane-list > .skeleton { margin: 0 6px 6px; }
 .cpane-list > .banner { margin: 0 6px; }
 

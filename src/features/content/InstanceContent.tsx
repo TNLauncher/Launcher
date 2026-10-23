@@ -7,6 +7,8 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Icon } from "@/components/ui/Icon";
 import { Switch } from "@/components/ui/Switch";
+import { Tab, Tabs } from "@/components/ui";
+import { Screenshots } from "@/features/screenshots/Screenshots";
 import { useDebounced } from "@/hooks/useDebounced";
 import { compact, errorMessage, megabytes } from "@/lib/format";
 import { useLauncher } from "@/store/LauncherContext";
@@ -50,10 +52,11 @@ const ORDER: ContentKind[] = ["mod", "resourcepack", "shader"];
 /** Iris: the Fabric/Quilt shader loader. */
 const IRIS = "YL57xq9U";
 
-/** Mods, resource packs and shaders of one instance: what is installed, and Modrinth to add more. */
+/** Mods, resource packs, shaders and screenshots of one instance: what is installed, and Modrinth to add more. */
 export function InstanceContent({ instance }: { instance: Instance }) {
   const modded = instance.loader !== "vanilla";
-  const [kind, setKind] = useState<ContentKind>(modded ? "mod" : "resourcepack");
+  const [tab, setTab] = useState<ContentKind | "screenshots">(modded ? "mod" : "resourcepack");
+  const kind = tab === "screenshots" ? "mod" : tab;
   const content = { mod: useContent(instance.id, "mod"), resourcepack: useContent(instance.id, "resourcepack"), shader: useContent(instance.id, "shader") };
   const current = content[kind];
   const needsLoader = kind !== "resourcepack" && !modded;
@@ -61,17 +64,20 @@ export function InstanceContent({ instance }: { instance: Instance }) {
 
   return (
     <div className="content">
-      <div className="tabs" role="tablist" aria-label="Instance content">
+      <Tabs label="Instance content">
         {ORDER.map((k) => (
-          <button key={k} role="tab" className="tab" aria-selected={kind === k} onClick={() => setKind(k)}>
-            <Icon name={KINDS[k].icon} />
+          <Tab key={k} selected={tab === k} onSelect={() => setTab(k)} icon={KINDS[k].icon} count={content[k].items?.length ?? ""}>
             {KINDS[k].label}
-            <span className="mono">{content[k].items?.length ?? ""}</span>
-          </button>
+          </Tab>
         ))}
-      </div>
+        <Tab selected={tab === "screenshots"} onSelect={() => setTab("screenshots")} icon="photo_camera">
+          Screenshots
+        </Tab>
+      </Tabs>
 
-      {needsLoader ? (
+      {tab === "screenshots" ? (
+        <Screenshots instanceId={instance.id} />
+      ) : needsLoader ? (
         <EmptyState icon={KINDS[kind].icon}>
           Vanilla can't load {KINDS[kind].noun}. Create a Fabric or Quilt instance to use them.
         </EmptyState>
@@ -111,7 +117,9 @@ function IrisNotice({ instance, onInstalled }: { instance: Instance; onInstalled
 }
 
 function InstalledPane({ instance, kind, content }: { instance: Instance; kind: ContentKind; content: ReturnType<typeof useContent> }) {
-  const { refresh } = useLauncher();
+  const { refresh, isRunning } = useLauncher();
+  // The game rewrites options.txt and Iris' config on exit, and Windows locks loaded jars.
+  const running = isRunning(instance.id);
   const info = KINDS[kind];
   const [filter, setFilter] = useState("");
   const [error, setError] = useState("");
@@ -148,7 +156,7 @@ function InstalledPane({ instance, kind, content }: { instance: Instance; kind: 
               Matching with Modrinth
             </span>
           )}
-          <button className="icon-btn" title={`Open ${info.folder} folder`} aria-label={`Open ${info.folder} folder`} onClick={() => act(launcher.openInstanceDir(instance.id, kind))}>
+          <button className="icon-btn" title={`Open ${info.folder} folder`} aria-label={`Open ${info.folder} folder`} onClick={() => act(launcher.openInstanceDir(instance.id, info.folder))}>
             <Icon name="folder_open" />
           </button>
         </div>
@@ -158,10 +166,11 @@ function InstalledPane({ instance, kind, content }: { instance: Instance; kind: 
             <input className="input" aria-label={`Filter installed ${info.noun}`} placeholder={`Filter ${info.noun}`} value={filter} onChange={(e) => setFilter(e.target.value)} />
           </label>
         )}
+        {running && <span className="identifying">Close the game to change installed {info.noun}.</span>}
         {(error || content.error) && <Banner message={error || errorMessage(content.error)} onDismiss={() => setError("")} />}
       </div>
 
-      <div className="cpane-list">
+      <fieldset className="cpane-list" disabled={running}>
         {!items ? (
           Array.from({ length: 4 }, (_, i) => <div key={i} className="skeleton" style={{ height: 52, flexShrink: 0 }} />)
         ) : !items.length ? (
@@ -192,7 +201,7 @@ function InstalledPane({ instance, kind, content }: { instance: Instance; kind: 
             </div>
           ))
         )}
-      </div>
+      </fieldset>
 
       <ConfirmDialog
         open={!!removing}

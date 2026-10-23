@@ -41,6 +41,13 @@ export interface ModFile {
   size: number;
 }
 
+export interface Screenshot {
+  file: string;
+  size: number;
+  /** Unix seconds. */
+  taken: number;
+}
+
 export interface Snapshot {
   settings: Settings;
   /** Signed-in Microsoft player name; null = offline. */
