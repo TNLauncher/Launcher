@@ -1,3 +1,4 @@
+@layer kit {
 .btn {
   width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0;
   background: rgb(255 255 255 / 0.08); border: 1px solid rgb(255 255 255 / 0.06); color: var(--icon);
@@ -8,3 +9,4 @@
 .btn :global(.icon) { font-size: 16px; }
 .danger:hover { background: rgb(255 69 58 / 0.18); color: var(--critical); }
 .overlay { width: 40px; height: 40px; background: rgb(0 0 0 / 0.35); backdrop-filter: blur(12px); }
+}

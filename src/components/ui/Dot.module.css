@@ -1,5 +1,7 @@
+@layer kit {
 .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--subtle); flex-shrink: 0; }
 .green { background: var(--green); }
 .blue { background: var(--accent); }
 .orange { background: var(--warning); }
 .red { background: var(--critical); }
+}

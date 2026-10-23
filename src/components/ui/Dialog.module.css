@@ -1,3 +1,4 @@
+@layer kit {
 .dialog {
   width: 440px; padding: 0; border-radius: 18px; color: var(--fg);
   background: var(--popover); border: 1px solid var(--border); box-shadow: var(--lift), var(--highlight);
@@ -8,3 +9,4 @@
 .head h2 { margin: 0; font-size: 15px; font-weight: 600; }
 .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
 .text { margin: 0; color: var(--muted); }
+}

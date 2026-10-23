@@ -1,2 +1,4 @@
+@layer kit {
 .empty { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 48px 16px; text-align: center; color: var(--muted); }
 .empty > :global(.icon) { font-size: 32px; color: var(--subtle); }
+}

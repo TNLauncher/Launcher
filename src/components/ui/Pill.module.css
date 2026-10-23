@@ -1,3 +1,4 @@
+@layer kit {
 .group { display: flex; gap: 6px; overflow-x: auto; }
 .wrap { flex-wrap: wrap; overflow: visible; }
 .pill {
@@ -9,3 +10,4 @@
 .pill[aria-pressed="true"] { background: var(--accent-fill); color: #fff; font-weight: 500; }
 .pill :global(.icon) { font-size: 16px; }
 .count { opacity: 0.75; }
+}

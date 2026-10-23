@@ -2,17 +2,16 @@ import { useQuery } from "@tanstack/react-query";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getPackVersions, getProject, getProjectsChunked, primaryFile, type GalleryImage, type PackHit, type PackVersion, type Project } from "@/api/modrinth";
-import { Banner } from "@/components/ui/Banner";
-import { EmptyState } from "@/components/ui/EmptyState";
-import { Icon } from "@/components/ui/Icon";
+import { Banner, Button, Chip, Dialog, EmptyState, Field, Icon, IconButton, Select, Skeleton, Tab, Tabs } from "@/components/ui";
 import { Markdown } from "@/components/ui/Markdown";
-import { Select } from "@/components/ui/Select";
+import { cx } from "@/lib/cx";
 import { ago, compact, errorMessage, megabytes } from "@/lib/format";
 import { useLauncher } from "@/store/LauncherContext";
 import { useUi } from "@/store/UiContext";
 import { packColor } from "./ModpacksView";
+import s from "./modpacks.module.css";
 
-type Tab = "description" | "gallery" | "mods" | "versions";
+type Section = "description" | "gallery" | "mods" | "versions";
 const LOADER_NAME: Record<string, string> = { fabric: "Fabric", quilt: "Quilt" };
 
 const dateLabel = (iso: string) => new Date(iso).toLocaleDateString("en", { year: "numeric", month: "short", day: "numeric" });
@@ -22,7 +21,7 @@ export function PackDetail({ hit, preferredVersion, onBack }: { hit: PackHit; pr
   const id = hit.project_id;
   const project = useQuery({ queryKey: ["project", id], queryFn: () => getProject(id) });
   const versions = useQuery({ queryKey: ["pack-versions", id], queryFn: () => getPackVersions(id) });
-  const [tab, setTab] = useState<Tab>("description");
+  const [tab, setTab] = useState<Section>("description");
   const [mc, setMc] = useState("");
   const [versionId, setVersionId] = useState("");
   const top = useRef<HTMLDivElement>(null);
@@ -46,40 +45,39 @@ export function PackDetail({ hit, preferredVersion, onBack }: { hit: PackHit; pr
   const modCount = version?.dependencies.length ?? 0;
 
   return (
-    <div className="pack-page" style={{ "--pack": packColor(hit.color) } as React.CSSProperties}>
+    <div className={s.packPage} style={{ "--pack": packColor(hit.color) } as React.CSSProperties}>
       <div ref={top} />
-      <div className="pack-hero">
-        {banner && <img className="pack-hero-bg" src={banner} alt="" />}
-        <div className="pack-hero-inner">
-          <button className="btn small pack-back" onClick={onBack}>
-            <Icon name="arrow_back" />
+      <div className={s.packHero}>
+        {banner && <img className={s.packHeroBg} src={banner} alt="" />}
+        <div className={s.packHeroInner}>
+          <Button variant="overlay" size="sm" icon="arrow_back" className={s.packBack} onClick={onBack}>
             Modpacks
-          </button>
-          <div className="pack-hero-main">
-            <span className="pack-icon big">{hit.icon_url ? <img src={hit.icon_url} alt="" /> : <Icon name="inventory_2" />}</span>
-            <div className="pack-hero-text">
+          </Button>
+          <div className={s.packHeroMain}>
+            <span className={cx(s.packIcon, s.big)}>{hit.icon_url ? <img src={hit.icon_url} alt="" /> : <Icon name="inventory_2" />}</span>
+            <div className={s.packHeroText}>
               <h1>{hit.title}</h1>
               <p>{hit.description}</p>
-              <div className="pack-meta">
-                <span>by <b>{hit.author}</b></span>
-                <span className="mono"><Icon name="download" />{compact(hit.downloads)}</span>
-                <span className="mono"><Icon name="favorite" />{compact(hit.follows)}</span>
-                <span><Icon name="update" />Updated {ago(hit.date_modified)}</span>
+              <div className={s.packMeta}>
+                <span className={s.stat}>by <b>{hit.author}</b></span>
+                <span className={cx(s.stat, "mono")}><Icon name="download" />{compact(hit.downloads)}</span>
+                <span className={cx(s.stat, "mono")}><Icon name="favorite" />{compact(hit.follows)}</span>
+                <span className={s.stat}><Icon name="update" />Updated {ago(hit.date_modified)}</span>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="pack-columns">
-        <div className="pack-content">
-          <div className="tabs" role="tablist" aria-label="Modpack sections">
-            <TabButton tab="description" current={tab} onSelect={setTab}>Description</TabButton>
-            {gallery.length > 0 && <TabButton tab="gallery" current={tab} onSelect={setTab}>Gallery <span className="mono">{gallery.length}</span></TabButton>}
-            {modCount > 0 && <TabButton tab="mods" current={tab} onSelect={setTab}>Mods <span className="mono">{modCount}</span></TabButton>}
-            <TabButton tab="versions" current={tab} onSelect={setTab}>Versions <span className="mono">{all.length || ""}</span></TabButton>
-          </div>
-          <div role="tabpanel" className="pack-panel">
+      <div className={s.packColumns}>
+        <div className={s.packContent}>
+          <Tabs label="Modpack sections">
+            <Tab selected={tab === "description"} onSelect={() => setTab("description")}>Description</Tab>
+            {gallery.length > 0 && <Tab selected={tab === "gallery"} onSelect={() => setTab("gallery")} count={gallery.length}>Gallery</Tab>}
+            {modCount > 0 && <Tab selected={tab === "mods"} onSelect={() => setTab("mods")} count={modCount}>Mods</Tab>}
+            <Tab selected={tab === "versions"} onSelect={() => setTab("versions")} count={all.length || undefined}>Versions</Tab>
+          </Tabs>
+          <div role="tabpanel">
             {project.isError ? (
               <Banner message={`Could not load this modpack: ${errorMessage(project.error)}`} onRetry={() => project.refetch()} />
             ) : tab === "description" ? (
@@ -94,7 +92,7 @@ export function PackDetail({ hit, preferredVersion, onBack }: { hit: PackHit; pr
           </div>
         </div>
 
-        <aside className="pack-side">
+        <aside className={s.packSide}>
           <InstallCard
             hit={hit}
             loading={versions.isPending}
@@ -111,14 +109,6 @@ export function PackDetail({ hit, preferredVersion, onBack }: { hit: PackHit; pr
         </aside>
       </div>
     </div>
-  );
-}
-
-function TabButton({ tab, current, onSelect, children }: { tab: Tab; current: Tab; onSelect(t: Tab): void; children: React.ReactNode }) {
-  return (
-    <button role="tab" className="tab" aria-selected={tab === current} onClick={() => onSelect(tab)}>
-      {children}
-    </button>
   );
 }
 
@@ -140,30 +130,29 @@ function InstallCard(p: {
   const file = p.version && primaryFile(p.version);
 
   return (
-    <div className="side-card install-card">
+    <div className={s.sideCard}>
       <h2>Create instance</h2>
       {p.error ? (
         <Banner message={`Could not load versions: ${p.error}`} onRetry={p.onRetry} />
       ) : !p.loading && !p.mcOptions.length ? (
-        <p className="muted small">This modpack has no Fabric or Quilt version the launcher can run.</p>
+        <p className={s.note}>This modpack has no Fabric or Quilt version the launcher can run.</p>
       ) : (
         <>
-          <div className="field">
-            <span>Minecraft version</span>
-            <Select label="Minecraft version" value={p.mc} onChange={p.onMc} placeholder="Loading…" options={p.mcOptions.map((v) => ({ value: v, label: v }))} />
-          </div>
-          <div className="field">
-            <span>Modpack version</span>
+          <Field label="Minecraft version" asLabel={false}>
+            <Select label="Minecraft version" className={s.sideCardSelect} value={p.mc} onChange={p.onMc} placeholder="Loading…" options={p.mcOptions.map((v) => ({ value: v, label: v }))} />
+          </Field>
+          <Field label="Modpack version" asLabel={false}>
             <Select
               label="Modpack version"
+              className={s.sideCardSelect}
               value={p.version?.id ?? ""}
               onChange={p.onVersion}
               placeholder="Loading…"
               options={p.forMc.map((v) => ({ value: v.id, label: v.version_number, hint: v.version_type === "release" ? undefined : v.version_type }))}
             />
-          </div>
+          </Field>
           {p.version && (
-            <dl className="install-facts">
+            <dl className={s.installFacts}>
               <dt>Loader</dt>
               <dd>{p.version.loaders.map((l) => LOADER_NAME[l] ?? l).join(", ")}</dd>
               <dt>Released</dt>
@@ -179,23 +168,26 @@ function InstallCard(p: {
             </dl>
           )}
           {p.version && p.version.version_type !== "release" && (
-            <p className="install-note">
+            <p className={s.installNote}>
               <Icon name="science" />
               This is a {p.version.version_type} build and may be unstable.
             </p>
           )}
-          <button
-            className="btn primary install-btn"
-            disabled={!p.version || installing}
+          <Button
+            variant="primary"
+            size="lg"
+            icon="download"
+            className={s.installBtn}
+            disabled={!p.version}
+            loading={installing}
             onClick={() => {
               startImport(p.hit, p.version);
               navigate("instances");
             }}
           >
-            <Icon name={installing ? "progress_activity" : "download"} spin={installing} />
             {installing ? "Installing…" : "Install"}
-          </button>
-          <p className="muted small">Mods download now; Minecraft itself downloads on first launch.</p>
+          </Button>
+          <p className={s.note}>Mods download now; Minecraft itself downloads on first launch.</p>
         </>
       )}
     </div>
@@ -211,9 +203,9 @@ function About({ project: p }: { project: Project }) {
     ["Discord", "forum", p.discord_url],
   ];
   return (
-    <div className="side-card">
+    <div className={s.sideCard}>
       <h2>About</h2>
-      <dl className="install-facts">
+      <dl className={s.installFacts}>
         <dt>Published</dt>
         <dd>{dateLabel(p.published)}</dd>
         {p.license && (
@@ -223,10 +215,10 @@ function About({ project: p }: { project: Project }) {
           </>
         )}
       </dl>
-      <div className="side-links">
+      <div className={s.sideLinks}>
         {links.map(([label, icon, url]) =>
           url ? (
-            <button key={label} className="side-link" onClick={() => openUrl(url)}>
+            <button key={label} className={s.sideLink} onClick={() => openUrl(url)}>
               <Icon name={icon} />
               {label}
             </button>
@@ -239,34 +231,30 @@ function About({ project: p }: { project: Project }) {
 
 function Gallery({ images }: { images: GalleryImage[] }) {
   const [index, setIndex] = useState<number | null>(null);
-  const dialog = useRef<HTMLDialogElement>(null);
+  const close = () => setIndex(null);
   const shown = index == null ? null : images[index];
   const step = (d: number) => setIndex((i) => (i == null ? i : (i + d + images.length) % images.length));
 
-  useEffect(() => {
-    if (index != null && !dialog.current?.open) dialog.current?.showModal();
-  }, [index]);
-
   return (
     <>
-      <div className="gallery">
+      <div className={s.gallery}>
         {images.map((img, i) => (
-          <button key={img.url} className="gallery-item" onClick={() => setIndex(i)}>
+          <button key={img.url} className={s.galleryItem} onClick={() => setIndex(i)}>
             <img src={img.url} alt={img.title ?? ""} loading="lazy" />
             {img.title && <span>{img.title}</span>}
           </button>
         ))}
       </div>
-      <dialog
-        ref={dialog}
-        className="lightbox"
+      <Dialog
+        open={index != null}
+        className={s.lightbox}
         aria-label="Screenshot"
-        onClose={() => setIndex(null)}
+        onClose={close}
         onKeyDown={(e) => {
           if (e.key === "ArrowRight") step(1);
           if (e.key === "ArrowLeft") step(-1);
         }}
-        onClick={(e) => e.target === e.currentTarget && dialog.current?.close()}
+        onClick={(e) => e.target === e.currentTarget && close()}
       >
         {shown && (
           <figure>
@@ -276,16 +264,16 @@ function Gallery({ images }: { images: GalleryImage[] }) {
                 {shown.title && <b>{shown.title}</b>}
                 {shown.description && <span>{shown.description}</span>}
               </div>
-              <div className="lightbox-nav">
-                <span className="mono">{(index ?? 0) + 1} / {images.length}</span>
-                <button className="icon-btn" aria-label="Previous" onClick={() => step(-1)}><Icon name="chevron_left" /></button>
-                <button className="icon-btn" aria-label="Next" onClick={() => step(1)}><Icon name="chevron_right" /></button>
-                <button className="icon-btn" aria-label="Close" onClick={() => dialog.current?.close()}><Icon name="close" /></button>
+              <div className={s.lightboxNav}>
+                <span className={cx(s.lightboxCount, "mono")}>{(index ?? 0) + 1} / {images.length}</span>
+                <IconButton icon="chevron_left" label="Previous" onClick={() => step(-1)} />
+                <IconButton icon="chevron_right" label="Next" onClick={() => step(1)} />
+                <IconButton icon="close" label="Close" onClick={close} />
               </div>
             </figcaption>
           </figure>
         )}
-      </dialog>
+      </Dialog>
     </>
   );
 }
@@ -296,26 +284,26 @@ function ModList({ version }: { version: PackVersion }) {
   const mods = useQuery({ queryKey: ["projects", ids], queryFn: () => getProjectsChunked(ids), enabled: ids.length > 0 });
 
   if (mods.isError) return <Banner message={`Could not load the mod list: ${errorMessage(mods.error)}`} onRetry={() => mods.refetch()} />;
-  if (ids.length && !mods.data) return <div className="mod-grid">{Array.from({ length: 8 }, (_, i) => <div key={i} className="skeleton" style={{ height: 56 }} />)}</div>;
+  if (ids.length && !mods.data) return <div className={s.modGrid}>{Array.from({ length: 8 }, (_, i) => <Skeleton key={i} height={56} />)}</div>;
   return (
     <>
-      <p className="muted small">
+      <p className={s.note}>
         Contents of version <span className="mono">{version.version_number}</span>.
       </p>
-      <div className="mod-grid">
+      <div className={s.modGrid}>
         {mods.data?.map((m) => (
-          <button key={m.id} className="mod-cell" title={m.description} onClick={() => openUrl(`https://modrinth.com/${m.project_type}/${m.slug}`)}>
-            <span className="pack-icon">{m.icon_url ? <img src={m.icon_url} alt="" loading="lazy" /> : <Icon name="extension" />}</span>
-            <span className="mod-cell-text">
+          <button key={m.id} className={s.modCell} title={m.description} onClick={() => openUrl(`https://modrinth.com/${m.project_type}/${m.slug}`)}>
+            <span className={s.packIcon}>{m.icon_url ? <img src={m.icon_url} alt="" loading="lazy" /> : <Icon name="extension" />}</span>
+            <span className={s.modCellText}>
               <b>{m.title}</b>
               <span>{m.project_type === "mod" ? m.description : m.project_type.replace("resourcepack", "resource pack")}</span>
             </span>
           </button>
         ))}
         {external.map((f) => (
-          <div key={f} className="mod-cell">
-            <span className="pack-icon"><Icon name="draft" /></span>
-            <span className="mod-cell-text"><b>{f}</b><span>Not hosted on Modrinth</span></span>
+          <div key={f} className={s.modCell}>
+            <span className={s.packIcon}><Icon name="draft" /></span>
+            <span className={s.modCellText}><b>{f}</b><span>Not hosted on Modrinth</span></span>
           </div>
         ))}
       </div>
@@ -327,25 +315,25 @@ function VersionList({ versions, loading, selected, onSelect }: { versions: Pack
   if (loading) return <TextSkeleton />;
   if (!versions.length) return <EmptyState icon="history">No Fabric or Quilt versions.</EmptyState>;
   return (
-    <div className="versions">
+    <div className={s.versions}>
       {versions.map((v) => {
         const on = v.id === selected?.id;
         return (
-          <div key={v.id} className={`version ${on ? "on" : ""}`}>
-            <button className="version-head" aria-expanded={on} onClick={() => onSelect(v)}>
-              <span className={`vtype ${v.version_type}`} title={v.version_type}>{v.version_type[0].toUpperCase()}</span>
-              <span className="version-name">
+          <div key={v.id} className={cx(s.version, on && s.on)}>
+            <button className={s.versionHead} aria-expanded={on} onClick={() => onSelect(v)}>
+              <span className={cx(s.vtype, s[v.version_type])} title={v.version_type}>{v.version_type[0].toUpperCase()}</span>
+              <span className={s.versionName}>
                 <b>{v.version_number}</b>
                 <span>{v.name}</span>
               </span>
-              <span className="chip tag">{v.game_versions.join(", ")}</span>
-              <span className="chip">{v.loaders.map((l) => LOADER_NAME[l] ?? l).join(", ")}</span>
-              <span className="version-date">{dateLabel(v.date_published)}</span>
-              {on && <Icon name="check_circle" fill className="version-check" />}
+              <Chip variant="tag" className={s.versionTag}>{v.game_versions.join(", ")}</Chip>
+              <Chip>{v.loaders.map((l) => LOADER_NAME[l] ?? l).join(", ")}</Chip>
+              <span className={s.versionDate}>{dateLabel(v.date_published)}</span>
+              {on && <Icon name="check_circle" fill className={s.versionCheck} />}
             </button>
             {on && (
-              <div className="version-body">
-                {v.changelog?.trim() ? <Markdown source={v.changelog} /> : <p className="muted small">No changelog for this version.</p>}
+              <div className={s.versionBody}>
+                {v.changelog?.trim() ? <Markdown source={v.changelog} /> : <p className={s.note}>No changelog for this version.</p>}
               </div>
             )}
           </div>
@@ -357,8 +345,8 @@ function VersionList({ versions, loading, selected, onSelect }: { versions: Pack
 
 function TextSkeleton() {
   return (
-    <div className="text-skeleton">
-      {[92, 100, 76, 0, 100, 88, 64].map((w, i) => (w ? <div key={i} className="skeleton" style={{ width: `${w}%` }} /> : <span key={i} />))}
+    <div className={s.textSkeleton}>
+      {[92, 100, 76, 0, 100, 88, 64].map((w, i) => (w ? <Skeleton key={i} className={s.line} height={12} width={`${w}%`} /> : <span key={i} />))}
     </div>
   );
 }

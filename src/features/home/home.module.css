@@ -45,10 +45,6 @@
 .dock-right { display: flex; justify-content: flex-end; align-items: center; gap: 16px; }
 .progress { width: 208px; display: flex; flex-direction: column; gap: 4px; }
 .progress-top { display: flex; justify-content: space-between; color: var(--muted); }
-.bar { height: 6px; border-radius: 999px; background: var(--btn); overflow: hidden; }
-.bar div { height: 100%; background: var(--accent-fill); border-radius: 999px; transform-origin: left; transform: scaleX(0); transition: transform 300ms var(--ease); }
-.indeterminate div { width: 30%; transform: none; animation: slide 1.2s var(--ease) infinite; }
-@keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(340%); } }
 .play { min-width: 200px; letter-spacing: 0.04em; }
 
 @media (max-width: 1100px) {

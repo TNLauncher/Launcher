@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { launcher } from "@/api/launcher";
-import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { Icon } from "@/components/ui/Icon";
+import { Button, Chip, ConfirmDialog, Dot, Icon, IconButton, Input, Meta } from "@/components/ui";
+import { cx } from "@/lib/cx";
 import { errorMessage, lastPlayed, LOADER_ICON, loaderLabel, playTime, plural } from "@/lib/format";
 import { useLauncher } from "@/store/LauncherContext";
 import { useUi } from "@/store/UiContext";
 import type { Instance } from "@/types";
+import s from "./instances.module.css";
 
 const ICON_PX = 128;
 
@@ -45,13 +46,13 @@ export function InstanceRow({ instance: i, onOpen }: { instance: Instance; onOpe
   return (
     // The name button stays the keyboard entry; this makes the rest of the card a click target too.
     <div
-      className="row openable"
+      className={cx(s.row, s.openable)}
       onClick={(e) => !(e.target as Element).closest("button, input, label, dialog") && onOpen()}
     >
-      <div className="row-main">
-        <label className="row-icon" title="Change icon">
+      <div className={s.rowMain}>
+        <label className={s.rowIcon} title="Change icon">
           {i.icon ? <img src={i.icon} alt="" /> : <Icon name={LOADER_ICON[i.loader]} />}
-          {running && <span className="dot blue" />}
+          {running && <Dot tone="blue" className={s.runningDot} />}
           <input
             type="file"
             accept="image/*"
@@ -63,11 +64,11 @@ export function InstanceRow({ instance: i, onOpen }: { instance: Instance; onOpe
             }}
           />
         </label>
-        <div className="row-text">
-          <div className="row-title">
+        <div className={s.rowText}>
+          <div className={s.rowTitle}>
             {editing ? (
-              <input
-                className="input inline-input"
+              <Input
+                className={s.inlineInput}
                 defaultValue={i.name}
                 autoFocus
                 maxLength={48}
@@ -79,63 +80,39 @@ export function InstanceRow({ instance: i, onOpen }: { instance: Instance; onOpe
                 }}
               />
             ) : (
-              <button className="row-name" onClick={onOpen} title="Mods, resource packs and shaders">
+              <button className={s.rowName} onClick={onOpen} title="Mods, resource packs and shaders">
                 {i.name}
               </button>
             )}
-            <span className="chip tag">{i.version}</span>
-            <span className="chip">{loaderLabel(i)}</span>
+            <Chip variant="tag">{i.version}</Chip>
+            <Chip>{loaderLabel(i)}</Chip>
           </div>
-          <div className="meta small">
-            {rowError ? (
-              <span style={{ color: "var(--critical)" }}>{rowError}</span>
-            ) : (
-              <>
-                <span>{lastPlayed(i.lastPlayed)}</span>
-                {i.playSeconds > 0 && (
-                  <>
-                    <span className="sep">•</span>
-                    <span>{playTime(i.playSeconds)}</span>
-                  </>
-                )}
-                {i.loader !== "vanilla" && (
-                  <>
-                    <span className="sep">•</span>
-                    <span>{plural(snapshot?.modCounts[i.id] ?? 0, "mod")}</span>
-                  </>
-                )}
-              </>
-            )}
-          </div>
+          {rowError ? (
+            <Meta small className={s.error} items={[rowError]} />
+          ) : (
+            <Meta
+              small
+              items={[
+                lastPlayed(i.lastPlayed),
+                i.playSeconds > 0 && playTime(i.playSeconds),
+                i.loader !== "vanilla" && plural(snapshot?.modCounts[i.id] ?? 0, "mod"),
+              ]}
+            />
+          )}
         </div>
       </div>
 
-      <div className="row-actions">
-        <button className="btn" disabled={running || !!busyId} onClick={() => launch(i.id)}>
-          <Icon name={starting ? "progress_activity" : "play_arrow"} fill spin={starting} />
+      <div className={s.rowActions}>
+        <Button icon="play_arrow" loading={starting} disabled={running || !!busyId} onClick={() => launch(i.id)}>
           {running ? "Running" : starting ? "Starting" : "Launch"}
-        </button>
-        <div className="group">
-          <button className="icon-btn" title="Console" onClick={() => (select(i.id), navigate("console"))}>
-            <Icon name="terminal" />
-          </button>
-          <button className="icon-btn" title="Mods, resource packs and shaders" aria-label={`Manage ${i.name}`} onClick={onOpen}>
-            <Icon name="widgets" />
-          </button>
-          <button className="icon-btn" title="Open folder" onClick={() => run(() => launcher.openInstanceDir(i.id))}>
-            <Icon name="folder_open" />
-          </button>
-          {i.icon && (
-            <button className="icon-btn" title="Reset icon" onClick={() => run(() => launcher.setInstanceIcon(i.id, ""))}>
-              <Icon name="hide_image" />
-            </button>
-          )}
-          <button className="icon-btn" title="Rename" onClick={() => setEditing(true)}>
-            <Icon name="edit" />
-          </button>
-          <button className="icon-btn danger" title="Delete" disabled={running} onClick={() => setConfirmDelete(true)}>
-            <Icon name="delete" />
-          </button>
+        </Button>
+        <div className={s.group}>
+          <IconButton icon="terminal" label="Console" onClick={() => (select(i.id), navigate("console"))} />
+          <IconButton icon="widgets" label={`Manage ${i.name}`} title="Mods, resource packs and shaders" onClick={onOpen} />
+          <IconButton icon="folder_open" label="Open folder" onClick={() => run(() => launcher.openInstanceDir(i.id))} />
+          {i.icon && <IconButton icon="hide_image" label="Reset icon" onClick={() => run(() => launcher.setInstanceIcon(i.id, ""))} />}
+          <IconButton icon="edit" label="Rename" onClick={() => setEditing(true)} />
+          <IconButton icon="delete" label="Delete" variant="danger" disabled={running} onClick={() => setConfirmDelete(true)} />
         </div>
       </div>
 

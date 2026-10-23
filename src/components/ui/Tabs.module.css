@@ -1,3 +1,4 @@
+@layer kit {
 .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--card-border); margin-bottom: 20px; }
 .tab {
   position: relative; display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px;
@@ -9,3 +10,4 @@
 .tab :global(.icon) { font-size: 16px; color: var(--subtle); }
 .tab[aria-selected="true"] :global(.icon) { color: var(--accent); }
 .count { font-size: 11px; color: var(--subtle); }
+}

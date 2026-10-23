@@ -1,3 +1,4 @@
+@layer kit {
 .input {
   height: 32px; padding: 0 12px; border-radius: 8px; min-width: 0;
   background: var(--card); border: 1px solid var(--border); box-shadow: var(--highlight);
@@ -13,3 +14,4 @@ textarea.input { height: auto; padding: 10px 12px; resize: vertical; font-family
 .search > :global(.icon) { position: absolute; left: 10px; font-size: 17px; color: var(--subtle); pointer-events: none; }
 .search .input { padding-left: 34px; width: 100%; }
 .search .input::-webkit-search-cancel-button { display: none; }
+}

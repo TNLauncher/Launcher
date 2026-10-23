@@ -1,0 +1,7 @@
+@layer kit {
+.bar { height: 6px; border-radius: 999px; background: var(--btn); overflow: hidden; }
+.fill { height: 100%; background: var(--accent-fill); border-radius: 999px; transform-origin: left; transition: transform 300ms var(--ease); }
+.indeterminate .fill { width: 30%; animation: slide 1.2s var(--ease) infinite; }
+@keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(340%); } }
+@media (prefers-reduced-motion: reduce) { .indeterminate .fill { animation: none; } }
+}

@@ -1,18 +1,17 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { launcher } from "@/api/launcher";
 import { getVersions, type ManifestVersion } from "@/api/mojang";
-import { Icon } from "@/components/ui/Icon";
+import { Banner, Button, Checkbox, Dialog, Field, Input, Pill, PillGroup, Select } from "@/components/ui";
 import { errorMessage, LOADERS } from "@/lib/format";
 import { useLauncher } from "@/store/LauncherContext";
 import { useUi } from "@/store/UiContext";
 import type { Loader } from "@/types";
-import { Select } from "@/components/ui/Select";
+import s from "./instances.module.css";
 
 /** Mounted only while open, so every opening starts from fresh state. */
 export function NewInstanceDialog() {
   const { closeNewInstance, navigate } = useUi();
   const { refresh, select } = useLauncher();
-  const ref = useRef<HTMLDialogElement>(null);
   const [versions, setVersions] = useState<ManifestVersion[] | null>(null);
   const [name, setName] = useState("");
   const [version, setVersion] = useState("");
@@ -22,15 +21,13 @@ export function NewInstanceDialog() {
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
-    ref.current?.showModal();
     getVersions().then(setVersions, (e) => setError(`Could not load versions: ${errorMessage(e)}`));
   }, []);
 
   const shown = (versions ?? []).filter((v) => v.type === "release" || (snapshots && v.type === "snapshot"));
   const chosen = shown.some((v) => v.id === version) ? version : (shown[0]?.id ?? "");
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
+  async function submit() {
     if (!chosen) return;
     setCreating(true);
     setError("");
@@ -47,59 +44,52 @@ export function NewInstanceDialog() {
   }
 
   return (
-    <dialog ref={ref} aria-labelledby="new-instance-title" onClose={closeNewInstance}>
-      <form onSubmit={submit}>
-        <div className="dialog-head">
-          <h2 id="new-instance-title">New instance</h2>
-          <button
-            type="button"
-            className="link"
-            onClick={() => {
-              closeNewInstance();
-              navigate("modpacks");
-            }}
-          >
-            Start from a modpack
-          </button>
-        </div>
-        <label className="field">
-          <span>Name</span>
-          <input className="input" placeholder={chosen || "My world"} maxLength={48} value={name} onChange={(e) => setName(e.target.value)} />
-        </label>
-        <div className="field">
-          <span>Minecraft version</span>
-          <div className="row-inline">
-            <Select label="Minecraft version" style={{ flex: 1 }} value={chosen} onChange={setVersion}
-              placeholder={versions ? "No versions" : "Loading versions…"}
-              options={shown.map((v) => ({ value: v.id, label: v.id, hint: v.type === "snapshot" ? "snapshot" : undefined }))} />
-            <label className="check">
-              <input type="checkbox" checked={snapshots} onChange={(e) => setSnapshots(e.target.checked)} />
-              Snapshots
-            </label>
-          </div>
-        </div>
-        <div className="field">
-          <span>Mod loader</span>
-          <div className="seg">
-            {(Object.keys(LOADERS) as Loader[]).map((l) => (
-              <button key={l} type="button" className="pill" aria-pressed={loader === l} onClick={() => setLoader(l)}>
-                {LOADERS[l]}
-              </button>
-            ))}
-          </div>
-        </div>
-        {error && (
-          <div className="banner">
-            <div className="msg"><Icon name="error" size={18} /><span>{error}</span></div>
-          </div>
-        )}
-        <div className="dialog-actions">
-          <button type="button" className="btn" onClick={closeNewInstance}>Cancel</button>
-          <button type="submit" className="btn primary" disabled={creating || !chosen}>
+    <Dialog
+      open
+      title="New instance"
+      onClose={closeNewInstance}
+      onSubmit={submit}
+      aside={
+        <Button
+          variant="link"
+          onClick={() => {
+            closeNewInstance();
+            navigate("modpacks");
+          }}
+        >
+          Start from a modpack
+        </Button>
+      }
+      actions={
+        <>
+          <Button onClick={closeNewInstance}>Cancel</Button>
+          <Button type="submit" variant="primary" disabled={creating || !chosen}>
             {creating ? "Creating…" : "Create"}
-          </button>
+          </Button>
+        </>
+      }
+    >
+      <Field label="Name">
+        <Input placeholder={chosen || "My world"} maxLength={48} value={name} onChange={(e) => setName(e.target.value)} />
+      </Field>
+      <Field label="Minecraft version" asLabel={false}>
+        <div className={s.rowInline}>
+          <Select label="Minecraft version" className={s.grow} value={chosen} onChange={setVersion}
+            placeholder={versions ? "No versions" : "Loading versions…"}
+            options={shown.map((v) => ({ value: v.id, label: v.id, hint: v.type === "snapshot" ? "snapshot" : undefined }))} />
+          <Checkbox checked={snapshots} onChange={setSnapshots}>Snapshots</Checkbox>
         </div>
-      </form>
-    </dialog>
+      </Field>
+      <Field label="Mod loader" asLabel={false}>
+        <PillGroup label="Mod loader">
+          {(Object.keys(LOADERS) as Loader[]).map((l) => (
+            <Pill key={l} pressed={loader === l} onClick={() => setLoader(l)}>
+              {LOADERS[l]}
+            </Pill>
+          ))}
+        </PillGroup>
+      </Field>
+      {error && <Banner message={error} />}
+    </Dialog>
   );
 }

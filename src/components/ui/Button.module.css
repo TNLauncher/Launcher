@@ -1,3 +1,4 @@
+@layer kit {
 .btn {
   height: 32px; padding: 0 14px; border-radius: 999px;
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
@@ -25,3 +26,7 @@
 .link { height: auto; padding: 0; gap: 4px; border: 0; border-radius: 0; background: none; box-shadow: none; color: var(--link); }
 .link:hover { background: none; text-decoration: underline; text-underline-offset: 2px; }
 .link:active { transform: none; }
+
+.overlay { background: rgb(0 0 0 / 0.35); backdrop-filter: blur(12px); }
+.overlay:hover { background: rgb(0 0 0 / 0.5); }
+}

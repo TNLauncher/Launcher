@@ -1,15 +1,14 @@
 import { keepPreviousData, useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { memo, useEffect, useRef, useState } from "react";
 import { getGameVersions, PACK_CATEGORIES, searchPacks, type PackFilters, type PackHit, type PackLoader, type PackSort } from "@/api/modrinth";
-import { Banner } from "@/components/ui/Banner";
-import { EmptyState } from "@/components/ui/EmptyState";
-import { Icon } from "@/components/ui/Icon";
-import { Select } from "@/components/ui/Select";
+import { View } from "@/components/layout/View";
+import { Banner, Button, Chip, EmptyState, Icon, Pill, PillGroup, SearchInput, Select, Skeleton } from "@/components/ui";
+import { cx } from "@/lib/cx";
 import { useDebounced } from "@/hooks/useDebounced";
 import { ago, compact, errorMessage } from "@/lib/format";
 import { useLauncher } from "@/store/LauncherContext";
 import { PackDetail } from "./PackDetail";
-import "./modpacks.css";
+import s from "./modpacks.module.css";
 
 const SORTS: { value: PackSort; label: string }[] = [
   { value: "relevance", label: "Relevance" },
@@ -66,61 +65,58 @@ export function ModpacksView() {
   };
 
   return (
-    <section className="view">
+    <View>
       {open && <PackDetail hit={open} preferredVersion={gameVersion} onBack={() => setOpen(null)} />}
-      <div className="page packs" hidden={!!open}>
-        <div className="packs-filters">
-          <div className="packs-filter-row">
-            <label className="search packs-search">
-              <Icon name="search" />
-              <input className="input" aria-label="Search modpacks" placeholder="Search modpacks" value={query} onChange={(e) => setQuery(e.target.value)} />
-            </label>
+      <div className={s.packs} hidden={!!open}>
+        <div className={s.packsFilters}>
+          <div className={s.packsFilterRow}>
+            <SearchInput className={s.packsSearch} label="Search modpacks" value={query} onChange={setQuery} />
             <Select
               label="Minecraft version"
-              className="packs-version"
+              className={s.packsVersion}
               value={gameVersion}
               onChange={setGameVersion}
               placeholder="Loading versions…"
               options={[{ value: "", label: "Any version" }, ...(gameVersions.data ?? []).map((v) => ({ value: v, label: v }))]}
             />
-            <div className="seg" role="group" aria-label="Loader">
+            <PillGroup label="Loader">
               {LOADER_PILLS.map(([value, label]) => (
-                <button key={label} className="pill" aria-pressed={loader === value} onClick={() => setLoader(value)}>
+                <Pill key={label} pressed={loader === value} onClick={() => setLoader(value)}>
                   {label}
-                </button>
+                </Pill>
               ))}
-            </div>
-            <Select label="Sort" className="packs-sort" value={sort} onChange={setSort} options={SORTS} />
+            </PillGroup>
+            <Select label="Sort" className={s.packsSort} value={sort} onChange={setSort} options={SORTS} />
           </div>
-          <div className="packs-filter-row">
-            <div className="pills" role="group" aria-label="Categories">
+          <div className={s.packsFilterRow}>
+            <PillGroup label="Categories" wrap>
               {PACK_CATEGORIES.map(([key, label]) => (
-                <button key={key} className="pill" aria-pressed={categories.includes(key)} onClick={() => toggleCategory(key)}>
+                <Pill key={key} pressed={categories.includes(key)} onClick={() => toggleCategory(key)}>
                   {label}
-                </button>
+                </Pill>
               ))}
-            </div>
+            </PillGroup>
           </div>
         </div>
 
-        <div className="packs-summary" aria-live="polite">
+        <div className={s.packsSummary} aria-live="polite">
           <span className="mono">{packs.data ? `${total.toLocaleString("en")} modpacks` : "Searching…"}</span>
           {filtered && (
-            <button className="link" onClick={reset}>
+            <Button variant="link" onClick={reset}>
               Clear filters
-            </button>
+            </Button>
           )}
         </div>
 
-        <div className={`packs-list ${packs.isPlaceholderData ? "stale" : ""}`}>
+        <div className={cx(s.packsList, packs.isPlaceholderData && s.stale)}>
           {packs.isError && !packs.data ? (
             <Banner message={`Modrinth search failed: ${errorMessage(packs.error)}`} onRetry={() => packs.refetch()} />
           ) : !packs.data ? (
-            Array.from({ length: 5 }, (_, i) => <div key={i} className="skeleton" style={{ height: 124 }} />)
+            Array.from({ length: 5 }, (_, i) => <Skeleton key={i} height={124} />)
           ) : !hits.length ? (
             <EmptyState
               icon="search_off"
-              action={filtered && <button className="btn" onClick={reset}>Clear filters</button>}
+              action={filtered && <Button onClick={reset}>Clear filters</Button>}
             >
               No Fabric or Quilt modpacks match these filters.
             </EmptyState>
@@ -128,11 +124,11 @@ export function ModpacksView() {
             hits.map((h) => <PackRow key={h.project_id} hit={h} onOpen={setOpen} />)
           )}
           <div ref={sentinel} />
-          {isFetchingNextPage && <div className="skeleton" style={{ height: 124 }} />}
+          {isFetchingNextPage && <Skeleton height={124} />}
           {packs.isFetchNextPageError && <Banner message="Could not load more modpacks." onRetry={() => fetchNextPage()} />}
         </div>
       </div>
-    </section>
+    </View>
   );
 }
 
@@ -142,28 +138,28 @@ const PackRow = memo(function PackRow({ hit: h, onOpen }: { hit: PackHit; onOpen
   const cats = h.categories.filter((c) => c in CATEGORY_LABEL);
   const mc = h.versions.length > 1 ? `${h.versions[0]} – ${h.versions.at(-1)}` : h.versions[0];
   return (
-    <button className="pack-row" onClick={() => onOpen(h)} style={{ "--pack": packColor(h.color) } as React.CSSProperties}>
-      <div className="pack-thumb">
-        {h.featured_gallery ? <img src={h.featured_gallery} alt="" loading="lazy" /> : h.icon_url && <img className="blur" src={h.icon_url} alt="" loading="lazy" />}
+    <button className={s.packRow} onClick={() => onOpen(h)} style={{ "--pack": packColor(h.color) } as React.CSSProperties}>
+      <div className={s.packThumb}>
+        {h.featured_gallery ? <img src={h.featured_gallery} alt="" loading="lazy" /> : h.icon_url && <img className={s.blur} src={h.icon_url} alt="" loading="lazy" />}
       </div>
-      <div className="pack-body">
-        <div className="pack-title">
-          <span className="pack-icon">{h.icon_url ? <img src={h.icon_url} alt="" loading="lazy" /> : <Icon name="inventory_2" />}</span>
+      <div className={s.packBody}>
+        <div className={s.packTitle}>
+          <span className={s.packIcon}>{h.icon_url ? <img src={h.icon_url} alt="" loading="lazy" /> : <Icon name="inventory_2" />}</span>
           <strong>{h.title}</strong>
-          <span className="by">by {h.author}</span>
-          {installing && <span className="chip installing"><Icon name="progress_activity" spin />Installing</span>}
+          <span className={s.by}>by {h.author}</span>
+          {installing && <Chip variant="accent" icon="progress_activity" spin>Installing</Chip>}
         </div>
-        <p className="pack-desc">{h.description}</p>
-        <div className="pack-meta">
-          <span className="mono"><Icon name="download" />{compact(h.downloads)}</span>
-          <span className="mono"><Icon name="favorite" />{compact(h.follows)}</span>
-          <span><Icon name="update" />{ago(h.date_modified)}</span>
-          {mc && <span className="chip tag">{mc}</span>}
-          {loaders.map((l) => <span key={l} className="chip">{l === "fabric" ? "Fabric" : "Quilt"}</span>)}
-          {cats.map((c) => <span key={c} className="chip ghost">{CATEGORY_LABEL[c]}</span>)}
+        <p className={s.packDesc}>{h.description}</p>
+        <div className={s.packMeta}>
+          <span className={cx(s.stat, "mono")}><Icon name="download" />{compact(h.downloads)}</span>
+          <span className={cx(s.stat, "mono")}><Icon name="favorite" />{compact(h.follows)}</span>
+          <span className={s.stat}><Icon name="update" />{ago(h.date_modified)}</span>
+          {mc && <Chip variant="tag">{mc}</Chip>}
+          {loaders.map((l) => <Chip key={l}>{l === "fabric" ? "Fabric" : "Quilt"}</Chip>)}
+          {cats.map((c) => <Chip key={c} variant="ghost">{CATEGORY_LABEL[c]}</Chip>)}
         </div>
       </div>
-      <Icon name="chevron_right" className="pack-chevron" />
+      <Icon name="chevron_right" className={s.packChevron} />
     </button>
   );
 });

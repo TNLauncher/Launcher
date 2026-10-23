@@ -1,3 +1,5 @@
+@layer kit {
 .meta { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
 .small { font-size: 11px; }
 .sep { opacity: 0.3; }
+}

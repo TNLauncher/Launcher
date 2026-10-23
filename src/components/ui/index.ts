@@ -12,6 +12,7 @@ export { IconButton } from "./IconButton";
 export { Input, SearchInput, Textarea } from "./Input";
 export { Meta } from "./Meta";
 export { Pill, PillGroup } from "./Pill";
+export { ProgressBar } from "./ProgressBar";
 export { SectionHead } from "./SectionHead";
 export { Select, type SelectOption } from "./Select";
 export { Skeleton } from "./Skeleton";

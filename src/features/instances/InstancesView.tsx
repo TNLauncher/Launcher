@@ -1,15 +1,14 @@
 import { useMemo, useState } from "react";
-import { Banner } from "@/components/ui/Banner";
-import { EmptyState } from "@/components/ui/EmptyState";
-import { Icon } from "@/components/ui/Icon";
+import { View } from "@/components/layout/View";
+import { Banner, Button, Chip, EmptyState, Icon, IconButton, Meta, Pill, PillGroup, ProgressBar, SearchInput, Select } from "@/components/ui";
+import { cx } from "@/lib/cx";
 import { LOADERS, recency } from "@/lib/format";
 import { useLauncher, type PendingImport } from "@/store/LauncherContext";
 import { useUi } from "@/store/UiContext";
 import type { Instance, Loader } from "@/types";
 import { InstancePage } from "./InstancePage";
 import { InstanceRow } from "./InstanceRow";
-import "./instances.css";
-import { Select } from "@/components/ui/Select";
+import s from "./instances.module.css";
 
 type Sort = "played" | "name" | "time";
 const SORTERS: Record<Sort, (a: Instance, b: Instance) => number> = {
@@ -42,50 +41,45 @@ export function InstancesView() {
   const opened = all.find((i) => i.id === openId);
 
   return (
-    <section className="view">
+    <View>
       {opened && <InstancePage instance={opened} onBack={() => setOpenId(null)} />}
-      <div className="page" hidden={!!opened}>
+      <div className={s.page} hidden={!!opened}>
         {error && <Banner message={error.message} onRetry={() => launch(error.id)} onDismiss={clearError} />}
-        <div className="toolbar">
-          <div className="toolbar-left">
-            <label className="search">
-              <Icon name="search" />
-              <input className="input" placeholder="Filter instances" value={query} onChange={(e) => setQuery(e.target.value)} />
-            </label>
-            <div className="vsep" />
-            <div className="pills">
+        <div className={s.toolbar}>
+          <div className={s.toolbarLeft}>
+            <SearchInput className={s.search} label="Filter instances" value={query} onChange={setQuery} />
+            <div className={s.vsep} />
+            <PillGroup label="Loader">
               {FILTERS.filter((k) => k === "all" || counts[k]).map((k) => (
-                <button key={k} className="pill" aria-pressed={loader === k} onClick={() => setLoader(k)}>
+                <Pill key={k} pressed={loader === k} onClick={() => setLoader(k)} count={counts[k] ?? 0}>
                   {k === "all" ? "All" : LOADERS[k]}
-                  <span className="mono">{counts[k] ?? 0}</span>
-                </button>
+                </Pill>
               ))}
-            </div>
+            </PillGroup>
           </div>
-          <div className="toolbar-right">
+          <div className={s.toolbarRight}>
             <Select label="Sort" value={sort} onChange={setSort}
               options={[
                 { value: "played", label: "Last played" },
                 { value: "name", label: "Name" },
                 { value: "time", label: "Play time" },
               ]} />
-            <button className="btn" onClick={openNewInstance}>
-              <Icon name="add" />
+            <Button icon="add" onClick={openNewInstance}>
               Create instance
-            </button>
+            </Button>
           </div>
         </div>
 
-        <div className="rows">
+        <div className={s.rows}>
           {imports.map((p) => <ImportRow key={p.projectId} pending={p} />)}
           {!all.length ? (
             !imports.length && (
               <EmptyState
                 icon="layers"
                 action={
-                  <div className="empty-actions">
-                    <button className="btn primary" onClick={() => navigate("modpacks")}><Icon name="inventory_2" />Browse modpacks</button>
-                    <button className="btn" onClick={openNewInstance}><Icon name="add" />Blank instance</button>
+                  <div className={s.emptyActions}>
+                    <Button variant="primary" icon="inventory_2" onClick={() => navigate("modpacks")}>Browse modpacks</Button>
+                    <Button icon="add" onClick={openNewInstance}>Blank instance</Button>
                   </div>
                 }
               >
@@ -99,12 +93,12 @@ export function InstancesView() {
           )}
         </div>
 
-        <div className="page-foot">
+        <div className={s.pageFoot}>
           <span>Java: <b>managed by launcher</b></span>
           <span className="mono selectable">{snapshot?.dataDir}</span>
         </div>
       </div>
-    </section>
+    </View>
   );
 }
 
@@ -113,39 +107,31 @@ function ImportRow({ pending: p }: { pending: PendingImport }) {
   const { startImport, dismissImport } = useLauncher();
   const pct = p.total ? (p.done / p.total) * 100 : 0;
   return (
-    <div className="row import-row" role="status" aria-busy={!p.error}>
-      <div className="row-main">
-        <div className="row-icon">{p.iconUrl ? <img src={p.iconUrl} alt="" /> : <Icon name="inventory_2" />}</div>
-        <div className="row-text">
-          <div className="row-title">
+    <div className={cx(s.row, s.importRow)} role="status" aria-busy={!p.error}>
+      <div className={s.rowMain}>
+        <div className={s.rowIcon}>{p.iconUrl ? <img src={p.iconUrl} alt="" /> : <Icon name="inventory_2" />}</div>
+        <div className={s.rowText}>
+          <div className={s.rowTitle}>
             <strong>{p.title}</strong>
-            {p.version && <span className="chip tag">{p.version.game_versions.at(-1)}</span>}
-            {p.version && <span className="chip">{p.version.version_number}</span>}
+            {p.version && <Chip variant="tag">{p.version.game_versions.at(-1)}</Chip>}
+            {p.version && <Chip>{p.version.version_number}</Chip>}
           </div>
           {p.error ? (
-            <div className="meta small" style={{ color: "var(--critical)" }}>{p.error}</div>
+            <Meta small className={s.error} items={[p.error]} />
           ) : (
-            <div className="import-progress">
-              <div className={`bar ${p.total ? "" : "indeterminate"}`}>
-                <div style={p.total ? { transform: `scaleX(${pct / 100})` } : undefined} />
-              </div>
-              <span className="meta small mono">{p.total ? `${p.done} / ${p.total} files` : "Preparing…"}</span>
+            <div className={s.importProgress}>
+              <ProgressBar value={p.total ? pct / 100 : undefined} />
+              <Meta small className="mono" items={[p.total ? `${p.done} / ${p.total} files` : "Preparing…"]} />
             </div>
           )}
         </div>
       </div>
       {p.error && (
-        <div className="row-actions">
-          <button
-            className="btn"
-            onClick={() => startImport({ project_id: p.projectId, title: p.title, icon_url: p.iconUrl }, p.version)}
-          >
-            <Icon name="refresh" />
+        <div className={s.rowActions}>
+          <Button icon="refresh" onClick={() => startImport({ project_id: p.projectId, title: p.title, icon_url: p.iconUrl }, p.version)}>
             Retry
-          </button>
-          <button className="icon-btn" title="Dismiss" aria-label="Dismiss" onClick={() => dismissImport(p.projectId)}>
-            <Icon name="close" />
-          </button>
+          </Button>
+          <IconButton icon="close" label="Dismiss" onClick={() => dismissImport(p.projectId)} />
         </div>
       )}
     </div>

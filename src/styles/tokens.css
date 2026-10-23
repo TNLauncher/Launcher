@@ -1,4 +1,6 @@
 /* Fabric Graphite tokens (~/.config/fabric/DESIGN.md) */
+/* Unlayered feature modules beat both layers, whatever order chunks load in. */
+@layer base, kit;
 :root {
   --lowest: #121214;
   --view: #161618;

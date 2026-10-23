@@ -4,8 +4,8 @@ import { Icon } from "./Icon";
 import s from "./Button.module.css";
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  /** primary: main action · destructive: confirm a deletion · danger: stop/abort · link: inline text action */
-  variant?: "default" | "primary" | "destructive" | "danger" | "link";
+  /** primary: main action · destructive: confirm a deletion · danger: stop/abort · link: inline text action · overlay: on top of imagery */
+  variant?: "default" | "primary" | "destructive" | "danger" | "link" | "overlay";
   size?: "sm" | "md" | "lg";
   icon?: string;
   /** Swaps the icon for a spinner and disables the button. */

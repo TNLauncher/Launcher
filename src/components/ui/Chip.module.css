@@ -1,3 +1,4 @@
+@layer kit {
 .chip {
   display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 999px;
   background: var(--btn); border: 1px solid rgb(255 255 255 / 0.06);
@@ -8,3 +9,4 @@
 .ghost { background: transparent; font-family: inherit; }
 .warn { background: rgb(255 159 10 / 0.15); border-color: rgb(255 159 10 / 0.3); color: var(--warning); font-family: inherit; font-weight: 500; }
 .accent { background: rgb(10 132 255 / 0.12); border-color: rgb(10 132 255 / 0.3); color: var(--accent); font-family: inherit; }
+}

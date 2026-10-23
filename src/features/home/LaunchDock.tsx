@@ -1,4 +1,4 @@
-import { Button, Chip, Dot, IconButton, Select, type Tone } from "@/components/ui";
+import { Button, Chip, Dot, IconButton, ProgressBar, Select, type Tone } from "@/components/ui";
 import { cx } from "@/lib/cx";
 import { STAGE_LABEL } from "@/lib/format";
 import { useLauncher, useProgress, useRecentInstances } from "@/store/LauncherContext";
@@ -45,9 +45,7 @@ export function LaunchDock() {
               <span>{STAGE_LABEL[progress.stage]}</span>
               <span>{known ? `${Math.floor(pct)}%` : ""}</span>
             </div>
-            <div className={cx(s.bar, !known && s.indeterminate)}>
-              <div style={known ? { transform: `scaleX(${pct / 100})` } : undefined} />
-            </div>
+            <ProgressBar value={known ? pct / 100 : undefined} />
           </div>
         )}
         <Button variant="primary" size="lg" icon="play_arrow" className={s.play} disabled={!inst || running || !!busyId} onClick={() => inst && launch(inst.id)}>
