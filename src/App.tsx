@@ -5,7 +5,7 @@ import { Titlebar } from "@/components/layout/Titlebar";
 import { HomeView } from "@/features/home/HomeView";
 import { LauncherProvider } from "@/store/LauncherContext";
 import { UiProvider, useUi, type View } from "@/store/UiContext";
-import "@/components/layout/layout.css";
+import s from "@/components/layout/Shell.module.css";
 
 // Home is the first screen and stays in the main chunk; the rest load on first visit.
 const VIEWS: Record<View, ComponentType> = {
@@ -25,7 +25,7 @@ function Shell() {
     <>
       <Sidebar />
       <Titlebar />
-      <main>
+      <main className={s.main}>
         <Suspense>
           <Current />
         </Suspense>

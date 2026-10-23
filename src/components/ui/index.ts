@@ -10,6 +10,7 @@ export { Checkbox, Field } from "./Field";
 export { Icon } from "./Icon";
 export { IconButton } from "./IconButton";
 export { Input, SearchInput, Textarea } from "./Input";
+export { Meta } from "./Meta";
 export { Pill, PillGroup } from "./Pill";
 export { SectionHead } from "./SectionHead";
 export { Select, type SelectOption } from "./Select";

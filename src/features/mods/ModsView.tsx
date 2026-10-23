@@ -1,11 +1,11 @@
 import { useMemo, useState } from "react";
-import { EmptyState } from "@/components/ui/EmptyState";
-import { Icon } from "@/components/ui/Icon";
-import { Select } from "@/components/ui/Select";
+import { View } from "@/components/layout/View";
+import { Button, EmptyState, Select } from "@/components/ui";
 import { InstanceContent } from "@/features/content/InstanceContent";
 import { loaderLabel } from "@/lib/format";
 import { useLauncher, useRecentInstances } from "@/store/LauncherContext";
 import { useUi } from "@/store/UiContext";
+import s from "./mods.module.css";
 
 /** Content of any instance, picked here; the same panes live on each instance's own page. */
 export function ModsView() {
@@ -21,26 +21,26 @@ export function ModsView() {
 
   if (!instance) {
     return (
-      <section className="view">
-        <EmptyState icon="extension_off" action={<button className="btn primary" onClick={openNewInstance}><Icon name="add" />Create instance</button>}>
+      <View>
+        <EmptyState icon="extension_off" action={<Button variant="primary" icon="add" onClick={openNewInstance}>Create instance</Button>}>
           Create an instance first: mods, resource packs and shaders live inside one.
         </EmptyState>
-      </section>
+      </View>
     );
   }
 
   return (
-    <section className="view mods-view">
-      <div className="mods-head">
+    <View className={s.mods}>
+      <div className={s.head}>
         <Select
           label="Instance"
-          className="mods-picker"
+          className={s.picker}
           value={instance.id}
           onChange={setPickedId}
           options={recent.map((i) => ({ value: i.id, label: i.name, hint: `${i.version} · ${loaderLabel(i)}` }))}
         />
       </div>
       <InstanceContent key={instance.id} instance={instance} />
-    </section>
+    </View>
   );
 }

@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { getPatchNotes, type PatchNote } from "@/api/mojang";
+import { Dot, SectionHead, Skeleton } from "@/components/ui";
+import s from "./home.module.css";
 
 export function PatchNotes() {
   const [notes, setNotes] = useState<PatchNote[] | null>(null);
@@ -10,19 +12,17 @@ export function PatchNotes() {
   }, []);
 
   return (
-    <div className="home-section">
-      <div className="section-head">
-        <h2>Minecraft patch notes</h2>
-      </div>
-      <div className="news">
+    <div className={s.section}>
+      <SectionHead title="Minecraft patch notes" />
+      <div className={s.news}>
         {failed ? (
-          <div className="news-row"><div className="t"><span className="dot" /><span>Patch notes are unavailable offline.</span></div></div>
+          <div className={s.newsRow}><div className={s.newsTitle}><Dot className={s.newsDot} /><span>Patch notes are unavailable offline.</span></div></div>
         ) : !notes ? (
-          <div className="skeleton" style={{ height: 120 }} />
+          <Skeleton height={120} />
         ) : (
           notes.map((n) => (
-            <div className="news-row" key={n.version}>
-              <div className="t"><span className="dot" /><span>{n.title}</span></div>
+            <div className={s.newsRow} key={n.version}>
+              <div className={s.newsTitle}><Dot className={s.newsDot} /><span>{n.title}</span></div>
               <span className="mono subtle">
                 {new Date(n.date).toLocaleDateString(undefined, { month: "short", day: "2-digit", year: "numeric" })}
               </span>

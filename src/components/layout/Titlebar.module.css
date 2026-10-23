@@ -1,0 +1,13 @@
+.titlebar {
+  position: fixed; top: 0; left: 64px; right: 0; height: 40px; z-index: 40;
+  background: rgb(35 35 38 / 0.9); backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--card-border); box-shadow: var(--highlight);
+  display: flex; align-items: center; justify-content: space-between; padding: 0 12px 0 20px;
+}
+.title { font-size: 12px; font-weight: 500; color: var(--subtle); }
+.title span { color: var(--fg); margin-left: 6px; }
+.win-btns { display: flex; gap: 4px; }
+.win-btns button { width: 28px; height: 28px; border-radius: 6px; display: grid; place-items: center; color: var(--muted); }
+.win-btns button:hover { background: var(--card); color: var(--fg); }
+.win-btns button.close:hover { background: rgb(255 69 58 / 0.18); color: var(--critical); }
+.win-btns :global(.icon) { font-size: 15px; }

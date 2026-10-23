@@ -1,7 +1,9 @@
-import { Icon } from "@/components/ui/Icon";
+import { Button, Icon, SectionHead } from "@/components/ui";
+import { cx } from "@/lib/cx";
 import { LOADER_ICON, LOADERS } from "@/lib/format";
 import { useLauncher, useRecentInstances } from "@/store/LauncherContext";
 import { useUi } from "@/store/UiContext";
+import s from "./home.module.css";
 
 export function InstanceTiles() {
   const { selected, select } = useLauncher();
@@ -9,30 +11,30 @@ export function InstanceTiles() {
   const recent = useRecentInstances();
 
   return (
-    <div className="home-section">
-      <div className="section-head">
-        <h2>Instances</h2>
-        {recent.length > 0 && (
-          <button className="link" onClick={() => navigate("instances")}>
+    <div className={s.section}>
+      <SectionHead
+        title="Instances"
+        action={recent.length > 0 && (
+          <Button variant="link" onClick={() => navigate("instances")}>
             {recent.length > 3 ? `All ${recent.length} instances` : "Manage"}
-          </button>
+          </Button>
         )}
-      </div>
-      <div className="tiles">
+      />
+      <div className={s.tiles}>
         {recent.slice(0, 3).map((i) => (
-          <button key={i.id} className="tile" aria-pressed={i.id === selected?.id} onClick={() => select(i.id)}>
-            <span className="tile-icon">{i.icon ? <img src={i.icon} alt="" /> : <Icon name={LOADER_ICON[i.loader]} />}</span>
-            <span className="tile-text">
-              <span className="tile-name">{i.name}</span>
-              <span className="tile-sub">{i.version} · {LOADERS[i.loader]}</span>
+          <button key={i.id} className={s.tile} aria-pressed={i.id === selected?.id} onClick={() => select(i.id)}>
+            <span className={s.tileIcon}>{i.icon ? <img src={i.icon} alt="" /> : <Icon name={LOADER_ICON[i.loader]} />}</span>
+            <span className={s.tileText}>
+              <span className={s.tileName}>{i.name}</span>
+              <span className={s.tileSub}>{i.version} · {LOADERS[i.loader]}</span>
             </span>
           </button>
         ))}
-        <button className="tile add" onClick={openNewInstance}>
-          <span className="tile-icon"><Icon name="add" /></span>
-          <span className="tile-text">
-            <span className="tile-name">Add instance</span>
-            <span className="tile-sub">Vanilla, Fabric or Quilt</span>
+        <button className={cx(s.tile, s.add)} onClick={openNewInstance}>
+          <span className={s.tileIcon}><Icon name="add" /></span>
+          <span className={s.tileText}>
+            <span className={s.tileName}>Add instance</span>
+            <span className={s.tileSub}>Vanilla, Fabric or Quilt</span>
           </span>
         </button>
       </div>

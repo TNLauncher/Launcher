@@ -1,41 +1,37 @@
-import { Icon } from "@/components/ui/Icon";
+import { Button, Meta } from "@/components/ui";
 import { lastPlayed, loaderLabel, plural } from "@/lib/format";
 import { useLauncher } from "@/store/LauncherContext";
 import { useUi } from "@/store/UiContext";
+import s from "./home.module.css";
 
 export function Hero() {
   const { selected: inst, snapshot } = useLauncher();
   const { openNewInstance } = useUi();
 
   return (
-    <div className="hero">
-      <div className="hero-bg" />
-      <div className="hero-body">
+    <div className={s.hero}>
+      <div className={s.heroBg} />
+      <div className={s.heroBody}>
         {!inst ? (
           <>
             <h1>No instances yet</h1>
-            <div className="meta">Create one to download Minecraft and start playing.</div>
-            <div className="hero-cta">
-              <button className="btn primary" onClick={openNewInstance}>
-                <Icon name="add" />
+            <Meta items={["Create one to download Minecraft and start playing."]} />
+            <div className={s.heroCta}>
+              <Button variant="primary" icon="add" onClick={openNewInstance}>
                 Create instance
-              </button>
+              </Button>
             </div>
           </>
         ) : (
           <>
             <h1>{inst.name}</h1>
-            <div className="meta">
-              <span>{inst.version} · {loaderLabel(inst)}</span>
-              {inst.loader !== "vanilla" && (
-                <>
-                  <span className="sep">•</span>
-                  <span>{plural(snapshot?.modCounts[inst.id] ?? 0, "mod")}</span>
-                </>
-              )}
-              <span className="sep">•</span>
-              <span>{lastPlayed(inst.lastPlayed)}</span>
-            </div>
+            <Meta
+              items={[
+                <span>{inst.version} · {loaderLabel(inst)}</span>,
+                inst.loader !== "vanilla" && <span>{plural(snapshot?.modCounts[inst.id] ?? 0, "mod")}</span>,
+                <span>{lastPlayed(inst.lastPlayed)}</span>,
+              ]}
+            />
           </>
         )}
       </div>
