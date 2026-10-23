@@ -28,11 +28,28 @@ export interface PluginEntry {
   enabled: boolean;
   /** Shipped with the launcher. */
   bundled: boolean;
-  permissions: { hosts: string[]; downloads: string[] };
+  permissions: { hosts: string[]; downloads: string[]; instances: boolean };
   source: SourceInfo | null;
-  pages: { id: string; title: string; icon: string; entry: string }[];
+  pages: PluginView[];
+  instanceTabs: PluginView[];
+  settings: PluginSetting[];
   /** Why the plugin did not load. */
   error: string | null;
+}
+
+/** A page or instance tab a plugin contributes. */
+export interface PluginView {
+  id: string;
+  title: string;
+  icon: string;
+  entry: string;
+}
+
+export interface PluginSetting {
+  key: string;
+  label: string;
+  hint: string;
+  type: "text" | "secret" | "toggle";
 }
 
 export interface SearchQuery {
@@ -126,6 +143,9 @@ export const primaryFile = (v: Pick<Version, "files">) => v.files.find((f) => f.
 export const sources = {
   listPlugins: () => call<PluginEntry[]>("list_plugins"),
   setPluginEnabled: (id: string, enabled: boolean) => call<void>("set_plugin_enabled", { id, enabled }),
+  /** Values of a plugin's declared settings. */
+  settings: (id: string) => call<Record<string, string | boolean>>("plugin_settings", { id }),
+  setSetting: (id: string, key: string, value: string | boolean) => call<void>("set_plugin_setting", { id, key, value }),
   /** User plugins live there and load on the next start. */
   openPluginsDir: () => call<void>("open_plugins_dir"),
 

@@ -18,6 +18,8 @@ interface Frame {
   plugin: string;
   /** Runs `main` and answers calls; pages only send requests. */
   background: boolean;
+  /** Gets game events (manifest `permissions.instances`). */
+  instances: boolean;
 }
 
 interface Background {
@@ -81,8 +83,8 @@ function fail(plugin: string, error: string) {
 }
 
 /** Registers a mounted plugin frame; returns its cleanup. */
-export function attachFrame(win: Window, plugin: string, background: boolean): () => void {
-  frames.set(win, { plugin, background });
+export function attachFrame(win: Window, plugin: string, background: boolean, instances: boolean): () => void {
+  frames.set(win, { plugin, background, instances });
   if (background) {
     const bg: Background = { win, ready: readyFrames.has(win), queue: [] };
     backgrounds.set(plugin, bg);
@@ -98,6 +100,11 @@ export function attachFrame(win: Window, plugin: string, background: boolean): (
       backgrounds.delete(plugin);
     }
   };
+}
+
+/** Sends an event to every frame of plugins allowed to see instances (`tn.events.on`). */
+export function broadcast(name: "game-started" | "game-exited", payload: object) {
+  for (const [win, f] of frames) if (f.instances) post(win, { type: "event", name, payload });
 }
 
 window.addEventListener("message", (e) => {

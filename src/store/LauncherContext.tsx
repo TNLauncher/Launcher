@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { launcher } from "@/api/launcher";
+import { broadcast } from "@/plugins/bridge";
 import { gameLogs } from "./gameLogs";
 import { sources, type Hit, type Version } from "@/api/sources";
 import { errorMessage, recency } from "@/lib/format";
@@ -104,6 +105,7 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
             setProgress(latest);
           });
         });
+        broadcast("game-started", { instanceId: id });
       } catch (e) {
         setError({ id, message: errorMessage(e) });
       } finally {
@@ -155,6 +157,7 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
     const unlisten = [
       gameLogs.listen(),
       launcher.onGameExit(({ id, code }) => {
+        broadcast("game-exited", { instanceId: id, code });
         if (!gameLogs.exited(id, code) && code) setError({ id, message: `Game crashed with exit code ${code}. Its log is in Console.` });
         refresh();
       }),

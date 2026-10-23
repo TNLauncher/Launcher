@@ -12,7 +12,7 @@ export function PluginPage({ plugin, page }: { plugin: string; page: string }) {
   if (!p || !spec) return <View><EmptyState icon="extension_off">This plugin page is not available.</EmptyState></View>;
   return (
     <View className={s.page}>
-      <PluginFrame key={`${plugin}/${page}`} plugin={plugin} src={`${pluginBase}${plugin}/${spec.entry}`} title={spec.title} className={s.frame} />
+      <PluginFrame key={`${plugin}/${page}`} plugin={plugin} instances={p.permissions.instances} src={`${pluginBase}${plugin}/${spec.entry}`} title={spec.title} className={s.frame} />
     </View>
   );
 }

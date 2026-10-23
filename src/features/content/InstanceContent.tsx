@@ -6,7 +6,9 @@ import { Banner, Button, Chip, ConfirmDialog, EmptyState, Icon, IconButton, Pill
 import { cx } from "@/lib/cx";
 import { Screenshots } from "@/features/screenshots/Screenshots";
 import { useDebounced } from "@/hooks/useDebounced";
-import { useSource } from "@/hooks/useSource";
+import { usePlugins, useSource } from "@/hooks/useSource";
+import { pluginBase } from "@/plugins/bridge";
+import { PluginFrame } from "@/plugins/PluginHost";
 import { compact, errorMessage, megabytes } from "@/lib/format";
 import { useLauncher } from "@/store/LauncherContext";
 import type { ContentKind, Instance } from "@/types";
@@ -48,8 +50,11 @@ const IRIS = { source: "modrinth", project: "YL57xq9U" };
 /** Mods, resource packs, shaders and screenshots of one instance: what is installed, and a content source to add more. */
 export function InstanceContent({ instance }: { instance: Instance }) {
   const modded = instance.loader !== "vanilla";
-  const [tab, setTab] = useState<ContentKind | "screenshots">(modded ? "mod" : "resourcepack");
-  const kind = tab === "screenshots" ? "mod" : tab;
+  // `plugin:<id>:<tab>` = a tab a plugin contributes.
+  const [tab, setTab] = useState<ContentKind | "screenshots" | `plugin:${string}`>(modded ? "mod" : "resourcepack");
+  const kind = tab === "screenshots" || tab.startsWith("plugin:") ? "mod" : (tab as ContentKind);
+  const pluginTabs = (usePlugins().data ?? []).filter((p) => p.enabled).flatMap((p) => p.instanceTabs.map((t) => ({ plugin: p, tab: t, key: `plugin:${p.id}:${t.id}` as const })));
+  const openPluginTab = pluginTabs.find((t) => t.key === tab);
   const content = { mod: useContent(instance.id, "mod"), resourcepack: useContent(instance.id, "resourcepack"), shader: useContent(instance.id, "shader") };
   const current = content[kind];
   const source = useSource();
@@ -68,9 +73,25 @@ export function InstanceContent({ instance }: { instance: Instance }) {
         <Tab selected={tab === "screenshots"} onSelect={() => setTab("screenshots")} icon="photo_camera">
           Screenshots
         </Tab>
+        {pluginTabs.map((t) => (
+          <Tab key={t.key} selected={tab === t.key} onSelect={() => setTab(t.key)} icon={t.tab.icon}>
+            {t.tab.title}
+          </Tab>
+        ))}
       </Tabs>
 
-      {tab === "screenshots" ? (
+      {openPluginTab ? (
+        <PluginFrame
+          key={`${openPluginTab.key}/${instance.id}`}
+          plugin={openPluginTab.plugin.id}
+          instances={openPluginTab.plugin.permissions.instances}
+          src={`${pluginBase}${openPluginTab.plugin.id}/${openPluginTab.tab.entry}?instance=${encodeURIComponent(instance.id)}`}
+          title={openPluginTab.tab.title}
+          className={s.pluginTab}
+        />
+      ) : tab.startsWith("plugin:") ? (
+        <EmptyState icon="extension_off">This plugin tab is not available.</EmptyState>
+      ) : tab === "screenshots" ? (
         <Screenshots instanceId={instance.id} />
       ) : needsLoader ? (
         <EmptyState icon={KINDS[kind].icon}>

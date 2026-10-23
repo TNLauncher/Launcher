@@ -1,0 +1,38 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { padding: 24px; }
+    h1 { margin: 0 0 16px; font-size: 18px; font-weight: 600; }
+    table { width: 100%; border-collapse: collapse; }
+    td, th { padding: 8px 10px; border-bottom: 1px solid var(--border); text-align: left; }
+    th { color: var(--muted); font-weight: 500; }
+    .empty { color: var(--muted); }
+  </style>
+</head>
+<body>
+  <h1 id="title">Play sessions</h1>
+  <table><thead><tr><th>Instance</th><th>Started</th><th>Length</th><th>Exit</th></tr></thead><tbody id="rows"></tbody></table>
+  <p class="empty" id="empty" hidden>No sessions yet. Play something and come back.</p>
+  <script type="module">
+    // In an instance tab `tn.context.instance` is set: show that instance only.
+    const only = tn.context.instance;
+    const [log, instances] = await Promise.all([tn.storage.get("log"), tn.instances.list()]);
+    const names = new Map(instances.map((i) => [i.id, i.name]));
+    const rows = (log ?? []).filter((s) => !only || s.instanceId === only).reverse();
+    if (only) document.getElementById("title").textContent = `Sessions of ${names.get(only) ?? "this instance"}`;
+    document.getElementById("empty").hidden = rows.length > 0;
+    const length = (s) => (s.end ? `${Math.max(1, Math.round((s.end - s.start) / 60000))} min` : "playing");
+    for (const s of rows) {
+      const tr = document.createElement("tr");
+      for (const text of [names.get(s.instanceId) ?? "deleted", new Date(s.start).toLocaleString(), length(s), s.code ?? "—"]) {
+        const td = document.createElement("td");
+        td.textContent = String(text);
+        tr.append(td);
+      }
+      document.getElementById("rows").append(tr);
+    }
+  </script>
+</body>
+</html>

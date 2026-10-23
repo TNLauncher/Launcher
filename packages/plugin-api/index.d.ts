@@ -36,14 +36,51 @@ export interface Manifest {
       categories: Partial<Record<ProjectKind, Choice[]>>;
     };
     /** Sidebar pages. */
-    pages?: { id: string; title: string; /** Material Symbols name. */ icon: string; /** HTML file in the plugin folder. */ entry: string }[];
+    pages?: View[];
+    /** Tabs on every instance page; `tn.context.instance` is that instance's id. */
+    instanceTabs?: View[];
+    /** Options the user fills in Settings; read them with `tn.settings.get()`. */
+    settings?: { /** `[A-Za-z0-9_-]`. */ key: string; label: string; hint?: string; type: "text" | "secret" | "toggle" }[];
   };
   permissions?: {
     /** Hosts `tn.net.fetch` may reach and pages may show images from; `*.example.com` allowed. HTTPS only. */
     hosts?: string[];
     /** URL prefixes the launcher may download files from on the plugin's behalf. */
     downloads?: string[];
+    /** Read instances (`tn.instances`) and receive `game-started` / `game-exited`. */
+    instances?: boolean;
   };
+}
+
+export interface View {
+  id: string;
+  title: string;
+  /** Material Symbols name. */
+  icon: string;
+  /** HTML file in the plugin folder. */
+  entry: string;
+}
+
+export interface Instance {
+  id: string;
+  name: string;
+  /** Minecraft version. */
+  version: string;
+  loader: "vanilla" | "fabric" | "quilt";
+  loaderVersion: string;
+  /** Unix seconds, 0 = never. */
+  lastPlayed: number;
+  playSeconds: number;
+  created: number;
+  /** `data:image/...` URL or "". */
+  icon: string;
+  /** Modpack it was installed from. */
+  pack: { source: string; project: string; version: string } | null;
+}
+
+export interface GameEvents {
+  "game-started": { instanceId: string };
+  "game-exited": { instanceId: string; code: number | null };
 }
 
 export interface SearchQuery {
@@ -195,6 +232,22 @@ export interface FetchResponse {
 
 export interface TN {
   apiVersion: 1;
+  /** Where this frame is shown. */
+  context: { /** Set in instance tabs. */ instance: string | null };
+  /** The plugin's own JSON store (1 MiB). */
+  storage: {
+    get<T = unknown>(key: string): Promise<T | null>;
+    /** `null`/`undefined` removes the key. */
+    set(key: string, value: unknown): Promise<void>;
+  };
+  /** Values of `contributes.settings`, defaulted ("" / false). */
+  settings: { get(): Promise<Record<string, string | boolean>> };
+  /** Needs `permissions.instances`. */
+  instances: { list(): Promise<Instance[]>; get(id: string): Promise<Instance> };
+  /** Needs `permissions.instances`. Returns a function that stops listening. */
+  events: { on<K extends keyof GameEvents>(name: K, cb: (payload: GameEvents[K]) => void): () => void };
+  /** Opens an http(s) page in the system browser. */
+  open(url: string): Promise<void>;
   sources: { register(source: ContentSource): void };
   net: { fetch(url: string, init?: FetchInit): Promise<FetchResponse> };
   /** Printed to the launcher's log. */

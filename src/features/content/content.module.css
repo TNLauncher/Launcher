@@ -62,3 +62,6 @@ fieldset.cpane-list:disabled .citem-actions { opacity: 0.5; }
   .content-split { gap: 12px; }
   .cats { gap: 4px; }
 }
+
+/* A plugin's instance tab: its page in a sandboxed frame. */
+.plugin-tab { display: block; width: 100%; height: max(440px, calc(100vh - 150px)); border: 0; background: transparent; }

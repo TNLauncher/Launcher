@@ -1,4 +1,4 @@
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { View } from "@/components/layout/View";
 import { Button, ConfirmDialog, Icon, Input, Select, Switch, Textarea } from "@/components/ui";
@@ -6,7 +6,7 @@ import { cx } from "@/lib/cx";
 import { errorMessage } from "@/lib/format";
 import { useLauncher } from "@/store/LauncherContext";
 import { launcher } from "@/api/launcher";
-import { sources } from "@/api/sources";
+import { sources, type PluginEntry } from "@/api/sources";
 import { usePlugins } from "@/hooks/useSource";
 import { usePluginFailures } from "@/plugins/bridge";
 import type { DeviceCode, Settings } from "@/types";
@@ -223,13 +223,24 @@ function PluginsGroup() {
           <Row
             key={p.id}
             label={`${p.name} ${p.version}${p.bundled ? "" : " · added by you"}`}
-            hint={[p.description, p.permissions.hosts.length ? `Connects to ${p.permissions.hosts.join(", ")}.` : "No network access."].filter(Boolean).join(" ")}
+            hint={[
+              p.description,
+              p.permissions.hosts.length ? `Connects to ${p.permissions.hosts.join(", ")}.` : "No network access.",
+              p.permissions.instances && "Reads your instances and when you play.",
+            ]
+              .filter(Boolean)
+              .join(" ")}
           >
             <div className={cx(s.settingControl, s.col)}>
               <Switch label={`${p.enabled ? "Turn off" : "Turn on"} ${p.name}`} checked={p.enabled} onChange={(on) => toggle(p.id, on)} />
               {p.enabled && failures[p.id] && <span className={s.error}>Failed to start: {failures[p.id]}</span>}
             </div>
           </Row>
+        )
+      )}
+      {plugins.data?.map((p) =>
+        p.error || !p.settings.length ? null : (
+          <PluginSettings key={`settings-${p.id}`} plugin={p} onError={setError} />
         )
       )}
       <Row label="Plugin folder" hint="Put a plugin's folder (manifest.json + its scripts) here and restart the launcher.">
@@ -239,6 +250,37 @@ function PluginsGroup() {
       </Row>
       {(error || plugins.error) && <span className={s.error}>{error || errorMessage(plugins.error)}</span>}
     </Group>
+  );
+}
+
+/** Fields a plugin declares (`contributes.settings`); text saves on blur, toggles at once. */
+function PluginSettings({ plugin, onError }: { plugin: PluginEntry; onError(message: string): void }) {
+  const values = useQuery({ queryKey: ["plugin-settings", plugin.id], queryFn: () => sources.settings(plugin.id) });
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  const save = (key: string, value: string | boolean) =>
+    sources.setSetting(plugin.id, key, value).then(() => values.refetch(), (e) => onError(errorMessage(e)));
+  if (!values.data) return null;
+  return (
+    <>
+      {plugin.settings.map((f) => (
+        <Row key={f.key} label={`${plugin.name}: ${f.label}`} hint={f.hint}>
+          <div className={s.settingControl}>
+            {f.type === "toggle" ? (
+              <Switch label={f.label} checked={values.data[f.key] === true} onChange={(on) => save(f.key, on)} />
+            ) : (
+              <Input
+                type={f.type === "secret" ? "password" : "text"}
+                spellCheck={false}
+                aria-label={f.label}
+                value={draft[f.key] ?? String(values.data[f.key] ?? "")}
+                onChange={(e) => setDraft((d) => ({ ...d, [f.key]: e.target.value }))}
+                onBlur={() => draft[f.key] !== undefined && save(f.key, draft[f.key])}
+              />
+            )}
+          </div>
+        </Row>
+      ))}
+    </>
   );
 }
 
