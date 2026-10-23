@@ -1,0 +1,11 @@
+.group { display: flex; gap: 6px; overflow-x: auto; }
+.wrap { flex-wrap: wrap; overflow: visible; }
+.pill {
+  height: 28px; padding: 0 12px; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0;
+  background: var(--btn); color: var(--muted); font-size: 12px; white-space: nowrap;
+  transition: background 160ms var(--ease), color 160ms var(--ease);
+}
+.pill:hover { background: var(--btn-hover); color: var(--fg); }
+.pill[aria-pressed="true"] { background: var(--accent-fill); color: #fff; font-weight: 500; }
+.pill :global(.icon) { font-size: 16px; }
+.count { opacity: 0.75; }

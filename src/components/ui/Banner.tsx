@@ -1,4 +1,5 @@
 import { Icon } from "./Icon";
+import s from "./Banner.module.css";
 
 interface Props {
   message: string;
@@ -9,13 +10,13 @@ interface Props {
 /** Inline error with optional Retry / Dismiss. */
 export function Banner({ message, onRetry, onDismiss }: Props) {
   return (
-    <div className="banner" role="alert">
-      <div className="msg">
+    <div className={s.banner} role="alert">
+      <div className={s.msg}>
         <Icon name="error" size={18} />
         <span title={message}>{message}</span>
       </div>
       {(onRetry || onDismiss) && (
-        <div className="actions">
+        <div className={s.actions}>
           {onRetry && (
             <button onClick={onRetry}>
               <Icon name="refresh" />

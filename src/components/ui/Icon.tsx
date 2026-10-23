@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import { cx } from "@/lib/cx";
 
 interface Props {
   name: string;
@@ -11,9 +12,8 @@ interface Props {
 
 /** Material Symbols glyph. */
 export function Icon({ name, fill, size, spin, className = "", style }: Props) {
-  const cls = ["icon", fill && "fill", spin && "spin", className].filter(Boolean).join(" ");
   return (
-    <i className={cls} style={size ? { fontSize: size, ...style } : style} aria-hidden="true">
+    <i className={cx("icon", fill && "fill", spin && "spin", className)} style={size ? { fontSize: size, ...style } : style} aria-hidden="true">
       {name}
     </i>
   );

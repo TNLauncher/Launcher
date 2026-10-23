@@ -10,6 +10,10 @@ export default defineConfig({
   resolve: {
     alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
   },
+  css: {
+    // kebab-case in .module.css, camelCase in TSX: `.pack-row` -> `s.packRow`
+    modules: { localsConvention: "camelCaseOnly" },
+  },
   clearScreen: false,
   server: {
     port: 5173,

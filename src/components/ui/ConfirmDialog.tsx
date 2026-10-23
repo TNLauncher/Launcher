@@ -1,4 +1,6 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import type { ReactNode } from "react";
+import { Button } from "./Button";
+import { Dialog, DialogText } from "./Dialog";
 
 interface Props {
   open: boolean;
@@ -10,32 +12,23 @@ interface Props {
   onCancel(): void;
 }
 
-/** Native <dialog>: focus trap, Esc and backdrop for free. */
 export function ConfirmDialog({ open, title, children, confirmLabel, danger, onConfirm, onCancel }: Props) {
-  const ref = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
-    const d = ref.current;
-    if (!d) return;
-    if (open && !d.open) d.showModal();
-    if (!open && d.open) d.close();
-  }, [open]);
-
   return (
-    <dialog ref={ref} onClose={onCancel}>
-      <form method="dialog" onSubmit={(e) => (e.preventDefault(), onConfirm())}>
-        <h2>{title}</h2>
-        <p className="muted" style={{ margin: 0 }}>
-          {children}
-        </p>
-        <div className="dialog-actions">
-          <button type="button" className="btn" onClick={onCancel}>
-            Cancel
-          </button>
-          <button type="submit" className={`btn primary ${danger ? "destructive" : ""}`} autoFocus>
+    <Dialog
+      open={open}
+      title={title}
+      onClose={onCancel}
+      onSubmit={onConfirm}
+      actions={
+        <>
+          <Button onClick={onCancel}>Cancel</Button>
+          <Button type="submit" variant={danger ? "destructive" : "primary"} autoFocus>
             {confirmLabel}
-          </button>
-        </div>
-      </form>
-    </dialog>
+          </Button>
+        </>
+      }
+    >
+      <DialogText>{children}</DialogText>
+    </Dialog>
   );
 }

@@ -1,0 +1,10 @@
+.dialog {
+  width: 440px; padding: 0; border-radius: 18px; color: var(--fg);
+  background: var(--popover); border: 1px solid var(--border); box-shadow: var(--lift), var(--highlight);
+}
+.dialog::backdrop { background: rgb(0 0 0 / 0.45); }
+.form { display: flex; flex-direction: column; gap: 16px; padding: 20px; }
+.head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.head h2 { margin: 0; font-size: 15px; font-weight: 600; }
+.actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+.text { margin: 0; color: var(--muted); }

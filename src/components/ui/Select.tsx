@@ -1,6 +1,8 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
+import { cx } from "@/lib/cx";
 import { Icon } from "./Icon";
+import s from "./Select.module.css";
 
 export interface SelectOption<T extends string> {
   value: T;
@@ -15,12 +17,14 @@ interface Props<T extends string> {
   label: string;
   placeholder?: string;
   disabled?: boolean;
+  /** pill: rounded trigger for toolbars and docks */
+  variant?: "default" | "pill";
   className?: string;
   style?: CSSProperties;
 }
 
 /** Select-only combobox: focus stays on the trigger, the list follows via aria-activedescendant. */
-export function Select<T extends string>({ value, options, onChange, label, placeholder, disabled, className = "", style }: Props<T>) {
+export function Select<T extends string>({ value, options, onChange, label, placeholder, disabled, variant = "default", className, style }: Props<T>) {
   const id = useId();
   const btn = useRef<HTMLButtonElement>(null);
   const list = useRef<HTMLUListElement>(null);
@@ -117,13 +121,13 @@ export function Select<T extends string>({ value, options, onChange, label, plac
         aria-expanded={open}
         aria-controls={open ? id : undefined}
         aria-activedescendant={open ? `${id}-${active}` : undefined}
-        className={`select ${className}`}
+        className={cx(s.select, variant === "pill" && s.pill, className)}
         style={style}
         disabled={off}
         onClick={() => (open ? setOpen(false) : show())}
         onKeyDown={onKeyDown}
       >
-        <span className={current ? "select-value" : "select-value subtle"}>{current?.label ?? placeholder}</span>
+        <span className={cx(s.value, !current && s.placeholder)}>{current?.label ?? placeholder}</span>
         <Icon name="unfold_more" />
       </button>
       {open && place && createPortal(
@@ -132,7 +136,7 @@ export function Select<T extends string>({ value, options, onChange, label, plac
           id={id}
           role="listbox"
           aria-label={label}
-          className={`select-list${place.up ? " up" : ""}`}
+          className={cx(s.list, place.up && s.up)}
           style={place.style}
           onPointerDown={(e) => e.preventDefault()}
         >
@@ -146,9 +150,9 @@ export function Select<T extends string>({ value, options, onChange, label, plac
               onPointerMove={() => i !== active && setActive(i)}
               onClick={() => pick(i)}
             >
-              <Icon name="check" className="select-check" />
+              <Icon name="check" className={s.check} />
               <span>{o.label}</span>
-              {o.hint && <span className="select-hint">{o.hint}</span>}
+              {o.hint && <span className={s.hint}>{o.hint}</span>}
             </li>
           ))}
         </ul>,

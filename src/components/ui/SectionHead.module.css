@@ -1,0 +1,2 @@
+.head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
+.head h2 { margin: 0; font-size: 14px; line-height: 1.3; font-weight: 600; }

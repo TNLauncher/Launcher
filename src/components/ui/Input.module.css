@@ -1,0 +1,15 @@
+.input {
+  height: 32px; padding: 0 12px; border-radius: 8px; min-width: 0;
+  background: var(--card); border: 1px solid var(--border); box-shadow: var(--highlight);
+  font-size: 12px; outline: none; transition: border-color 160ms var(--ease), background 160ms var(--ease);
+}
+.input:focus { border-color: var(--accent); background: rgb(255 255 255 / 0.08); }
+.input::placeholder { color: var(--subtle); }
+.input[aria-invalid="true"] { border-color: var(--critical); }
+.mono { font-family: var(--mono); font-size: 11px; }
+textarea.input { height: auto; padding: 10px 12px; resize: vertical; font-family: var(--mono); font-size: 11px; line-height: 1.6; }
+
+.search { position: relative; display: flex; align-items: center; }
+.search > :global(.icon) { position: absolute; left: 10px; font-size: 17px; color: var(--subtle); pointer-events: none; }
+.search .input { padding-left: 34px; width: 100%; }
+.search .input::-webkit-search-cancel-button { display: none; }
