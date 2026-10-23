@@ -83,7 +83,7 @@ export function InstancesView() {
                   </div>
                 }
               >
-                No instances yet. Start from a ready-made Modrinth modpack, or a blank game with your own mods.
+                No instances yet. Start from a ready-made modpack, or a blank game with your own mods.
               </EmptyState>
             )
           ) : !list.length ? (
@@ -113,8 +113,8 @@ function ImportRow({ pending: p }: { pending: PendingImport }) {
         <div className={s.rowText}>
           <div className={s.rowTitle}>
             <strong>{p.title}</strong>
-            {p.version && <Chip variant="tag">{p.version.game_versions.at(-1)}</Chip>}
-            {p.version && <Chip>{p.version.version_number}</Chip>}
+            {p.version && <Chip variant="tag">{p.version.gameVersions.at(-1)}</Chip>}
+            {p.version && <Chip>{p.version.number}</Chip>}
           </div>
           {p.error ? (
             <Meta small className={s.error} items={[p.error]} />
@@ -128,7 +128,7 @@ function ImportRow({ pending: p }: { pending: PendingImport }) {
       </div>
       {p.error && (
         <div className={s.rowActions}>
-          <Button icon="refresh" onClick={() => startImport({ project_id: p.projectId, title: p.title, icon_url: p.iconUrl }, p.version)}>
+          <Button icon="refresh" onClick={() => startImport(p.source, { id: p.projectId, title: p.title, iconUrl: p.iconUrl }, p.version)}>
             Retry
           </Button>
           <IconButton icon="close" label="Dismiss" onClick={() => dismissImport(p.projectId)} />

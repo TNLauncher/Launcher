@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { launcher } from "@/api/launcher";
 import { gameLogs } from "./gameLogs";
-import { importModpack, type ModHit, type PackVersion } from "@/api/modrinth";
+import { sources, type Hit, type Version } from "@/api/sources";
 import { errorMessage, recency } from "@/lib/format";
 import type { Instance, Settings, Snapshot, Stage } from "@/types";
 
@@ -16,15 +16,16 @@ export interface LaunchError {
   message: string;
 }
 
-type PackRef = Pick<ModHit, "project_id" | "title" | "icon_url">;
+type PackHit = Pick<Hit, "id" | "title" | "iconUrl">;
 
 /** A modpack download that has not become an instance yet. */
 export interface PendingImport {
+  source: string;
   projectId: string;
   title: string;
   iconUrl: string | null;
   /** Chosen pack version; undefined = newest. */
-  version?: PackVersion;
+  version?: Version;
   done: number;
   total: number;
   error: string;
@@ -46,7 +47,7 @@ interface LauncherValue {
   /** Modpack installs in flight (or failed, until dismissed). */
   imports: PendingImport[];
   /** Starts a background install; a pack already installing is ignored. */
-  startImport(pack: PackRef, version?: PackVersion): void;
+  startImport(source: string, pack: PackHit, version?: Version): void;
   dismissImport(projectId: string): void;
 }
 
@@ -127,14 +128,14 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
     setImports((list) => list.map((p) => (p.projectId === projectId ? { ...p, ...patch } : p)));
 
   const startImport = useCallback(
-    async (pack: PackRef, version?: PackVersion) => {
-      const id = pack.project_id;
+    async (source: string, pack: PackHit, version?: Version) => {
+      const id = pack.id;
       if (inFlight.current.has(id)) return;
       inFlight.current.add(id);
-      const pending: PendingImport = { projectId: id, title: pack.title, iconUrl: pack.icon_url, version, done: 0, total: 0, error: "" };
+      const pending: PendingImport = { source, projectId: id, title: pack.title, iconUrl: pack.iconUrl, version, done: 0, total: 0, error: "" };
       setImports((list) => [pending, ...list.filter((p) => p.projectId !== id)]);
       try {
-        const inst = await importModpack(id, version, ({ done, total }) => patchImport(id, { done, total }));
+        const inst = await sources.importModpack(source, id, version?.id, ({ done, total }) => patchImport(id, { done, total }));
         select(inst.id);
         await refresh();
         setImports((list) => list.filter((p) => p.projectId !== id));

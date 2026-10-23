@@ -1,11 +1,12 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { memo, useCallback, useRef, useState } from "react";
 import { launcher } from "@/api/launcher";
-import { installContent, searchContent, type ModHit } from "@/api/modrinth";
+import { sources, type Hit, type SourceInfo } from "@/api/sources";
 import { Banner, Button, Chip, ConfirmDialog, EmptyState, Icon, IconButton, Pill, PillGroup, SearchInput, Skeleton, Switch, Tab, Tabs } from "@/components/ui";
 import { cx } from "@/lib/cx";
 import { Screenshots } from "@/features/screenshots/Screenshots";
 import { useDebounced } from "@/hooks/useDebounced";
+import { useSource } from "@/hooks/useSource";
 import { compact, errorMessage, megabytes } from "@/lib/format";
 import { useLauncher } from "@/store/LauncherContext";
 import type { ContentKind, Instance } from "@/types";
@@ -18,7 +19,6 @@ interface KindInfo {
   noun: string;
   icon: string;
   folder: string;
-  categories: [string, string][];
 }
 
 const KINDS: Record<ContentKind, KindInfo> = {
@@ -27,36 +27,35 @@ const KINDS: Record<ContentKind, KindInfo> = {
     noun: "mods",
     icon: "extension",
     folder: "mods",
-    categories: [["", "All"], ["optimization", "Performance"], ["utility", "Utility"], ["worldgen", "Worldgen"], ["decoration", "Decoration"], ["library", "Libraries"]],
   },
   resourcepack: {
     label: "Resource packs",
     noun: "resource packs",
     icon: "texture",
     folder: "resourcepacks",
-    categories: [["", "All"], ["vanilla-like", "Vanilla-like"], ["simplistic", "Simplistic"], ["realistic", "Realistic"], ["themed", "Themed"], ["tweaks", "Tweaks"], ["utility", "Utility"]],
   },
   shader: {
     label: "Shaders",
     noun: "shaders",
     icon: "wb_twilight",
     folder: "shaderpacks",
-    categories: [["", "All"], ["vanilla-like", "Vanilla-like"], ["semi-realistic", "Semi-realistic"], ["realistic", "Realistic"], ["fantasy", "Fantasy"], ["cartoon", "Cartoon"], ["low", "Lightweight"]],
   },
 };
 const ORDER: ContentKind[] = ["mod", "resourcepack", "shader"];
-/** Iris: the Fabric/Quilt shader loader. */
-const IRIS = "YL57xq9U";
+/** Iris, the Fabric/Quilt shader loader, on Modrinth. */
+const IRIS = { source: "modrinth", project: "YL57xq9U" };
 
-/** Mods, resource packs, shaders and screenshots of one instance: what is installed, and Modrinth to add more. */
+/** Mods, resource packs, shaders and screenshots of one instance: what is installed, and a content source to add more. */
 export function InstanceContent({ instance }: { instance: Instance }) {
   const modded = instance.loader !== "vanilla";
   const [tab, setTab] = useState<ContentKind | "screenshots">(modded ? "mod" : "resourcepack");
   const kind = tab === "screenshots" ? "mod" : tab;
   const content = { mod: useContent(instance.id, "mod"), resourcepack: useContent(instance.id, "resourcepack"), shader: useContent(instance.id, "shader") };
   const current = content[kind];
+  const source = useSource();
   const needsLoader = kind !== "resourcepack" && !modded;
-  const irisMissing = kind === "shader" && modded && !!content.mod.items && !content.mod.identifying && !content.mod.installedProjects.has(IRIS);
+  const irisMissing =
+    kind === "shader" && modded && source?.id === IRIS.source && !!content.mod.items && !content.mod.identifying && !content.mod.installedProjects.has(IRIS.project);
 
   return (
     <div>
@@ -81,8 +80,12 @@ export function InstanceContent({ instance }: { instance: Instance }) {
         <>
           {irisMissing && <IrisNotice instance={instance} onInstalled={content.mod.reload} />}
           <div className={s.contentSplit}>
-            <InstalledPane key={kind} instance={instance} kind={kind} content={current} />
-            <BrowsePane key={`${kind}-browse`} instance={instance} kind={kind} installed={current.installedProjects} onInstalled={current.reload} />
+            <InstalledPane key={kind} instance={instance} kind={kind} content={current} sourceName={source?.name} />
+            {source ? (
+              <BrowsePane key={`${source.id}-${kind}`} source={source} instance={instance} kind={kind} installed={current.installedProjects} onInstalled={current.reload} />
+            ) : (
+              <EmptyState icon="extension_off">Turn on a content source in Settings → Plugins to add {KINDS[kind].noun}.</EmptyState>
+            )}
           </div>
         </>
       )}
@@ -96,7 +99,8 @@ function IrisNotice({ instance, onInstalled }: { instance: Instance; onInstalled
   const install = () => {
     setBusy(true);
     setError("");
-    installContent(IRIS, instance, "mod")
+    sources
+      .installContent(IRIS.source, instance.id, "mod", IRIS.project)
       .then(onInstalled, (e) => setError(`Could not install Iris: ${errorMessage(e)}`))
       .finally(() => setBusy(false));
   };
@@ -111,7 +115,7 @@ function IrisNotice({ instance, onInstalled }: { instance: Instance; onInstalled
   );
 }
 
-function InstalledPane({ instance, kind, content }: { instance: Instance; kind: ContentKind; content: ReturnType<typeof useContent> }) {
+function InstalledPane({ instance, kind, content, sourceName }: { instance: Instance; kind: ContentKind; content: ReturnType<typeof useContent>; sourceName?: string }) {
   const { refresh, isRunning } = useLauncher();
   // The game rewrites options.txt and Iris' config on exit, and Windows locks loaded jars.
   const running = isRunning(instance.id);
@@ -148,7 +152,7 @@ function InstalledPane({ instance, kind, content }: { instance: Instance; kind: 
           {content.identifying && (
             <span className={s.identifying}>
               <Icon name="progress_activity" spin />
-              Matching with Modrinth
+              Matching with {sourceName}
             </span>
           )}
           <IconButton icon="folder_open" label={`Open ${info.folder} folder`} className={s.pushEnd} onClick={() => act(launcher.openInstanceDir(instance.id, info.folder))} />
@@ -179,7 +183,7 @@ function InstalledPane({ instance, kind, content }: { instance: Instance; kind: 
                 <span className={cx(s.citemSub, "mono")} title={i.file}>
                   {i.versionNumber && <>{i.versionNumber} · </>}
                   {megabytes(i.size)}
-                  {!i.project && !content.identifying && " · not on Modrinth"}
+                  {!i.project && !content.identifying && sourceName && ` · not on ${sourceName}`}
                 </span>
               </div>
               <div className={s.citemActions}>
@@ -209,8 +213,8 @@ function InstalledPane({ instance, kind, content }: { instance: Instance; kind: 
 }
 
 function ItemIcon({ item, instanceId, kind }: { item: ContentItem; instanceId: string; kind: ContentKind }) {
-  const src = item.project?.icon_url ?? (kind === "mod" ? launcher.modIconUrl(instanceId, item.file) : null);
-  // The jar icon is tried before Modrinth answers; remember a failure per URL so the Modrinth one still shows.
+  const src = item.project?.iconUrl ?? (kind === "mod" ? launcher.modIconUrl(instanceId, item.file) : null);
+  // The jar icon is tried before the source answers; remember a failure per URL so the source's one still shows.
   const [failed, setFailed] = useState<string | null>(null);
   return (
     <span className={s.citemIcon}>
@@ -222,8 +226,10 @@ function ItemIcon({ item, instanceId, kind }: { item: ContentItem; instanceId: s
 
 type InstallState = "installing" | "installed" | { error: string };
 
-function BrowsePane({ instance, kind, installed, onInstalled }: { instance: Instance; kind: ContentKind; installed: Set<string>; onInstalled(): void }) {
+function BrowsePane(p: { source: SourceInfo; instance: Instance; kind: ContentKind; installed: Set<string>; onInstalled(): void }) {
+  const { source, instance, kind, installed, onInstalled } = p;
   const info = KINDS[kind];
+  const categories = [{ id: "", label: "All" }, ...(source.categories[kind] ?? [])];
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("");
   const [installs, setInstalls] = useState<Record<string, InstallState>>({});
@@ -234,8 +240,11 @@ function BrowsePane({ instance, kind, installed, onInstalled }: { instance: Inst
   installedRef.current = installed;
 
   const hits = useQuery({
-    queryKey: ["browse", kind, version, loader, debounced, category],
-    queryFn: () => searchContent({ version, loader }, kind, debounced, category),
+    queryKey: ["browse", source.id, kind, version, loader, debounced, category],
+    queryFn: () =>
+      sources
+        .search(source.id, { kind, query: debounced, gameVersion: version, loader, categories: category ? [category] : [], limit: 30 })
+        .then((page) => page.hits),
     placeholderData: keepPreviousData,
   });
 
@@ -245,28 +254,28 @@ function BrowsePane({ instance, kind, installed, onInstalled }: { instance: Inst
       setInstalls((s) => ({ ...s, [projectId]: "installing" }));
       try {
         // Dependencies already present (any version) are skipped instead of landing as a second jar.
-        await installContent(projectId, instance, kind, new Set([...installedRef.current].filter((id) => id !== projectId)));
+        await sources.installContent(source.id, instance.id, kind, projectId, [...installedRef.current]);
         setInstalls((s) => ({ ...s, [projectId]: "installed" }));
         onInstalled();
       } catch (e) {
         setInstalls((s) => ({ ...s, [projectId]: { error: errorMessage(e) } }));
       }
     },
-    [instance, kind, onInstalled]
+    [source.id, instance.id, kind, onInstalled]
   );
 
   return (
-    <section className={s.cpane} aria-label={`Add ${info.noun} from Modrinth`}>
+    <section className={s.cpane} aria-label={`Add ${info.noun} from ${source.name}`}>
       <div className={s.cpaneHead}>
         <div className={s.cpaneTitle}>
-          <h3>Add from Modrinth</h3>
+          <h3>Add from {source.name}</h3>
           <span className="mono">{version}</span>
         </div>
-        <SearchInput icon="travel_explore" label={`Search ${info.noun} on Modrinth`} placeholder={`Search ${info.noun}`} value={query} onChange={setQuery} />
+        <SearchInput icon="travel_explore" label={`Search ${info.noun} on ${source.name}`} placeholder={`Search ${info.noun}`} value={query} onChange={setQuery} />
         <PillGroup label="Category" wrap className={s.cats}>
-          {info.categories.map(([key, name]) => (
-            <Pill key={key} pressed={category === key} onClick={() => setCategory(key)}>
-              {name}
+          {categories.map((c) => (
+            <Pill key={c.id} pressed={category === c.id} onClick={() => setCategory(c.id)}>
+              {c.label}
             </Pill>
           ))}
         </PillGroup>
@@ -274,14 +283,14 @@ function BrowsePane({ instance, kind, installed, onInstalled }: { instance: Inst
 
       <div className={cx(s.cpaneList, hits.isPlaceholderData && s.stale)}>
         {hits.isError ? (
-          <Banner message={`Modrinth search failed: ${errorMessage(hits.error)}`} onRetry={() => hits.refetch()} />
+          <Banner message={`${source.name} search failed: ${errorMessage(hits.error)}`} onRetry={() => hits.refetch()} />
         ) : !hits.data ? (
           Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className={s.listSkeleton} height={84} />)
         ) : !hits.data.length ? (
           <EmptyState icon="search_off">No {info.noun} for Minecraft {version}{debounced && ` match “${debounced}”`}.</EmptyState>
         ) : (
           hits.data.map((h) => (
-            <ResultCard key={h.project_id} hit={h} icon={info.icon} state={installed.has(h.project_id) ? "installed" : installs[h.project_id]} onInstall={install} />
+            <ResultCard key={h.id} hit={h} icon={info.icon} state={installed.has(h.id) ? "installed" : installs[h.id]} onInstall={install} />
           ))
         )}
       </div>
@@ -289,11 +298,11 @@ function BrowsePane({ instance, kind, installed, onInstalled }: { instance: Inst
   );
 }
 
-const ResultCard = memo(function ResultCard({ hit, icon, state, onInstall }: { hit: ModHit; icon: string; state?: InstallState; onInstall(id: string): void }) {
+const ResultCard = memo(function ResultCard({ hit, icon, state, onInstall }: { hit: Hit; icon: string; state?: InstallState; onInstall(id: string): void }) {
   const failed = typeof state === "object";
   return (
     <div className={s.cresult}>
-      <span className={cx(s.citemIcon, s.big)}>{hit.icon_url ? <img src={hit.icon_url} alt="" loading="lazy" /> : <Icon name={icon} />}</span>
+      <span className={cx(s.citemIcon, s.big)}>{hit.iconUrl ? <img src={hit.iconUrl} alt="" loading="lazy" /> : <Icon name={icon} />}</span>
       <div className={s.citemText}>
         <div className={s.citemName}>
           <b>{hit.title}</b>
@@ -314,7 +323,7 @@ const ResultCard = memo(function ResultCard({ hit, icon, state, onInstall }: { h
           loading={state === "installing"}
           title={failed ? state.error : undefined}
           aria-label={`Install ${hit.title}`}
-          onClick={() => onInstall(hit.project_id)}
+          onClick={() => onInstall(hit.id)}
         >
           {state === "installing" ? "Installing" : failed ? "Retry" : "Install"}
         </Button>

@@ -1,4 +1,4 @@
-/* Instance content: installed files beside the Modrinth browser */
+/* Instance content: installed files beside the content source browser */
 .content-split {
   display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px;
   height: max(440px, calc(100vh - 150px));

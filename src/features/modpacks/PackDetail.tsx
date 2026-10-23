@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { getPackVersions, getProject, getProjectsChunked, primaryFile, type GalleryImage, type PackHit, type PackVersion, type Project } from "@/api/modrinth";
+import { primaryFile, sources, type GalleryImage, type Hit, type Project, type SourceInfo, type Version } from "@/api/sources";
 import { Banner, Button, Chip, Dialog, EmptyState, Field, Icon, IconButton, Select, Skeleton, Tab, Tabs } from "@/components/ui";
 import { Markdown } from "@/components/ui/Markdown";
 import { cx } from "@/lib/cx";
@@ -17,10 +17,10 @@ const LOADER_NAME: Record<string, string> = { fabric: "Fabric", quilt: "Quilt" }
 const dateLabel = (iso: string) => new Date(iso).toLocaleDateString("en", { year: "numeric", month: "short", day: "numeric" });
 
 /** One modpack: what it is, what is inside, and which version to install. */
-export function PackDetail({ hit, preferredVersion, onBack }: { hit: PackHit; preferredVersion: string; onBack(): void }) {
-  const id = hit.project_id;
-  const project = useQuery({ queryKey: ["project", id], queryFn: () => getProject(id) });
-  const versions = useQuery({ queryKey: ["pack-versions", id], queryFn: () => getPackVersions(id) });
+export function PackDetail({ source, hit, preferredVersion, onBack }: { source: SourceInfo; hit: Hit; preferredVersion: string; onBack(): void }) {
+  const id = hit.id;
+  const project = useQuery({ queryKey: ["project", source.id, id], queryFn: () => sources.project(source.id, id) });
+  const versions = useQuery({ queryKey: ["pack-versions", source.id, id], queryFn: () => sources.versions(source.id, id, { kind: "modpack" }) });
   const [tab, setTab] = useState<Section>("description");
   const [mc, setMc] = useState("");
   const [versionId, setVersionId] = useState("");
@@ -32,16 +32,16 @@ export function PackDetail({ hit, preferredVersion, onBack }: { hit: PackHit; pr
 
   // Minecraft versions in the order the pack shipped them, newest first.
   const all = versions.data ?? [];
-  const mcOptions = useMemo(() => [...new Set(all.flatMap((v) => [...v.game_versions].reverse()))], [all]);
+  const mcOptions = useMemo(() => [...new Set(all.flatMap((v) => [...v.gameVersions].reverse()))], [all]);
   const chosenMc = mcOptions.includes(mc) ? mc : mcOptions.includes(preferredVersion) ? preferredVersion : (mcOptions[0] ?? "");
-  const forMc = all.filter((v) => v.game_versions.includes(chosenMc));
-  const version = forMc.find((v) => v.id === versionId) ?? forMc.find((v) => v.version_type === "release") ?? forMc[0];
+  const forMc = all.filter((v) => v.gameVersions.includes(chosenMc));
+  const version = forMc.find((v) => v.id === versionId) ?? forMc.find((v) => v.channel === "release") ?? forMc[0];
 
   const gallery = useMemo(
     () => [...(project.data?.gallery ?? [])].sort((a, b) => Number(b.featured) - Number(a.featured)),
     [project.data]
   );
-  const banner = hit.featured_gallery ?? gallery[0]?.url;
+  const banner = hit.bannerUrl ?? gallery[0]?.url;
   const modCount = version?.dependencies.length ?? 0;
 
   return (
@@ -54,7 +54,7 @@ export function PackDetail({ hit, preferredVersion, onBack }: { hit: PackHit; pr
             Modpacks
           </Button>
           <div className={s.packHeroMain}>
-            <span className={cx(s.packIcon, s.big)}>{hit.icon_url ? <img src={hit.icon_url} alt="" /> : <Icon name="inventory_2" />}</span>
+            <span className={cx(s.packIcon, s.big)}>{hit.iconUrl ? <img src={hit.iconUrl} alt="" /> : <Icon name="inventory_2" />}</span>
             <div className={s.packHeroText}>
               <h1>{hit.title}</h1>
               <p>{hit.description}</p>
@@ -62,7 +62,7 @@ export function PackDetail({ hit, preferredVersion, onBack }: { hit: PackHit; pr
                 <span className={s.stat}>by <b>{hit.author}</b></span>
                 <span className={cx(s.stat, "mono")}><Icon name="download" />{compact(hit.downloads)}</span>
                 <span className={cx(s.stat, "mono")}><Icon name="favorite" />{compact(hit.follows)}</span>
-                <span className={s.stat}><Icon name="update" />Updated {ago(hit.date_modified)}</span>
+                <span className={s.stat}><Icon name="update" />Updated {ago(hit.updated)}</span>
               </div>
             </div>
           </div>
@@ -85,15 +85,16 @@ export function PackDetail({ hit, preferredVersion, onBack }: { hit: PackHit; pr
             ) : tab === "gallery" ? (
               <Gallery images={gallery} />
             ) : tab === "mods" && version ? (
-              <ModList version={version} />
+              <ModList source={source} version={version} />
             ) : (
-              <VersionList versions={all} loading={versions.isPending} selected={version} onSelect={(v) => { setMc(v.game_versions.at(-1) ?? ""); setVersionId(v.id); }} />
+              <VersionList versions={all} loading={versions.isPending} selected={version} onSelect={(v) => { setMc(v.gameVersions.at(-1) ?? ""); setVersionId(v.id); }} />
             )}
           </div>
         </div>
 
         <aside className={s.packSide}>
           <InstallCard
+            source={source}
             hit={hit}
             loading={versions.isPending}
             error={versions.isError ? errorMessage(versions.error) : ""}
@@ -113,20 +114,21 @@ export function PackDetail({ hit, preferredVersion, onBack }: { hit: PackHit; pr
 }
 
 function InstallCard(p: {
-  hit: PackHit;
+  source: SourceInfo;
+  hit: Hit;
   loading: boolean;
   error: string;
   onRetry(): void;
   mcOptions: string[];
   mc: string;
   onMc(v: string): void;
-  forMc: PackVersion[];
-  version: PackVersion | undefined;
+  forMc: Version[];
+  version: Version | undefined;
   onVersion(id: string): void;
 }) {
   const { imports, startImport } = useLauncher();
   const { navigate } = useUi();
-  const installing = imports.some((i) => i.projectId === p.hit.project_id && !i.error);
+  const installing = imports.some((i) => i.projectId === p.hit.id && !i.error);
   const file = p.version && primaryFile(p.version);
 
   return (
@@ -148,7 +150,7 @@ function InstallCard(p: {
               value={p.version?.id ?? ""}
               onChange={p.onVersion}
               placeholder="Loading…"
-              options={p.forMc.map((v) => ({ value: v.id, label: v.version_number, hint: v.version_type === "release" ? undefined : v.version_type }))}
+              options={p.forMc.map((v) => ({ value: v.id, label: v.number, hint: v.channel === "release" ? undefined : v.channel }))}
             />
           </Field>
           {p.version && (
@@ -156,7 +158,7 @@ function InstallCard(p: {
               <dt>Loader</dt>
               <dd>{p.version.loaders.map((l) => LOADER_NAME[l] ?? l).join(", ")}</dd>
               <dt>Released</dt>
-              <dd>{dateLabel(p.version.date_published)}</dd>
+              <dd>{dateLabel(p.version.published)}</dd>
               <dt>Mods</dt>
               <dd className="mono">{p.version.dependencies.length || "—"}</dd>
               {file && (
@@ -167,10 +169,10 @@ function InstallCard(p: {
               )}
             </dl>
           )}
-          {p.version && p.version.version_type !== "release" && (
+          {p.version && p.version.channel !== "release" && (
             <p className={s.installNote}>
               <Icon name="science" />
-              This is a {p.version.version_type} build and may be unstable.
+              This is a {p.version.channel} build and may be unstable.
             </p>
           )}
           <Button
@@ -181,7 +183,7 @@ function InstallCard(p: {
             disabled={!p.version}
             loading={installing}
             onClick={() => {
-              startImport(p.hit, p.version);
+              startImport(p.source.id, p.hit, p.version);
               navigate("instances");
             }}
           >
@@ -195,13 +197,6 @@ function InstallCard(p: {
 }
 
 function About({ project: p }: { project: Project }) {
-  const links: [string, string, string | null][] = [
-    ["Modrinth page", "open_in_new", `https://modrinth.com/modpack/${p.slug}`],
-    ["Source code", "code", p.source_url],
-    ["Issues", "bug_report", p.issues_url],
-    ["Wiki", "menu_book", p.wiki_url],
-    ["Discord", "forum", p.discord_url],
-  ];
   return (
     <div className={s.sideCard}>
       <h2>About</h2>
@@ -211,19 +206,17 @@ function About({ project: p }: { project: Project }) {
         {p.license && (
           <>
             <dt>License</dt>
-            <dd>{p.license.id.replace(/^LicenseRef-/, "")}</dd>
+            <dd>{p.license}</dd>
           </>
         )}
       </dl>
       <div className={s.sideLinks}>
-        {links.map(([label, icon, url]) =>
-          url ? (
-            <button key={label} className={s.sideLink} onClick={() => openUrl(url)}>
-              <Icon name={icon} />
-              {label}
-            </button>
-          ) : null
-        )}
+        {p.links.map((l) => (
+          <button key={l.label} className={s.sideLink} onClick={() => openUrl(l.url)}>
+            <Icon name={l.icon} />
+            {l.label}
+          </button>
+        ))}
       </div>
     </div>
   );
@@ -258,7 +251,7 @@ function Gallery({ images }: { images: GalleryImage[] }) {
       >
         {shown && (
           <figure>
-            <img src={shown.raw_url} alt={shown.title ?? ""} />
+            <img src={shown.rawUrl} alt={shown.title ?? ""} />
             <figcaption>
               <div>
                 {shown.title && <b>{shown.title}</b>}
@@ -278,32 +271,36 @@ function Gallery({ images }: { images: GalleryImage[] }) {
   );
 }
 
-function ModList({ version }: { version: PackVersion }) {
-  const ids = useMemo(() => [...new Set(version.dependencies.flatMap((d) => (d.project_id ? [d.project_id] : [])))], [version]);
-  const external = version.dependencies.filter((d) => !d.project_id && d.file_name).map((d) => d.file_name!);
-  const mods = useQuery({ queryKey: ["projects", ids], queryFn: () => getProjectsChunked(ids), enabled: ids.length > 0 });
+function ModList({ source, version }: { source: SourceInfo; version: Version }) {
+  const ids = useMemo(() => [...new Set(version.dependencies.flatMap((d) => (d.projectId ? [d.projectId] : [])))], [version]);
+  const external = version.dependencies.filter((d) => !d.projectId && d.fileName).map((d) => d.fileName!);
+  const mods = useQuery({
+    queryKey: ["projects", source.id, ids],
+    queryFn: () => sources.projects(source.id, ids).then((list) => list.sort((a, b) => a.title.localeCompare(b.title))),
+    enabled: ids.length > 0,
+  });
 
   if (mods.isError) return <Banner message={`Could not load the mod list: ${errorMessage(mods.error)}`} onRetry={() => mods.refetch()} />;
   if (ids.length && !mods.data) return <div className={s.modGrid}>{Array.from({ length: 8 }, (_, i) => <Skeleton key={i} height={56} />)}</div>;
   return (
     <>
       <p className={s.note}>
-        Contents of version <span className="mono">{version.version_number}</span>.
+        Contents of version <span className="mono">{version.number}</span>.
       </p>
       <div className={s.modGrid}>
         {mods.data?.map((m) => (
-          <button key={m.id} className={s.modCell} title={m.description} onClick={() => openUrl(`https://modrinth.com/${m.project_type}/${m.slug}`)}>
-            <span className={s.packIcon}>{m.icon_url ? <img src={m.icon_url} alt="" loading="lazy" /> : <Icon name="extension" />}</span>
+          <button key={m.id} className={s.modCell} title={m.description} onClick={() => openUrl(m.url)}>
+            <span className={s.packIcon}>{m.iconUrl ? <img src={m.iconUrl} alt="" loading="lazy" /> : <Icon name="extension" />}</span>
             <span className={s.modCellText}>
               <b>{m.title}</b>
-              <span>{m.project_type === "mod" ? m.description : m.project_type.replace("resourcepack", "resource pack")}</span>
+              <span>{m.kind === "mod" ? m.description : m.kind.replace("resourcepack", "resource pack")}</span>
             </span>
           </button>
         ))}
         {external.map((f) => (
           <div key={f} className={s.modCell}>
             <span className={s.packIcon}><Icon name="draft" /></span>
-            <span className={s.modCellText}><b>{f}</b><span>Not hosted on Modrinth</span></span>
+            <span className={s.modCellText}><b>{f}</b><span>Not hosted on {source.name}</span></span>
           </div>
         ))}
       </div>
@@ -311,7 +308,7 @@ function ModList({ version }: { version: PackVersion }) {
   );
 }
 
-function VersionList({ versions, loading, selected, onSelect }: { versions: PackVersion[]; loading: boolean; selected?: PackVersion; onSelect(v: PackVersion): void }) {
+function VersionList({ versions, loading, selected, onSelect }: { versions: Version[]; loading: boolean; selected?: Version; onSelect(v: Version): void }) {
   if (loading) return <TextSkeleton />;
   if (!versions.length) return <EmptyState icon="history">No Fabric or Quilt versions.</EmptyState>;
   return (
@@ -321,14 +318,14 @@ function VersionList({ versions, loading, selected, onSelect }: { versions: Pack
         return (
           <div key={v.id} className={cx(s.version, on && s.on)}>
             <button className={s.versionHead} aria-expanded={on} onClick={() => onSelect(v)}>
-              <span className={cx(s.vtype, s[v.version_type])} title={v.version_type}>{v.version_type[0].toUpperCase()}</span>
+              <span className={cx(s.vtype, s[v.channel])} title={v.channel}>{v.channel[0].toUpperCase()}</span>
               <span className={s.versionName}>
-                <b>{v.version_number}</b>
+                <b>{v.number}</b>
                 <span>{v.name}</span>
               </span>
-              <Chip variant="tag" className={s.versionTag}>{v.game_versions.join(", ")}</Chip>
+              <Chip variant="tag" className={s.versionTag}>{v.gameVersions.join(", ")}</Chip>
               <Chip>{v.loaders.map((l) => LOADER_NAME[l] ?? l).join(", ")}</Chip>
-              <span className={s.versionDate}>{dateLabel(v.date_published)}</span>
+              <span className={s.versionDate}>{dateLabel(v.published)}</span>
               {on && <Icon name="check_circle" fill className={s.versionCheck} />}
             </button>
             {on && (

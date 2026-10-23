@@ -39,7 +39,7 @@ function Shell() {
   );
 }
 
-// Remote catalog data (Modrinth): cached for the session, refetched only when stale.
+// Remote catalog data (content sources): cached for the session, refetched only when stale.
 const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 5 * 60_000, retry: 1, refetchOnWindowFocus: false } } });
 
 export function App() {

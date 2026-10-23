@@ -1,10 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { launcher } from "@/api/launcher";
-import { getProject } from "@/api/modrinth";
+import { sources } from "@/api/sources";
 import { Button, Chip, Icon, IconButton } from "@/components/ui";
 import { cx } from "@/lib/cx";
 import { InstanceContent } from "@/features/content/InstanceContent";
 import { lastPlayed, LOADER_ICON, loaderLabel, playTime } from "@/lib/format";
+import { useSourceEnabled } from "@/hooks/useSource";
 import { useLauncher } from "@/store/LauncherContext";
 import type { Instance } from "@/types";
 // The page reuses the modpack hero.
@@ -13,9 +14,11 @@ import s from "@/features/modpacks/modpacks.module.css";
 /** One instance: header with launch, then its mods, resource packs and shaders. */
 export function InstancePage({ instance: i, onBack }: { instance: Instance; onBack(): void }) {
   const { launch, busyId, isRunning } = useLauncher();
-  const pack = useQuery({ queryKey: ["project", i.modpackId], queryFn: () => getProject(i.modpackId), enabled: !!i.modpackId });
+  const ref = i.pack;
+  const sourceOn = useSourceEnabled(ref?.source);
+  const pack = useQuery({ queryKey: ["project", ref?.source, ref?.project], queryFn: () => sources.project(ref!.source, ref!.project), enabled: !!ref && sourceOn });
   const banner = pack.data?.gallery.find((g) => g.featured)?.url ?? pack.data?.gallery[0]?.url;
-  const icon = i.icon || pack.data?.icon_url;
+  const icon = i.icon || pack.data?.iconUrl;
   const running = isRunning(i.id);
   const starting = busyId === i.id;
   const color = pack.data?.color;
@@ -35,9 +38,9 @@ export function InstancePage({ instance: i, onBack }: { instance: Instance; onBa
               <div className={s.packMeta}>
                 <Chip variant="tag">{i.version}</Chip>
                 <Chip>{loaderLabel(i)}</Chip>
-                {i.modpackId && (
+                {ref && (
                   <Chip variant="ghost" icon="inventory_2">
-                    {pack.data?.title ?? "Modpack"} {i.modpackVersion}
+                    {pack.data?.title ?? "Modpack"} {ref.version}
                   </Chip>
                 )}
                 <span className={s.stat}>{lastPlayed(i.lastPlayed)}</span>

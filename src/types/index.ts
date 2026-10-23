@@ -27,9 +27,16 @@ export interface Instance {
   created: number;
   /** `data:image/...` URL; empty = loader icon. */
   icon: string;
-  /** Modrinth project it was created from; "" = made by hand. */
-  modpackId: string;
-  modpackVersion: string;
+  /** Modpack it was created from; null = made by hand. */
+  pack: PackRef | null;
+}
+
+export interface PackRef {
+  /** Content source plugin id. */
+  source: string;
+  project: string;
+  /** Version number as shown to the user. */
+  version: string;
 }
 
 /** Folder an instance file lives in: mods/, resourcepacks/, shaderpacks/. */

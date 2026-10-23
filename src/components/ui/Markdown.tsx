@@ -8,7 +8,7 @@ DOMPurify.addHook("afterSanitizeAttributes", (node) => {
   if (node.tagName === "IMG") node.setAttribute("loading", "lazy");
 });
 
-/** Untrusted Markdown (Modrinth bodies, changelogs): sanitized, links open in the system browser. */
+/** Untrusted Markdown (content source bodies, changelogs): sanitized, links open in the system browser. */
 export function Markdown({ source }: { source: string }) {
   const html = useMemo(() => DOMPurify.sanitize(marked.parse(source, { async: false })), [source]);
   return (

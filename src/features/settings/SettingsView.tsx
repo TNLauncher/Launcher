@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { View } from "@/components/layout/View";
 import { Button, ConfirmDialog, Icon, Input, Select, Switch, Textarea } from "@/components/ui";
@@ -5,6 +6,8 @@ import { cx } from "@/lib/cx";
 import { errorMessage } from "@/lib/format";
 import { useLauncher } from "@/store/LauncherContext";
 import { launcher } from "@/api/launcher";
+import { sources } from "@/api/sources";
+import { usePlugins } from "@/hooks/useSource";
 import type { DeviceCode, Settings } from "@/types";
 import s from "./settings.module.css";
 
@@ -173,6 +176,8 @@ export function SettingsView() {
           </Row>
         </Group>
 
+        <PluginsGroup />
+
         <div className={s.settingsFoot}>
           <div><Icon name="check_circle" /><span className="mono">{status}</span></div>
           <Button onClick={() => setConfirmReset(true)}>Restore defaults</Button>
@@ -192,6 +197,30 @@ export function SettingsView() {
         Memory, Java, window and launcher options go back to defaults. Your player name stays.
       </ConfirmDialog>
     </View>
+  );
+}
+
+/** Built-in plugins; a turned-off content source disappears from the catalogs, installed files stay. */
+function PluginsGroup() {
+  const qc = useQueryClient();
+  const plugins = usePlugins();
+  const [error, setError] = useState("");
+  const toggle = (id: string, enabled: boolean) =>
+    sources
+      .setPluginEnabled(id, enabled)
+      .then(() => setError(""), (e) => setError(errorMessage(e)))
+      .finally(() => qc.invalidateQueries());
+  return (
+    <Group icon="extension" title="Plugins">
+      {plugins.data?.map((p) => (
+        <Row key={p.id} label={p.name} hint={p.source ? "Content source: browse and install mods, packs and modpacks." : "Plugin"}>
+          <div className={s.settingControl}>
+            <Switch label={`${p.enabled ? "Turn off" : "Turn on"} ${p.name}`} checked={p.enabled} onChange={(on) => toggle(p.id, on)} />
+          </div>
+        </Row>
+      ))}
+      {(error || plugins.error) && <span className={s.error}>{error || errorMessage(plugins.error)}</span>}
+    </Group>
   );
 }
 
