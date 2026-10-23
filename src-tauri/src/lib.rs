@@ -22,19 +22,21 @@ use tauri::Manager;
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        // `modicon://localhost/<instance id>/<jar file>` -> the icon packed inside that mod jar.
-        .register_asynchronous_uri_scheme_protocol("modicon", |ctx, req, responder| {
+        // `instance://localhost/<what>/<instance id>/<file>`: `modicon` -> the icon packed inside that
+        // mod jar, `screenshot` -> that screenshot.
+        .register_asynchronous_uri_scheme_protocol("instance", |ctx, req, responder| {
             let app = ctx.app_handle().clone();
             tauri::async_runtime::spawn_blocking(move || {
                 let path = percent_encoding::percent_decode_str(req.uri().path()).decode_utf8_lossy().into_owned();
-                let icon = path
-                    .trim_start_matches('/')
-                    .split_once('/')
-                    .ok_or(())
-                    .and_then(|(id, file)| services::mods::icon(&app.state::<state::AppState>(), id, file).map_err(|_| ()));
-                let res = match icon {
-                    Ok((bytes, mime)) => tauri::http::Response::builder().header("Content-Type", mime).body(bytes),
-                    Err(()) => tauri::http::Response::builder().status(404).body(Vec::new()),
+                let state = app.state::<state::AppState>();
+                let found = match path.trim_start_matches('/').splitn(3, '/').collect::<Vec<_>>()[..] {
+                    ["modicon", id, file] => services::mods::icon(&state, id, file).ok(),
+                    ["screenshot", id, file] => services::screenshots::read(&state, id, file).ok().map(|b| (b, "image/png")),
+                    _ => None,
+                };
+                let res = match found {
+                    Some((bytes, mime)) => tauri::http::Response::builder().header("Content-Type", mime).body(bytes),
+                    None => tauri::http::Response::builder().status(404).body(Vec::new()),
                 };
                 responder.respond(res.expect("static response parts"));
             });
@@ -57,6 +59,8 @@ pub fn run() {
             commands::instances::set_instance_icon,
             commands::instances::delete_instance,
             commands::instances::open_instance_dir,
+            commands::instances::list_screenshots,
+            commands::instances::delete_screenshot,
             commands::game::launch,
             commands::game::stop_game,
             commands::game::read_game_log,

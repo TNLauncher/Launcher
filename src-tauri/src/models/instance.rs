@@ -63,3 +63,12 @@ pub struct ModFile {
     pub enabled: bool,
     pub size: u64,
 }
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Screenshot {
+    pub file: String,
+    pub size: u64,
+    /// Unix seconds of the file's last change.
+    pub taken: u64,
+}
