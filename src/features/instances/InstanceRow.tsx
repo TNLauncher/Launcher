@@ -43,7 +43,11 @@ export function InstanceRow({ instance: i, onOpen }: { instance: Instance; onOpe
   };
 
   return (
-    <div className="row">
+    // The name button stays the keyboard entry; this makes the rest of the card a click target too.
+    <div
+      className="row openable"
+      onClick={(e) => !(e.target as Element).closest("button, input, label, dialog") && onOpen()}
+    >
       <div className="row-main">
         <label className="row-icon" title="Change icon">
           {i.icon ? <img src={i.icon} alt="" /> : <Icon name={LOADER_ICON[i.loader]} />}

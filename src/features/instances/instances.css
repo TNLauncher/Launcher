@@ -12,6 +12,7 @@
   transition: background 160ms var(--ease);
 }
 .row:hover { background: var(--card-hover); }
+.row.openable { cursor: pointer; }
 .row-main { display: flex; align-items: center; gap: 14px; min-width: 0; }
 .row-icon { position: relative; width: 48px; height: 48px; border-radius: 8px; background: rgb(255 255 255 / 0.04); border: 1px solid var(--card-border); display: grid; place-items: center; color: var(--muted); flex-shrink: 0; cursor: pointer; }
 .row-icon:hover { border-color: var(--border); }
