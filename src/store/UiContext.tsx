@@ -1,6 +1,6 @@
 import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
 
-export type View = "home" | "instances" | "mods" | "console" | "settings";
+export type View = "home" | "instances" | "modpacks" | "mods" | "console" | "settings";
 
 interface UiValue {
   view: View;

@@ -1,0 +1,64 @@
+/* Instance content: installed files beside the Modrinth browser */
+.content .tabs { margin-bottom: 16px; }
+.content-split {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px;
+  height: max(440px, calc(100vh - 150px));
+}
+.cpane {
+  display: flex; flex-direction: column; min-height: 0; overflow: hidden;
+  border-radius: 14px; background: var(--window); border: 1px solid var(--card-border); box-shadow: var(--highlight);
+}
+.cpane-head { display: flex; flex-direction: column; gap: 10px; padding: 14px 14px 10px; }
+.cpane-title { display: flex; align-items: center; gap: 8px; min-height: 32px; }
+.cpane-title h3 { margin: 0; font-size: 13px; font-weight: 600; }
+.cpane-title .mono { font-size: 11px; color: var(--subtle); }
+.cpane-title .icon-btn { margin-left: auto; }
+.cpane .pills { flex-wrap: wrap; overflow: visible; }
+.identifying { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--subtle); }
+.identifying .icon { font-size: 14px; }
+.cpane-list { flex: 1; overflow-y: auto; padding: 0 8px 10px; display: flex; flex-direction: column; gap: 2px; transition: opacity 160ms var(--ease); }
+.cpane-list.stale { opacity: 0.55; }
+.cpane-list > .skeleton { margin: 0 6px 6px; }
+.cpane-list > .banner { margin: 0 6px; }
+
+.citem { display: flex; align-items: center; gap: 12px; padding: 8px 8px; border-radius: 10px; transition: background 160ms var(--ease), opacity 160ms var(--ease); }
+.citem:hover { background: var(--card); }
+.citem.off { opacity: 0.55; }
+.citem.off:hover { opacity: 0.85; }
+.citem-icon {
+  position: relative; width: 36px; height: 36px; border-radius: 9px; flex-shrink: 0; overflow: hidden;
+  display: grid; place-items: center; background: rgb(255 255 255 / 0.07); color: var(--subtle);
+}
+.citem-icon .icon { font-size: 18px; }
+.citem-icon img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.citem-icon.big { width: 48px; height: 48px; border-radius: 12px; }
+.citem-icon.big .icon { font-size: 22px; }
+.citem-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.citem-name { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 12px; }
+.citem-name b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.citem-name .by { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.citem-name .chip { padding: 1px 6px; font-size: 10px; }
+.citem-sub { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--subtle); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.citem-sub .icon { font-size: 13px; }
+.citem-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.citem-actions .icon-btn { opacity: 0; transition: opacity 160ms var(--ease); }
+.citem:hover .citem-actions .icon-btn, .citem-actions .icon-btn:focus-visible { opacity: 1; }
+
+.cresult { display: flex; align-items: flex-start; gap: 12px; padding: 10px 8px; border-radius: 10px; transition: background 160ms var(--ease); }
+.cresult:hover { background: var(--card); }
+.cresult-desc { margin: 0; font-size: 12px; line-height: 1.45; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.cresult .btn { flex-shrink: 0; }
+.btn.installed { color: var(--muted); }
+.btn.installed .icon { color: var(--green); }
+
+.content-notice {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 12px; padding: 10px 12px; border-radius: 12px;
+  font-size: 12px; color: var(--fg); background: rgb(10 132 255 / 0.1); border: 1px solid rgb(10 132 255 / 0.25);
+}
+.content-notice > .icon { color: var(--accent); font-size: 18px; }
+.content-notice span { flex: 1; }
+
+@media (max-width: 1100px) {
+  .content-split { gap: 12px; }
+  .cpane-head .pills { gap: 4px; }
+}

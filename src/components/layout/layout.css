@@ -46,7 +46,9 @@ h2 { margin: 0; font-size: 14px; line-height: 1.3; font-weight: 600; }
 
 main { position: fixed; top: 40px; left: 64px; right: 0; bottom: 0; overflow-y: auto; background: var(--view); }
 .view.home { background: var(--window); }
-.view.mods { height: 100%; }
+.mods-view { padding: 16px 24px 24px; background: var(--view); }
+.mods-head { display: flex; margin-bottom: 4px; }
+.mods-picker { width: 280px; }
 #mods-instance { max-width: 220px; }
 .view { min-height: 100%; }
 .view.with-dock { padding-bottom: 96px; }

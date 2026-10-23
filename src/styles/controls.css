@@ -129,3 +129,18 @@ textarea.input { height: auto; padding: 10px 12px; resize: vertical; font-family
 .btn.primary.destructive { background: var(--critical-fill); }
 .btn.primary.destructive:hover { background: var(--critical); }
 .inline-input { height: 26px; padding: 0 8px; font-weight: 500; font-size: 13px; width: 220px; }
+
+/* Underlined tab strip */
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--card-border); margin-bottom: 20px; }
+.tab {
+  position: relative; display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px;
+  font-size: 12px; font-weight: 500; color: var(--muted); transition: color 160ms var(--ease);
+}
+.tab .mono { font-size: 11px; color: var(--subtle); }
+.tab:hover { color: var(--fg); }
+.tab[aria-selected="true"] { color: var(--fg); }
+.tab[aria-selected="true"]::after { content: ""; position: absolute; left: 8px; right: 8px; bottom: -1px; height: 2px; border-radius: 2px; background: var(--accent); }
+.tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 6px; }
+
+.tab .icon { font-size: 16px; color: var(--subtle); }
+.tab[aria-selected="true"] .icon { color: var(--accent); }

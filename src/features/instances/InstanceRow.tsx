@@ -22,7 +22,7 @@ async function toIcon(file: File): Promise<string> {
   return canvas.toDataURL("image/webp", 0.9);
 }
 
-export function InstanceRow({ instance: i }: { instance: Instance }) {
+export function InstanceRow({ instance: i, onOpen }: { instance: Instance; onOpen(): void }) {
   const { launch, busyId, isRunning, refresh, snapshot, select } = useLauncher();
   const { navigate } = useUi();
   const [editing, setEditing] = useState(false);
@@ -75,7 +75,9 @@ export function InstanceRow({ instance: i }: { instance: Instance }) {
                 }}
               />
             ) : (
-              <strong>{i.name}</strong>
+              <button className="row-name" onClick={onOpen} title="Mods, resource packs and shaders">
+                {i.name}
+              </button>
             )}
             <span className="chip tag">{i.version}</span>
             <span className="chip">{loaderLabel(i)}</span>
@@ -112,6 +114,9 @@ export function InstanceRow({ instance: i }: { instance: Instance }) {
         <div className="group">
           <button className="icon-btn" title="Console" onClick={() => (select(i.id), navigate("console"))}>
             <Icon name="terminal" />
+          </button>
+          <button className="icon-btn" title="Mods, resource packs and shaders" aria-label={`Manage ${i.name}`} onClick={onOpen}>
+            <Icon name="widgets" />
           </button>
           <button className="icon-btn" title="Open folder" onClick={() => run(() => launcher.openInstanceDir(i.id))}>
             <Icon name="folder_open" />

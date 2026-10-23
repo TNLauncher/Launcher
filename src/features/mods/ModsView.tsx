@@ -1,55 +1,46 @@
-import { useCallback, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Icon } from "@/components/ui/Icon";
+import { Select } from "@/components/ui/Select";
+import { InstanceContent } from "@/features/content/InstanceContent";
+import { loaderLabel } from "@/lib/format";
 import { useLauncher, useRecentInstances } from "@/store/LauncherContext";
 import { useUi } from "@/store/UiContext";
-import { InstalledMods } from "./InstalledMods";
-import { ModBrowser } from "./ModBrowser";
-import "./mods.css";
-import { Select } from "@/components/ui/Select";
 
-/** Two panes for one modded instance: installed jars and Modrinth search. */
+/** Content of any instance, picked here; the same panes live on each instance's own page. */
 export function ModsView() {
   const { selected } = useLauncher();
   const { openNewInstance } = useUi();
   const recent = useRecentInstances();
-  const modded = useMemo(() => recent.filter((i) => i.loader !== "vanilla"), [recent]);
   const [pickedId, setPickedId] = useState<string>();
-  // Bumped after installs so the installed list reloads.
-  const [revision, setRevision] = useState(0);
-  const onInstalled = useCallback(() => setRevision((r) => r + 1), []);
 
   const instance = useMemo(
-    () => modded.find((i) => i.id === pickedId) ?? modded.find((i) => i.id === selected?.id) ?? modded[0],
-    [modded, pickedId, selected]
+    () => recent.find((i) => i.id === pickedId) ?? recent.find((i) => i.id === selected?.id) ?? recent[0],
+    [recent, pickedId, selected]
   );
 
   if (!instance) {
     return (
-      <section className="view mods">
-        <EmptyState
-          icon="extension_off"
-          action={<button className="btn primary" onClick={openNewInstance}><Icon name="add" />Create instance</button>}
-        >
-          Mods need a Fabric or Quilt instance.
+      <section className="view">
+        <EmptyState icon="extension_off" action={<button className="btn primary" onClick={openNewInstance}><Icon name="add" />Create instance</button>}>
+          Create an instance first: mods, resource packs and shaders live inside one.
         </EmptyState>
       </section>
     );
   }
 
   return (
-    <section className="view mods">
-      <div className="split">
-        <InstalledMods
-          key={`${instance.id}:${revision}`}
-          instance={instance}
-          picker={
-            <Select label="Instance" value={instance.id} onChange={setPickedId}
-              options={modded.map((i) => ({ value: i.id, label: i.name }))} />
-          }
+    <section className="view mods-view">
+      <div className="mods-head">
+        <Select
+          label="Instance"
+          className="mods-picker"
+          value={instance.id}
+          onChange={setPickedId}
+          options={recent.map((i) => ({ value: i.id, label: i.name, hint: `${i.version} · ${loaderLabel(i)}` }))}
         />
-        <ModBrowser key={instance.id} instance={instance} onInstalled={onInstalled} />
       </div>
+      <InstanceContent key={instance.id} instance={instance} />
     </section>
   );
 }

@@ -1,7 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { launcher } from "@/api/launcher";
 import { gameLogs } from "./gameLogs";
-import { errorMessage } from "@/lib/format";
+import { importModpack, type ModHit, type PackVersion } from "@/api/modrinth";
+import { errorMessage, recency } from "@/lib/format";
 import type { Instance, Settings, Snapshot, Stage } from "@/types";
 
 export interface Progress {
@@ -13,6 +14,20 @@ export interface Progress {
 export interface LaunchError {
   id: string;
   message: string;
+}
+
+type PackRef = Pick<ModHit, "project_id" | "title" | "icon_url">;
+
+/** A modpack download that has not become an instance yet. */
+export interface PendingImport {
+  projectId: string;
+  title: string;
+  iconUrl: string | null;
+  /** Chosen pack version; undefined = newest. */
+  version?: PackVersion;
+  done: number;
+  total: number;
+  error: string;
 }
 
 interface LauncherValue {
@@ -28,6 +43,11 @@ interface LauncherValue {
   clearError(): void;
   saveSettings(settings: Settings): Promise<void>;
   isRunning(id: string): boolean;
+  /** Modpack installs in flight (or failed, until dismissed). */
+  imports: PendingImport[];
+  /** Starts a background install; a pack already installing is ignored. */
+  startImport(pack: PackRef, version?: PackVersion): void;
+  dismissImport(projectId: string): void;
 }
 
 const LauncherContext = createContext<LauncherValue | null>(null);
@@ -51,6 +71,8 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
   const [progress, setProgress] = useState<Progress | null>(null);
   const frame = useRef(0);
   const [error, setError] = useState<LaunchError | null>(null);
+  const [imports, setImports] = useState<PendingImport[]>([]);
+  const inFlight = useRef(new Set<string>());
 
   const refresh = useCallback(async () => setSnapshot(await launcher.getState()), []);
 
@@ -101,6 +123,32 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
 
   const clearError = useCallback(() => setError(null), []);
 
+  const patchImport = (projectId: string, patch: Partial<PendingImport>) =>
+    setImports((list) => list.map((p) => (p.projectId === projectId ? { ...p, ...patch } : p)));
+
+  const startImport = useCallback(
+    async (pack: PackRef, version?: PackVersion) => {
+      const id = pack.project_id;
+      if (inFlight.current.has(id)) return;
+      inFlight.current.add(id);
+      const pending: PendingImport = { projectId: id, title: pack.title, iconUrl: pack.icon_url, version, done: 0, total: 0, error: "" };
+      setImports((list) => [pending, ...list.filter((p) => p.projectId !== id)]);
+      try {
+        const inst = await importModpack(id, version, ({ done, total }) => patchImport(id, { done, total }));
+        select(inst.id);
+        await refresh();
+        setImports((list) => list.filter((p) => p.projectId !== id));
+      } catch (e) {
+        patchImport(id, { error: errorMessage(e) });
+      } finally {
+        inFlight.current.delete(id);
+      }
+    },
+    [refresh, select]
+  );
+
+  const dismissImport = useCallback((projectId: string) => setImports((list) => list.filter((p) => p.projectId !== projectId)), []);
+
   useEffect(() => {
     refresh();
     const unlisten = [
@@ -116,7 +164,7 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
   const value = useMemo<LauncherValue>(() => {
     const instances = snapshot?.instances ?? [];
     const selected =
-      instances.find((i) => i.id === selectedId) ?? [...instances].sort((a, b) => b.lastPlayed - a.lastPlayed)[0];
+      instances.find((i) => i.id === selectedId) ?? [...instances].sort((a, b) => recency(b) - recency(a))[0];
     return {
       snapshot,
       selected,
@@ -128,8 +176,11 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
       clearError,
       saveSettings,
       isRunning: (id) => snapshot?.running.includes(id) ?? false,
+      imports,
+      startImport,
+      dismissImport,
     };
-  }, [snapshot, selectedId, select, refresh, launch, busyId, error, clearError, saveSettings]);
+  }, [snapshot, selectedId, select, refresh, launch, busyId, error, clearError, saveSettings, imports, startImport, dismissImport]);
 
   return (
     <LauncherContext.Provider value={value}>
@@ -150,5 +201,5 @@ export const useProgress = () => useContext(ProgressContext);
 /** Instances sorted by most recently played. */
 export function useRecentInstances(): Instance[] {
   const { snapshot } = useLauncher();
-  return useMemo(() => [...(snapshot?.instances ?? [])].sort((a, b) => b.lastPlayed - a.lastPlayed), [snapshot]);
+  return useMemo(() => [...(snapshot?.instances ?? [])].sort((a, b) => recency(b) - recency(a)), [snapshot]);
 }

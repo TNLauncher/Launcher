@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { lazy, Suspense, type ComponentType } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Titlebar } from "@/components/layout/Titlebar";
@@ -10,6 +11,7 @@ import "@/components/layout/layout.css";
 const VIEWS: Record<View, ComponentType> = {
   home: HomeView,
   instances: lazy(() => import("@/features/instances/InstancesView").then((m) => ({ default: m.InstancesView }))),
+  modpacks: lazy(() => import("@/features/modpacks/ModpacksView").then((m) => ({ default: m.ModpacksView }))),
   mods: lazy(() => import("@/features/mods/ModsView").then((m) => ({ default: m.ModsView }))),
   console: lazy(() => import("@/features/console/ConsoleView").then((m) => ({ default: m.ConsoleView }))),
   settings: lazy(() => import("@/features/settings/SettingsView").then((m) => ({ default: m.SettingsView }))),
@@ -37,12 +39,17 @@ function Shell() {
   );
 }
 
+// Remote catalog data (Modrinth): cached for the session, refetched only when stale.
+const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 5 * 60_000, retry: 1, refetchOnWindowFocus: false } } });
+
 export function App() {
   return (
-    <LauncherProvider>
-      <UiProvider>
-        <Shell />
-      </UiProvider>
-    </LauncherProvider>
+    <QueryClientProvider client={queryClient}>
+      <LauncherProvider>
+        <UiProvider>
+          <Shell />
+        </UiProvider>
+      </LauncherProvider>
+    </QueryClientProvider>
   );
 }

@@ -2,30 +2,30 @@ import { useMemo, useState } from "react";
 import { Banner } from "@/components/ui/Banner";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Icon } from "@/components/ui/Icon";
-import { LOADERS } from "@/lib/format";
-import { useLauncher } from "@/store/LauncherContext";
+import { LOADERS, recency } from "@/lib/format";
+import { useLauncher, type PendingImport } from "@/store/LauncherContext";
 import { useUi } from "@/store/UiContext";
 import type { Instance, Loader } from "@/types";
+import { InstancePage } from "./InstancePage";
 import { InstanceRow } from "./InstanceRow";
-import { ModpackDialog } from "./ModpackDialog";
 import "./instances.css";
 import { Select } from "@/components/ui/Select";
 
 type Sort = "played" | "name" | "time";
 const SORTERS: Record<Sort, (a: Instance, b: Instance) => number> = {
-  played: (a, b) => b.lastPlayed - a.lastPlayed,
+  played: (a, b) => recency(b) - recency(a),
   name: (a, b) => a.name.localeCompare(b.name),
   time: (a, b) => b.playSeconds - a.playSeconds,
 };
 const FILTERS: ("all" | Loader)[] = ["all", "vanilla", "fabric", "quilt"];
 
 export function InstancesView() {
-  const { snapshot, error, clearError, launch } = useLauncher();
-  const { openNewInstance } = useUi();
+  const { snapshot, error, clearError, launch, imports } = useLauncher();
+  const { openNewInstance, navigate } = useUi();
   const [query, setQuery] = useState("");
   const [loader, setLoader] = useState<"all" | Loader>("all");
   const [sort, setSort] = useState<Sort>("played");
-  const [importing, setImporting] = useState(false);
+  const [openId, setOpenId] = useState<string | null>(null);
   const all = snapshot?.instances ?? [];
 
   const counts = useMemo(() => {
@@ -39,9 +39,12 @@ export function InstancesView() {
     .filter((i) => (loader === "all" || i.loader === loader) && (!q || `${i.name} ${i.version}`.toLowerCase().includes(q)))
     .sort(SORTERS[sort]);
 
+  const opened = all.find((i) => i.id === openId);
+
   return (
     <section className="view">
-      <div className="page">
+      {opened && <InstancePage instance={opened} onBack={() => setOpenId(null)} />}
+      <div className="page" hidden={!!opened}>
         {error && <Banner message={error.message} onRetry={() => launch(error.id)} onDismiss={clearError} />}
         <div className="toolbar">
           <div className="toolbar-left">
@@ -66,10 +69,6 @@ export function InstancesView() {
                 { value: "name", label: "Name" },
                 { value: "time", label: "Play time" },
               ]} />
-            <button className="btn" onClick={() => setImporting(true)}>
-              <Icon name="travel_explore" />
-              Modrinth modpack
-            </button>
             <button className="btn" onClick={openNewInstance}>
               <Icon name="add" />
               Create instance
@@ -78,17 +77,25 @@ export function InstancesView() {
         </div>
 
         <div className="rows">
+          {imports.map((p) => <ImportRow key={p.projectId} pending={p} />)}
           {!all.length ? (
-            <EmptyState
-              icon="layers"
-              action={<button className="btn primary" onClick={openNewInstance}><Icon name="add" />Create instance</button>}
-            >
-              No instances yet. Each instance is a separate game folder with its own version, mods and worlds.
-            </EmptyState>
+            !imports.length && (
+              <EmptyState
+                icon="layers"
+                action={
+                  <div className="empty-actions">
+                    <button className="btn primary" onClick={() => navigate("modpacks")}><Icon name="inventory_2" />Browse modpacks</button>
+                    <button className="btn" onClick={openNewInstance}><Icon name="add" />Blank instance</button>
+                  </div>
+                }
+              >
+                No instances yet. Start from a ready-made Modrinth modpack, or a blank game with your own mods.
+              </EmptyState>
+            )
           ) : !list.length ? (
             <EmptyState icon="search_off">Nothing matches this filter.</EmptyState>
           ) : (
-            list.map((i) => <InstanceRow key={i.id} instance={i} />)
+            list.map((i) => <InstanceRow key={i.id} instance={i} onOpen={() => setOpenId(i.id)} />)
           )}
         </div>
 
@@ -97,7 +104,50 @@ export function InstancesView() {
           <span className="mono selectable">{snapshot?.dataDir}</span>
         </div>
       </div>
-      {importing && <ModpackDialog onClose={() => setImporting(false)} />}
     </section>
+  );
+}
+
+/** A modpack still downloading; replaced by the real instance row once it lands. */
+function ImportRow({ pending: p }: { pending: PendingImport }) {
+  const { startImport, dismissImport } = useLauncher();
+  const pct = p.total ? (p.done / p.total) * 100 : 0;
+  return (
+    <div className="row import-row" role="status" aria-busy={!p.error}>
+      <div className="row-main">
+        <div className="row-icon">{p.iconUrl ? <img src={p.iconUrl} alt="" /> : <Icon name="inventory_2" />}</div>
+        <div className="row-text">
+          <div className="row-title">
+            <strong>{p.title}</strong>
+            {p.version && <span className="chip tag">{p.version.game_versions.at(-1)}</span>}
+            {p.version && <span className="chip">{p.version.version_number}</span>}
+          </div>
+          {p.error ? (
+            <div className="meta small" style={{ color: "var(--critical)" }}>{p.error}</div>
+          ) : (
+            <div className="import-progress">
+              <div className={`bar ${p.total ? "" : "indeterminate"}`}>
+                <div style={p.total ? { transform: `scaleX(${pct / 100})` } : undefined} />
+              </div>
+              <span className="meta small mono">{p.total ? `${p.done} / ${p.total} files` : "Preparing…"}</span>
+            </div>
+          )}
+        </div>
+      </div>
+      {p.error && (
+        <div className="row-actions">
+          <button
+            className="btn"
+            onClick={() => startImport({ project_id: p.projectId, title: p.title, icon_url: p.iconUrl }, p.version)}
+          >
+            <Icon name="refresh" />
+            Retry
+          </button>
+          <button className="icon-btn" title="Dismiss" aria-label="Dismiss" onClick={() => dismissImport(p.projectId)}>
+            <Icon name="close" />
+          </button>
+        </div>
+      )}
+    </div>
   );
 }

@@ -10,7 +10,7 @@ import { Select } from "@/components/ui/Select";
 
 /** Mounted only while open, so every opening starts from fresh state. */
 export function NewInstanceDialog() {
-  const { closeNewInstance } = useUi();
+  const { closeNewInstance, navigate } = useUi();
   const { refresh, select } = useLauncher();
   const ref = useRef<HTMLDialogElement>(null);
   const [versions, setVersions] = useState<ManifestVersion[] | null>(null);
@@ -47,9 +47,21 @@ export function NewInstanceDialog() {
   }
 
   return (
-    <dialog ref={ref} onClose={closeNewInstance}>
+    <dialog ref={ref} aria-labelledby="new-instance-title" onClose={closeNewInstance}>
       <form onSubmit={submit}>
-        <h2>New instance</h2>
+        <div className="dialog-head">
+          <h2 id="new-instance-title">New instance</h2>
+          <button
+            type="button"
+            className="link"
+            onClick={() => {
+              closeNewInstance();
+              navigate("modpacks");
+            }}
+          >
+            Start from a modpack
+          </button>
+        </div>
         <label className="field">
           <span>Name</span>
           <input className="input" placeholder={chosen || "My world"} maxLength={48} value={name} onChange={(e) => setName(e.target.value)} />

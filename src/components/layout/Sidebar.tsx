@@ -6,6 +6,7 @@ import { useUi, type View } from "@/store/UiContext";
 const NAV: { view: View; icon: string; label: string }[] = [
   { view: "home", icon: "sports_esports", label: "Home" },
   { view: "instances", icon: "layers", label: "Instances" },
+  { view: "modpacks", icon: "inventory_2", label: "Modpacks" },
   { view: "mods", icon: "extension", label: "Mods" },
   { view: "console", icon: "terminal", label: "Console" },
   { view: "settings", icon: "tune", label: "Settings" },

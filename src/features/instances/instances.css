@@ -30,5 +30,12 @@
 @media (max-width: 1100px) {
   .toolbar .search { width: 180px; }
 }
-.modpack-dialog { width: 560px; }
-.modpack-list { display: flex; flex-direction: column; gap: 8px; max-height: 420px; overflow-y: auto; }
+.import-row .row-icon { cursor: default; }
+.import-row .row-main { flex: 1; }
+.import-row .row-text { flex: 1; max-width: 360px; }
+.import-progress { display: flex; align-items: center; gap: 10px; }
+.import-progress .bar { flex: 1; }
+.empty-actions { display: flex; gap: 8px; }
+.page[hidden] { display: none; }
+.row-name { padding: 0; font-weight: 500; font-size: inherit; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row-name:hover { color: var(--link); }

@@ -1,6 +1,6 @@
 # TNLauncher
 
-Minecraft launcher: Tauri 2 + React 19 + Vite. Vanilla, Fabric and Quilt instances, Modrinth mods,
+Minecraft launcher: Tauri 2 + React 19 + Vite. Vanilla, Fabric and Quilt instances, Modrinth mods and modpacks,
 Java runtimes downloaded from Mojang. Offline or Microsoft accounts.
 
 ```sh

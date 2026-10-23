@@ -23,9 +23,17 @@ export interface Instance {
   /** Unix seconds, 0 = never. */
   lastPlayed: number;
   playSeconds: number;
+  /** Unix seconds; 0 for old instances. */
+  created: number;
   /** `data:image/...` URL; empty = loader icon. */
   icon: string;
+  /** Modrinth project it was created from; "" = made by hand. */
+  modpackId: string;
+  modpackVersion: string;
 }
+
+/** Folder an instance file lives in: mods/, resourcepacks/, shaderpacks/. */
+export type ContentKind = "mod" | "resourcepack" | "shader";
 
 export interface ModFile {
   file: string;
@@ -53,6 +61,11 @@ export type Stage = "resolving" | "java" | "libraries" | "assets" | "starting";
 export type LaunchEvent =
   | { event: "progress"; data: { stage: Stage; done: number; total: number } }
   | { event: "started" };
+
+export interface ImportProgress {
+  done: number;
+  total: number;
+}
 
 export interface GameExit {
   id: string;
