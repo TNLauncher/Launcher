@@ -34,15 +34,30 @@ pub fn save_account(state: &AppState, account: Option<&Account>) -> Result<()> {
     write(&state.paths.account_file(), &account)
 }
 
+/// Ids of plugins the user switched off; everything else is on.
+pub fn load_disabled_plugins(state: &AppState) -> Vec<String> {
+    read(&state.paths.plugins_file())
+}
+
+pub fn save_disabled_plugins(state: &AppState, ids: &[String]) -> Result<()> {
+    write(&state.paths.plugins_file(), &ids)
+}
+
 pub fn load_instances(state: &AppState) -> Vec<Instance> {
-    read(&state.paths.instances_file())
+    read_instances(&state.paths.instances_file())
+}
+
+fn read_instances(path: &Path) -> Vec<Instance> {
+    let mut list: Vec<Instance> = read(path);
+    list.iter_mut().for_each(Instance::migrate);
+    list
 }
 
 /// Locked read-modify-write of the instance list.
 pub fn update_instances<R>(state: &AppState, f: impl FnOnce(&mut Vec<Instance>) -> R) -> Result<R> {
     let _guard = state.store_lock.lock().unwrap();
     let path = state.paths.instances_file();
-    let mut list: Vec<Instance> = read(&path);
+    let mut list = read_instances(&path);
     let out = f(&mut list);
     write(&path, &list)?;
     Ok(out)

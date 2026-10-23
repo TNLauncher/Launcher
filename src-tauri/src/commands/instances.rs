@@ -11,16 +11,16 @@ pub async fn create_instance(state: State<'_, AppState>, name: String, version: 
     instances::create(&state, &name, &version, loader).await
 }
 
-/// Creates an instance from a Modrinth `.mrpack` URL.
+/// Creates an instance from a modpack project; `version` is a version id, `None` = newest.
 #[tauri::command]
 pub async fn import_modpack(
     state: State<'_, AppState>,
-    url: String,
-    project_id: String,
-    version_number: String,
+    source: String,
+    project: String,
+    version: Option<String>,
     on_progress: Channel<ImportProgress>,
 ) -> Result<Instance> {
-    modpacks::import(&state, &url, &project_id, &version_number, &|p| {
+    modpacks::import(&state, &source, &project, version.as_deref(), &|p| {
         let _ = on_progress.send(p);
     })
     .await

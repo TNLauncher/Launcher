@@ -1,20 +1,21 @@
 use crate::error::Result;
 use crate::models::{ContentKind, ModFile};
-use crate::services::mods;
+use crate::services::mods::{self, IdentifiedFile};
 use crate::state::AppState;
 use std::collections::HashMap;
-use tauri::State;
+use tauri::{Manager, State};
 
 #[tauri::command]
 pub fn list_content(state: State<'_, AppState>, id: String, kind: ContentKind) -> Result<Vec<ModFile>> {
     mods::list(&state, &id, kind)
 }
 
-/// Hashing reads every file, so it runs off the main thread.
+/// Files of one kind the source recognises, by file name. Hashing reads every file, so it runs off the main thread.
 #[tauri::command]
-pub async fn hash_content(app: tauri::AppHandle, id: String, kind: ContentKind) -> Result<HashMap<String, String>> {
-    use tauri::Manager;
-    tauri::async_runtime::spawn_blocking(move || mods::hashes(&app.state::<AppState>(), &id, kind)).await?
+pub async fn identify_content(app: tauri::AppHandle, source: String, id: String, kind: ContentKind) -> Result<HashMap<String, IdentifiedFile>> {
+    let handle = app.clone();
+    let hashes = tauri::async_runtime::spawn_blocking(move || mods::hashes(&handle.state::<AppState>(), &id, kind)).await??;
+    mods::identify(&app.state::<AppState>(), &source, hashes).await
 }
 
 #[tauri::command]
@@ -27,7 +28,8 @@ pub fn delete_content(state: State<'_, AppState>, id: String, kind: ContentKind,
     mods::delete(&state, &id, kind, &file)
 }
 
+/// `skip`: projects already installed, so dependencies are not added twice.
 #[tauri::command]
-pub async fn install_content(state: State<'_, AppState>, id: String, kind: ContentKind, url: String, file: String) -> Result<()> {
-    mods::install(&state, &id, kind, &url, &file).await
+pub async fn install_content(state: State<'_, AppState>, source: String, id: String, kind: ContentKind, project: String, skip: Vec<String>) -> Result<()> {
+    mods::install(&state, &source, &id, kind, &project, &skip).await
 }

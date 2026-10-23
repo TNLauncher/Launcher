@@ -1,14 +1,17 @@
-use crate::error::Result;
+use crate::error::{AppError, Result};
 use crate::minecraft::http;
 use crate::state::AppState;
 use serde_json::Value;
 use tauri::State;
 
-/// GET (or POST `body`) a JSON document through Rust, so the webview never deals with CORS.
+/// The only hosts the UI may read directly; content sources go through `plugins`.
+const ALLOWED: [&str; 2] = ["https://piston-meta.mojang.com/", "https://launchercontent.mojang.com/"];
+
+/// GET a Mojang JSON document through Rust, so the webview never deals with CORS.
 #[tauri::command]
-pub async fn fetch_json(state: State<'_, AppState>, url: String, body: Option<Value>) -> Result<Value> {
-    match body {
-        Some(body) => http::post_json(&state.http, &url, &body).await,
-        None => http::get_json(&state.http, &url).await,
+pub async fn fetch_json(state: State<'_, AppState>, url: String) -> Result<Value> {
+    if !ALLOWED.iter().any(|h| url.starts_with(h)) {
+        return Err(AppError::Invalid(format!("{url} is not an allowed host")));
     }
+    http::get_json(&state.http, &url).await
 }

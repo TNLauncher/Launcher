@@ -4,6 +4,7 @@
 //! - `commands`  — thin `#[tauri::command]` adapters: parse IPC input, call a service.
 //! - `services`  — use cases (create instance, launch, manage mods); own all side effects.
 //! - `minecraft` — protocol knowledge: Mojang/Fabric/Quilt metadata, installs, JVM command.
+//! - `plugins`   — switchable providers (content sources) behind the traits in `plugins::api`.
 //! - `storage`   — JSON persistence of settings and instances.
 //! - `models`, `state`, `error` — shared types; `config` — build-time `TN_*` settings from .env.
 
@@ -12,6 +13,7 @@ pub mod config;
 pub mod error;
 pub mod minecraft;
 pub mod models;
+pub mod plugins;
 pub mod services;
 pub mod state;
 pub mod storage;
@@ -65,10 +67,16 @@ pub fn run() {
             commands::game::stop_game,
             commands::game::read_game_log,
             commands::mods::list_content,
-            commands::mods::hash_content,
+            commands::mods::identify_content,
             commands::mods::toggle_content,
             commands::mods::delete_content,
             commands::mods::install_content,
+            commands::plugins::list_plugins,
+            commands::plugins::set_plugin_enabled,
+            commands::plugins::source_search,
+            commands::plugins::source_project,
+            commands::plugins::source_projects,
+            commands::plugins::source_versions,
         ])
         .run(tauri::generate_context!())
         .expect("error while running TNLauncher");

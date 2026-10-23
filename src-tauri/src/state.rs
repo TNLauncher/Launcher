@@ -1,5 +1,6 @@
 use crate::error::{AppError, Result};
 use crate::models::ContentKind;
+use crate::plugins::Registry;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::process::Child;
@@ -15,14 +16,17 @@ pub struct AppState {
     pub running: Mutex<HashSet<String>>,
     /// Live game processes by instance id; held so the UI can stop them.
     pub games: Mutex<HashMap<String, Child>>,
+    pub plugins: Registry,
 }
 
 impl AppState {
     pub fn new(root: PathBuf) -> Result<Self> {
         std::fs::create_dir_all(&root)?;
+        let http = http_client()?;
         Ok(Self {
             paths: Paths { root },
-            http: http_client()?,
+            plugins: Registry::builtin(&http),
+            http,
             store_lock: Mutex::new(()),
             running: Mutex::new(HashSet::new()),
             games: Mutex::new(HashMap::new()),
@@ -51,6 +55,9 @@ impl Paths {
     }
     pub fn account_file(&self) -> PathBuf {
         self.root.join("account.json")
+    }
+    pub fn plugins_file(&self) -> PathBuf {
+        self.root.join("disabled-plugins.json")
     }
     pub fn instances_file(&self) -> PathBuf {
         self.root.join("instances.json")

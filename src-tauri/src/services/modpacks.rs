@@ -1,42 +1,27 @@
-//! Modrinth modpacks (`.mrpack`): a zip with `modrinth.index.json` listing files to download,
-//! plus `overrides/` and `client-overrides/` copied over the game directory.
+//! Modpack import for any content source: the source reads the archive's manifest into a `PackPlan`,
+//! the launcher downloads its files and copies the archive's override folders over the game directory.
 use crate::error::{AppError, Result};
 use crate::minecraft::http::{self, Job};
-use crate::models::{Instance, Loader};
+use crate::models::{Instance, Loader, PackRef};
+use crate::plugins::{
+    self,
+    api::{PackFile, PackPlan, ProjectKind, VersionFilter},
+};
 use crate::services::instances;
 use crate::state::AppState;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::collections::HashMap;
-use std::io::Cursor;
+use std::io::{Cursor, Read};
 use std::path::{Component, Path, PathBuf};
 
-const PACK_HOST: &str = "https://cdn.modrinth.com/";
-/// Hosts the mrpack spec allows pack files to come from.
-const FILE_HOSTS: [&str; 4] = [PACK_HOST, "https://github.com/", "https://raw.githubusercontent.com/", "https://gitlab.com/"];
+/// Top-level archive files bigger than this are not handed to the source.
+const MAX_MANIFEST: u64 = 16 * 1024 * 1024;
 
 /// Files downloaded so far; streamed to the UI.
 #[derive(Clone, Serialize)]
 pub struct ImportProgress {
     pub done: usize,
     pub total: usize,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct Index {
-    name: String,
-    files: Vec<PackFile>,
-    dependencies: HashMap<String, String>,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct PackFile {
-    path: String,
-    downloads: Vec<String>,
-    file_size: Option<u64>,
-    #[serde(default)]
-    env: HashMap<String, String>,
 }
 
 /// Pack paths are untrusted: only plain relative components, so nothing escapes the instance dir.
@@ -48,38 +33,48 @@ fn safe_rel(path: &str) -> Result<&Path> {
     Ok(p)
 }
 
-fn loader_of(deps: &HashMap<String, String>) -> Result<(Loader, String)> {
-    if let Some(v) = deps.get("fabric-loader") {
-        return Ok((Loader::Fabric, v.clone()));
-    }
-    if let Some(v) = deps.get("quilt-loader") {
-        return Ok((Loader::Quilt, v.clone()));
-    }
-    if deps.contains_key("forge") || deps.contains_key("neoforge") {
-        return Err(AppError::Unsupported("Forge and NeoForge modpacks are not supported".into()));
-    }
-    Ok((Loader::Vanilla, String::new()))
+pub(crate) fn allowed(hosts: &[String], url: &str) -> bool {
+    hosts.iter().any(|h| url.starts_with(h.as_str()))
 }
 
-fn jobs(dir: &Path, files: &[PackFile]) -> Result<Vec<Job>> {
+fn loader_of(plan: &PackPlan) -> Result<Loader> {
+    match plan.loader.as_str() {
+        "" => Ok(Loader::Vanilla),
+        "fabric" => Ok(Loader::Fabric),
+        "quilt" => Ok(Loader::Quilt),
+        other => Err(AppError::Unsupported(format!("{other} modpacks are not supported"))),
+    }
+}
+
+fn jobs(dir: &Path, hosts: &[String], files: &[PackFile]) -> Result<Vec<Job>> {
     files
         .iter()
-        .filter(|f| f.env.get("client").map_or(true, |e| e != "unsupported"))
         .map(|f| {
-            let url = f
-                .downloads
-                .iter()
-                .find(|u| FILE_HOSTS.iter().any(|h| u.starts_with(h)))
-                .ok_or_else(|| AppError::Invalid(format!("No allowed download for {}", f.path)))?;
-            Ok(Job { url: url.clone(), path: dir.join(safe_rel(&f.path)?), size: f.file_size })
+            let url = f.urls.iter().find(|u| allowed(hosts, u)).ok_or_else(|| AppError::Invalid(format!("No allowed download for {}", f.path)))?;
+            Ok(Job { url: url.clone(), path: dir.join(safe_rel(&f.path)?), size: f.size })
         })
         .collect()
 }
 
-fn extract_overrides(bytes: &[u8], dir: &Path) -> Result<()> {
+/// Top-level files of the archive, which is where pack formats keep their manifest.
+pub(crate) fn root_files(bytes: &[u8]) -> Result<HashMap<String, Vec<u8>>> {
     let mut zip = zip::ZipArchive::new(Cursor::new(bytes))?;
-    // client-overrides go second so they win over the shared ones.
-    for prefix in ["overrides", "client-overrides"] {
+    let mut out = HashMap::new();
+    for i in 0..zip.len() {
+        let mut entry = zip.by_index(i)?;
+        if entry.is_dir() || entry.name().contains('/') || entry.size() > MAX_MANIFEST {
+            continue;
+        }
+        let mut buf = Vec::new();
+        entry.read_to_end(&mut buf)?;
+        out.insert(entry.name().to_string(), buf);
+    }
+    Ok(out)
+}
+
+fn extract_overrides(bytes: &[u8], dir: &Path, prefixes: &[String]) -> Result<()> {
+    let mut zip = zip::ZipArchive::new(Cursor::new(bytes))?;
+    for prefix in prefixes {
         for i in 0..zip.len() {
             let mut entry = zip.by_index(i)?;
             let Some(name) = entry.enclosed_name() else { continue };
@@ -97,37 +92,42 @@ fn extract_overrides(bytes: &[u8], dir: &Path) -> Result<()> {
     Ok(())
 }
 
-/// `project_id` / `version_number` are stored on the instance so its page can show where it came from.
+/// Installs `version` (an id) of a modpack project as a new instance, or its newest version when `None`.
 pub async fn import(
     state: &AppState,
-    url: &str,
-    project_id: &str,
-    version_number: &str,
+    source_id: &str,
+    project: &str,
+    version: Option<&str>,
     progress: &(dyn Fn(ImportProgress) + Sync),
 ) -> Result<Instance> {
-    if !url.starts_with(PACK_HOST) {
-        return Err(AppError::Invalid("Only Modrinth modpacks are allowed".into()));
+    let source = plugins::source(state, source_id)?;
+    let hosts = &source.info().hosts;
+    let filter = VersionFilter { kind: ProjectKind::Modpack, game_version: None, loader: None };
+    let versions = source.versions(project, &filter).await?;
+    let picked = match version {
+        Some(id) => versions.into_iter().find(|v| v.id == id),
+        None => versions.into_iter().next(),
     }
-    let bytes = http::fetch_bytes(&state.http, url).await?;
-    let index: Index = {
-        let mut zip = zip::ZipArchive::new(Cursor::new(&bytes))?;
-        let index = serde_json::from_reader(zip.by_name("modrinth.index.json")?)?;
-        index
-    };
-    let version = index.dependencies.get("minecraft").ok_or_else(|| AppError::Invalid("Modpack has no Minecraft version".into()))?;
-    let (loader, loader_version) = loader_of(&index.dependencies)?;
+    .ok_or_else(|| AppError::NotFound("This modpack has no version the launcher can run".into()))?;
+    let file = picked.primary_file().ok_or_else(|| AppError::NotFound("This modpack version has no file".into()))?;
+    if !allowed(hosts, &file.url) {
+        return Err(AppError::Invalid(format!("{} is not an allowed download", file.url)));
+    }
+
+    let bytes = http::fetch_bytes(&state.http, &file.url).await?;
+    let plan = source.plan_pack(&root_files(&bytes)?)?;
+    let loader = loader_of(&plan)?;
     let instance = Instance {
-        modpack_id: project_id.into(),
-        modpack_version: version_number.into(),
-        ..instances::new(&index.name, version, loader, loader_version)
+        pack: Some(PackRef { source: source_id.into(), project: project.into(), version: picked.number.clone() }),
+        ..instances::new(&plan.name, &plan.game_version, loader, plan.loader_version.clone())
     };
     let dir = state.paths.instance_dir(&instance.id)?;
 
     let result = async {
-        let jobs = jobs(&dir, &index.files)?;
+        let jobs = jobs(&dir, hosts, &plan.files)?;
         progress(ImportProgress { done: 0, total: jobs.len() });
         http::download_all(&state.http, jobs, &|done, total| progress(ImportProgress { done, total })).await?;
-        extract_overrides(&bytes, &dir)?;
+        extract_overrides(&bytes, &dir, &plan.overrides)?;
         instances::add(state, &instance)
     }
     .await;
@@ -149,24 +149,21 @@ mod tests {
     }
 
     #[test]
-    fn picks_loader() {
-        let deps = |k: &str| HashMap::from([("minecraft".into(), "1.21".into()), (k.into(), "1.0".into())]);
-        assert_eq!(loader_of(&deps("fabric-loader")).unwrap(), (Loader::Fabric, "1.0".into()));
-        assert_eq!(loader_of(&deps("quilt-loader")).unwrap().0, Loader::Quilt);
-        assert!(loader_of(&deps("forge")).is_err());
+    fn skips_foreign_hosts() {
+        let hosts = vec!["https://cdn.modrinth.com/".to_string()];
+        let file = |url: &str| PackFile { path: "mods/a.jar".into(), urls: vec!["https://evil.com/a.jar".into(), url.into()], size: None };
+        let dir = Path::new("/x");
+        assert_eq!(jobs(dir, &hosts, &[file("https://cdn.modrinth.com/a.jar")]).unwrap()[0].url, "https://cdn.modrinth.com/a.jar");
+        assert!(jobs(dir, &hosts, &[file("https://evil.com/b.jar")]).is_err());
+        let traversal = PackFile { path: "../a.jar".into(), urls: vec!["https://cdn.modrinth.com/a.jar".into()], size: None };
+        assert!(jobs(dir, &hosts, &[traversal]).is_err());
     }
 
     #[test]
-    fn skips_server_only_and_foreign_hosts() {
-        let file = |env: &str, url: &str| PackFile {
-            path: "mods/a.jar".into(),
-            downloads: vec![url.into()],
-            file_size: None,
-            env: HashMap::from([("client".into(), env.into())]),
-        };
-        let dir = Path::new("/x");
-        assert_eq!(jobs(dir, &[file("unsupported", "https://evil.com/a.jar")]).unwrap().len(), 0);
-        assert_eq!(jobs(dir, &[file("required", "https://cdn.modrinth.com/a.jar")]).unwrap()[0].path, dir.join("mods/a.jar"));
-        assert!(jobs(dir, &[file("required", "https://evil.com/a.jar")]).is_err());
+    fn maps_loaders() {
+        let plan = |l: &str| PackPlan { name: "p".into(), game_version: "1.21".into(), loader: l.into(), loader_version: String::new(), files: vec![], overrides: vec![] };
+        assert_eq!(loader_of(&plan("")).unwrap(), Loader::Vanilla);
+        assert_eq!(loader_of(&plan("quilt")).unwrap(), Loader::Quilt);
+        assert!(loader_of(&plan("neoforge")).is_err());
     }
 }

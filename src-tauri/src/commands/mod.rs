@@ -6,4 +6,5 @@ pub mod game;
 pub mod instances;
 pub mod mods;
 pub mod net;
+pub mod plugins;
 pub mod settings;

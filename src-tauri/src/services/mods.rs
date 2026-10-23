@@ -4,14 +4,19 @@
 //! `config/iris.properties`. A `*.disabled` pack (older launcher builds) still lists as off.
 use crate::error::{AppError, Result};
 use crate::minecraft::http;
-use crate::models::{ContentKind, ModFile};
+use crate::models::{ContentKind, Loader, ModFile};
+use crate::plugins::{
+    self,
+    api::{DependencyKind, ProjectSummary, VersionFilter},
+};
+use crate::services::{instances, modpacks};
 use crate::state::AppState;
+use serde::Serialize;
 use sha1::{Digest, Sha1};
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 const DISABLED: &str = ".disabled";
-const ALLOWED_DOWNLOAD_HOST: &str = "https://cdn.modrinth.com/";
 
 /// File names come from the frontend: no separators, no hidden files.
 pub(crate) fn safe_file(name: &str) -> Result<&str> {
@@ -193,12 +198,75 @@ pub fn delete(state: &AppState, id: &str, kind: ContentKind, file: &str) -> Resu
     Ok(())
 }
 
-pub async fn install(state: &AppState, id: &str, kind: ContentKind, url: &str, file: &str) -> Result<()> {
-    if !url.starts_with(ALLOWED_DOWNLOAD_HOST) {
-        return Err(AppError::Invalid("Only Modrinth downloads are allowed".into()));
+/// Installs the newest build of `project` that fits the instance, plus its required dependencies for mods.
+/// Projects in `skip` (already installed, in any version) are left alone.
+pub async fn install(state: &AppState, source_id: &str, id: &str, kind: ContentKind, project: &str, skip: &[String]) -> Result<()> {
+    let source = plugins::source(state, source_id)?;
+    let inst = instances::get(state, id)?;
+    let dir = state.paths.content_dir(id, kind)?;
+    let mut seen: HashSet<String> = skip.iter().filter(|p| *p != project).cloned().collect();
+    let mut queue = vec![project.to_string()];
+    while let Some(project) = queue.pop() {
+        if !seen.insert(project.clone()) {
+            continue;
+        }
+        let mut filter = VersionFilter { kind: kind.into(), game_version: Some(inst.version.clone()), loader: Some(loader_name(inst.loader).into()) };
+        let mut list = source.versions(&project, &filter).await?;
+        // Packs rarely break between versions and authors seldom tag every release: fall back to the newest.
+        if list.is_empty() && kind != ContentKind::Mod {
+            filter.game_version = None;
+            list = source.versions(&project, &filter).await?;
+        }
+        let latest = list.into_iter().next().ok_or_else(|| AppError::NotFound(format!("No build for Minecraft {}", inst.version)))?;
+        let file = latest.primary_file().ok_or_else(|| AppError::NotFound("This version has no file".into()))?;
+        if !modpacks::allowed(&source.info().hosts, &file.url) {
+            return Err(AppError::Invalid(format!("{} is not an allowed download", file.url)));
+        }
+        http::download(&state.http, &file.url, &dir.join(safe_file(&file.filename)?), None).await?;
+        if kind == ContentKind::Mod {
+            queue.extend(latest.dependencies.into_iter().filter(|d| d.kind == DependencyKind::Required).filter_map(|d| d.project_id));
+        }
     }
-    let path = state.paths.content_dir(id, kind)?.join(safe_file(file)?);
-    http::download(&state.http, url, &path, None).await
+    Ok(())
+}
+
+fn loader_name(l: Loader) -> &'static str {
+    match l {
+        Loader::Vanilla => "minecraft",
+        Loader::Fabric => "fabric",
+        Loader::Quilt => "quilt",
+    }
+}
+
+/// A local file the source recognised.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IdentifiedFile {
+    pub project: ProjectSummary,
+    pub version_number: String,
+}
+
+/// Which of the files (name -> SHA-1, from `hashes`) the source knows, by file name.
+pub async fn identify(state: &AppState, source_id: &str, hashes: HashMap<String, String>) -> Result<HashMap<String, IdentifiedFile>> {
+    let source = plugins::source(state, source_id)?;
+    let mut unique: Vec<String> = hashes.values().cloned().collect();
+    unique.sort();
+    unique.dedup();
+    if unique.is_empty() {
+        return Ok(HashMap::new());
+    }
+    let found = source.identify(&unique).await?;
+    let mut ids: Vec<String> = found.values().map(|v| v.project_id.clone()).collect();
+    ids.sort();
+    ids.dedup();
+    let projects: HashMap<String, ProjectSummary> = source.projects(&ids).await?.into_iter().map(|p| (p.id.clone(), p)).collect();
+    Ok(hashes
+        .into_iter()
+        .filter_map(|(file, hash)| {
+            let v = found.get(&hash)?;
+            Some((file, IdentifiedFile { project: projects.get(&v.project_id)?.clone(), version_number: v.version_number.clone() }))
+        })
+        .collect())
 }
 
 /// Icon path declared in `fabric.mod.json` / `quilt.mod.json`: a string or a `{ "size": path }` map.
