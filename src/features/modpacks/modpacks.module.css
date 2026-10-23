@@ -150,3 +150,5 @@ button.mod-cell:hover { background: var(--card-hover); }
 .instance-actions { margin-left: auto; display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
 .instance-body { padding: 0 24px; }
 .instance-page .pack-hero-inner { gap: 24px; }
+
+.source-picker { margin: 20px 24px 0; }

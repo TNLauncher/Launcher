@@ -2,7 +2,7 @@
 import { Channel, convertFileSrc } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { call } from "./ipc";
-import type { ContentKind, DeviceCode, GameExit, GameLog, Instance, LaunchEvent, Loader, ModFile, Screenshot, Settings, Snapshot } from "@/types";
+import type { Account, ContentKind, DeviceCode, GameExit, GameLog, Instance, LaunchEvent, Loader, ModFile, Screenshot, Settings, Snapshot } from "@/types";
 
 export const launcher = {
   getState: () => call<Snapshot>("get_state"),
@@ -14,7 +14,12 @@ export const launcher = {
     channel.onmessage = onCode;
     return call<string>("microsoft_login", { onCode: channel });
   },
-  microsoftLogout: () => call<void>("microsoft_logout"),
+  listAccounts: () => call<Account[]>("list_accounts"),
+  /** null = play offline. */
+  selectAccount: (id: string | null) => call<void>("select_account", { id }),
+  removeAccount: (id: string) => call<void>("remove_account", { id }),
+  /** Signs in through an account provider plugin; `fields` are its form's values. Resolves with the player name. */
+  pluginLogin: (plugin: string, fields: Record<string, string>) => call<string>("plugin_login", { plugin, fields }),
 
   createInstance: (name: string, version: string, loader: Loader) =>
     call<Instance>("create_instance", { name, version, loader }),

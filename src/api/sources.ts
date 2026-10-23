@@ -28,11 +28,13 @@ export interface PluginEntry {
   enabled: boolean;
   /** Shipped with the launcher. */
   bundled: boolean;
-  permissions: { hosts: string[]; downloads: string[]; instances: boolean };
+  permissions: { hosts: string[]; downloads: string[]; instances: boolean; jvm: boolean; presence: boolean };
   source: SourceInfo | null;
   pages: PluginView[];
   instanceTabs: PluginView[];
   settings: PluginSetting[];
+  /** Sign-in form when the plugin provides accounts. */
+  account: { fields: PluginSetting[] } | null;
   /** Why the plugin did not load. */
   error: string | null;
 }

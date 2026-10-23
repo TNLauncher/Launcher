@@ -7,6 +7,7 @@ import { Banner, Button, Chip, EmptyState, Icon, Pill, PillGroup, SearchInput, S
 import { cx } from "@/lib/cx";
 import { useDebounced } from "@/hooks/useDebounced";
 import { useSource } from "@/hooks/useSource";
+import { SourcePicker } from "@/plugins/SourcePicker";
 import { ago, compact, errorMessage } from "@/lib/format";
 import { useLauncher } from "@/store/LauncherContext";
 import { PackDetail } from "./PackDetail";
@@ -29,7 +30,10 @@ export function ModpacksView() {
       {source?.categories.modpack ? (
         <Catalog key={source.id} source={source} />
       ) : (
-        <EmptyState icon="extension_off">Turn on a content source with modpacks in Settings → Plugins.</EmptyState>
+        <>
+          <SourcePicker className={s.sourcePicker} />
+          <EmptyState icon="extension_off">Turn on a content source with modpacks in Settings → Plugins.</EmptyState>
+        </>
       )}
     </View>
   );
@@ -84,6 +88,7 @@ function Catalog({ source }: { source: SourceInfo }) {
       {open && <PackDetail source={source} hit={open} preferredVersion={gameVersion} onBack={() => setOpen(null)} />}
       <div className={s.packs} hidden={!!open}>
         <div className={s.packsFilters}>
+          <SourcePicker />
           <div className={s.packsFilterRow}>
             <SearchInput className={s.packsSearch} label="Search modpacks" value={query} onChange={setQuery} />
             <Select

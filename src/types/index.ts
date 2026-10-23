@@ -55,10 +55,20 @@ export interface Screenshot {
   taken: number;
 }
 
+/** A signed-in account; tokens stay in Rust. */
+export interface Account {
+  id: string;
+  /** `microsoft` or the plugin id that signed it in. */
+  provider: string;
+  providerName: string;
+  name: string;
+  selected: boolean;
+}
+
 export interface Snapshot {
   settings: Settings;
-  /** Signed-in Microsoft player name; null = offline. */
-  account: string | null;
+  /** The account launches use; null = offline. */
+  account: Account | null;
   instances: Instance[];
   modCounts: Record<string, number>;
   running: string[];

@@ -17,7 +17,7 @@ const NAV: { view: View; icon: string; label: string }[] = [
 export function Sidebar() {
   const { view, navigate } = useUi();
   const snapshot = useLauncher().snapshot;
-  const name = snapshot?.account ?? (snapshot?.settings.username || "Player");
+  const name = snapshot?.account?.name ?? (snapshot?.settings.username || "Player");
   const pages: typeof NAV = (usePlugins().data ?? [])
     .filter((p) => p.enabled)
     .flatMap((p) => p.pages.map((pg) => ({ view: `plugin:${p.id}:${pg.id}` as View, icon: pg.icon, label: pg.title })));
@@ -39,7 +39,7 @@ export function Sidebar() {
       </div>
       <button className={s.avatar} onClick={() => navigate("settings")} aria-label="Account settings">
         <span>{name[0].toUpperCase()}</span>
-        <span className={`${s.tip} mono`}>{name} · {snapshot?.account ? "Microsoft" : "Offline"}</span>
+        <span className={`${s.tip} mono`}>{name} · {snapshot?.account?.providerName ?? "Offline"}</span>
       </button>
     </aside>
   );

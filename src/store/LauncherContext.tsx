@@ -92,6 +92,7 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
       setError(null);
       select(id);
       setBusyId(id);
+      broadcast("game-launching", { instanceId: id });
       setProgress(STARTING);
       gameLogs.reset(id);
       // Backend reports every downloaded file (thousands for assets): commit at most once per frame.
@@ -107,6 +108,7 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
         });
         broadcast("game-started", { instanceId: id });
       } catch (e) {
+        broadcast("game-exited", { instanceId: id, code: null });
         setError({ id, message: errorMessage(e) });
       } finally {
         cancelAnimationFrame(frame.current);

@@ -39,6 +39,8 @@ export interface Manifest {
     pages?: View[];
     /** Tabs on every instance page; `tn.context.instance` is that instance's id. */
     instanceTabs?: View[];
+    /** Makes the plugin an account provider: these fields make up its sign-in form. `activate` must call `tn.accounts.register`. */
+    account?: { fields: { key: string; label: string; hint?: string; type: "text" | "secret" }[] };
     /** Options the user fills in Settings; read them with `tn.settings.get()`. */
     settings?: { /** `[A-Za-z0-9_-]`. */ key: string; label: string; hint?: string; type: "text" | "secret" | "toggle" }[];
   };
@@ -49,6 +51,10 @@ export interface Manifest {
     downloads?: string[];
     /** Read instances (`tn.instances`) and receive `game-started` / `game-exited`. */
     instances?: boolean;
+    /** Set the Discord status (`tn.presence`). */
+    presence?: boolean;
+    /** Load a Java agent into the game (`AccountSession.javaAgent`); it runs code in the game. */
+    jvm?: boolean;
   };
 }
 
@@ -76,11 +82,26 @@ export interface Instance {
   icon: string;
   /** Modpack it was installed from. */
   pack: { source: string; project: string; version: string } | null;
+  /** Enabled mod jars. */
+  mods: number;
 }
 
 export interface GameEvents {
+  /** Play was pressed; downloads may follow. */
+  "game-launching": { instanceId: string };
   "game-started": { instanceId: string };
+  /** The game stopped, or failed to start (`code` null). */
   "game-exited": { instanceId: string; code: number | null };
+}
+
+/** What Discord shows (`tn.presence.set`); each line 2–128 characters. */
+export interface Presence {
+  details: string;
+  state: string;
+  /** Unix seconds: shows elapsed time, and `details` replaces the app name in the member list. */
+  startedAt?: number;
+  /** Hover text of the logo. */
+  tooltip?: string;
 }
 
 export interface SearchQuery {
@@ -216,6 +237,37 @@ export interface ContentSource {
   planPack(root: Record<string, string>): Promise<PackPlan>;
 }
 
+/** A stored account as `session` receives it. */
+export interface StoredAccount {
+  name: string;
+  /** 32 hex digits. */
+  uuid: string;
+  /** Whatever `login` or the last `session` returned as `data`. */
+  data: unknown;
+}
+
+export interface AccountSession {
+  /** 1–16 of `[A-Za-z0-9_]`. */
+  name: string;
+  uuid: string;
+  /** Passed to the game as the access token. */
+  token: string;
+  /** `mojang` for Yggdrasil servers (Ely.by...), `legacy` for none. */
+  userType: "mojang" | "legacy";
+  /** Replaces the stored data, e.g. after a refresh. */
+  data?: unknown;
+  /** A jar from `permissions.downloads`, loaded as `-javaagent:<jar>=<options>`; needs `permissions.jvm`. */
+  javaAgent?: { url: string; filename: string; options?: string };
+}
+
+/** What `tn.accounts.register` takes. Throw to report an error (shown at sign-in or launch). */
+export interface AccountProvider {
+  /** `fields`: the sign-in form's values by key. */
+  login(fields: Record<string, string>): Promise<{ name: string; uuid: string; data?: unknown }>;
+  /** Before each launch: validate or refresh, then say how to start the game. */
+  session(account: StoredAccount): Promise<AccountSession>;
+}
+
 export interface FetchInit {
   method?: string;
   headers?: Record<string, string>;
@@ -246,9 +298,12 @@ export interface TN {
   instances: { list(): Promise<Instance[]>; get(id: string): Promise<Instance> };
   /** Needs `permissions.instances`. Returns a function that stops listening. */
   events: { on<K extends keyof GameEvents>(name: K, cb: (payload: GameEvents[K]) => void): () => void };
+  /** Needs `permissions.presence`. Last call wins among plugins. */
+  presence: { set(p: Presence): Promise<void>; clear(): Promise<void> };
   /** Opens an http(s) page in the system browser. */
   open(url: string): Promise<void>;
   sources: { register(source: ContentSource): void };
+  accounts: { register(provider: AccountProvider): void };
   net: { fetch(url: string, init?: FetchInit): Promise<FetchResponse> };
   /** Printed to the launcher's log. */
   log(...args: unknown[]): Promise<void>;

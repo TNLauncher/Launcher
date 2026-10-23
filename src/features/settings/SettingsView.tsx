@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { View } from "@/components/layout/View";
-import { Button, ConfirmDialog, Icon, Input, Select, Switch, Textarea } from "@/components/ui";
+import { Button, ConfirmDialog, Icon, IconButton, Input, Select, Switch, Textarea } from "@/components/ui";
 import { cx } from "@/lib/cx";
 import { errorMessage } from "@/lib/format";
 import { useLauncher } from "@/store/LauncherContext";
@@ -28,11 +28,10 @@ const USERNAME = /^[A-Za-z0-9_]{3,16}$/;
 const SAVE_DELAY = 400;
 
 export function SettingsView() {
-  const { snapshot, saveSettings, refresh } = useLauncher();
+  const { snapshot, saveSettings } = useLauncher();
   const [form, setForm] = useState<Settings | null>(snapshot?.settings ?? null);
   const [status, setStatus] = useState("Changes save automatically");
   const [confirmReset, setConfirmReset] = useState(false);
-  const [login, setLogin] = useState<{ code?: DeviceCode; error?: string } | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
@@ -56,22 +55,6 @@ export function SettingsView() {
         (e) => setStatus(`Could not save: ${errorMessage(e)}`)
       );
     }, SAVE_DELAY);
-  }
-
-  async function signIn() {
-    setLogin({});
-    try {
-      await launcher.microsoftLogin((code) => setLogin({ code }));
-      setLogin(null);
-      await refresh();
-    } catch (e) {
-      setLogin({ error: errorMessage(e) });
-    }
-  }
-
-  async function signOut() {
-    await launcher.microsoftLogout();
-    await refresh();
   }
 
   const int = (v: string, fallback: number) => Math.max(1, parseInt(v, 10) || fallback);
@@ -145,30 +128,9 @@ export function SettingsView() {
           </Row>
         </Group>
 
-        <Group icon="manage_accounts" title="Account" aside={snapshot?.account ? "Licensed" : "Offline mode"}>
-          <Row label="Microsoft account" hint="Sign in to play with your licensed Minecraft: Java Edition on online servers.">
-            <div className={cx(s.settingControl, s.col)}>
-              {snapshot?.account ? (
-                <div className={cx(s.settingControl, s.between)}>
-                  <strong className="mono">{snapshot.account}</strong>
-                  <Button onClick={signOut}>Sign out</Button>
-                </div>
-              ) : login && !login.error ? (
-                <span role="status">
-                  {login.code ? (
-                    <>Enter <strong className={cx("mono", s.code)}>{login.code.userCode}</strong> at{" "}
-                      <span className="mono">{login.code.verificationUri}</span> (opened in your browser)</>
-                  ) : "Requesting code…"}
-                </span>
-              ) : (
-                <>
-                  <Button className={s.alignEnd} onClick={signIn}>Sign in with Microsoft</Button>
-                  {login?.error && <span className={s.error}>{login.error}</span>}
-                </>
-              )}
-            </div>
-          </Row>
-          <Row label="Player name" hint="Used when not signed in: singleplayer and offline-mode servers.">
+        <Group icon="manage_accounts" title="Account" aside={snapshot?.account?.providerName ?? "Offline mode"}>
+          <AccountRows />
+          <Row label="Player name" hint="Used when playing offline: singleplayer and offline-mode servers.">
             <div className={cx(s.settingControl, s.col)}>
               <Input maxLength={16} spellCheck={false} aria-label="Player name" aria-invalid={!usernameValid}
                 value={form.username} onChange={(e) => update({ username: e.target.value })} />
@@ -201,6 +163,113 @@ export function SettingsView() {
   );
 }
 
+/** Signed-in accounts (pick the one launches use), Microsoft sign-in, and the forms of account provider plugins. */
+function AccountRows() {
+  const { snapshot, refresh } = useLauncher();
+  const qc = useQueryClient();
+  const accounts = useQuery({ queryKey: ["accounts"], queryFn: launcher.listAccounts });
+  const providers = (usePlugins().data ?? []).filter((p) => p.enabled && p.account);
+  const [error, setError] = useState("");
+  const [ms, setMs] = useState<{ code?: DeviceCode } | null>(null);
+
+  const done = () => Promise.all([refresh(), qc.invalidateQueries({ queryKey: ["accounts"] })]).then(() => setError(""));
+  const act = (p: Promise<unknown>) => p.then(done, (e) => setError(errorMessage(e)));
+
+  async function signInMicrosoft() {
+    setMs({});
+    await act(launcher.microsoftLogin((code) => setMs({ code })));
+    setMs(null);
+  }
+
+  const offline = !snapshot?.account;
+  return (
+    <>
+      <Row label="Play as" hint="The account the game starts with. Offline uses the player name below.">
+        <div className={cx(s.settingControl, s.col)}>
+          <AccountLine name={`${snapshot?.settings.username || "Player"}`} provider="Offline" selected={offline} onSelect={() => act(launcher.selectAccount(null))} />
+          {accounts.data?.map((a) => (
+            <AccountLine
+              key={a.id}
+              name={a.name}
+              provider={a.providerName}
+              selected={a.selected}
+              onSelect={() => act(launcher.selectAccount(a.id))}
+              onRemove={() => act(launcher.removeAccount(a.id))}
+            />
+          ))}
+          {error && <span className={s.error}>{error}</span>}
+        </div>
+      </Row>
+      <Row label="Microsoft" hint="Sign in to play your licensed Minecraft: Java Edition on online servers.">
+        <div className={cx(s.settingControl, s.col)}>
+          {ms ? (
+            <span role="status">
+              {ms.code ? (
+                <>Enter <strong className={cx("mono", s.code)}>{ms.code.userCode}</strong> at{" "}
+                  <span className="mono">{ms.code.verificationUri}</span> (opened in your browser)</>
+              ) : "Requesting code…"}
+            </span>
+          ) : (
+            <Button className={s.alignEnd} onClick={signInMicrosoft}>Sign in with Microsoft</Button>
+          )}
+        </div>
+      </Row>
+      {providers.map((p) => (
+        <PluginSignIn key={p.id} plugin={p} onSignedIn={done} />
+      ))}
+    </>
+  );
+}
+
+function AccountLine(p: { name: string; provider: string; selected: boolean; onSelect(): void; onRemove?(): void }) {
+  return (
+    <div className={cx(s.settingControl, s.between)}>
+      <span>
+        <strong className="mono">{p.name}</strong> <span className="subtle">· {p.provider}</span>
+      </span>
+      <span className={s.settingControl}>
+        {p.selected ? <Icon name="check_circle" fill /> : <Button size="sm" onClick={p.onSelect}>Use</Button>}
+        {p.onRemove && <IconButton icon="delete" label={`Remove ${p.name}`} variant="danger" onClick={p.onRemove} />}
+      </span>
+    </div>
+  );
+}
+
+/** The sign-in form an account provider plugin declares. */
+function PluginSignIn({ plugin, onSignedIn }: { plugin: PluginEntry; onSignedIn(): Promise<unknown> }) {
+  const [fields, setFields] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const submit = () => {
+    setBusy(true);
+    launcher
+      .pluginLogin(plugin.id, fields)
+      .then(() => (setFields({}), setError(""), onSignedIn()), (e) => setError(errorMessage(e)))
+      .finally(() => setBusy(false));
+  };
+  return (
+    <Row label={plugin.name} hint={plugin.permissions.jvm ? `${plugin.description} Loads a Java agent into the game.` : plugin.description}>
+      <div className={cx(s.settingControl, s.col)}>
+        {plugin.account!.fields.map((f) => (
+          <Input
+            key={f.key}
+            type={f.type === "secret" ? "password" : "text"}
+            spellCheck={false}
+            placeholder={f.label}
+            aria-label={`${plugin.name} ${f.label}`}
+            title={f.hint || undefined}
+            value={fields[f.key] ?? ""}
+            onChange={(e) => setFields((v) => ({ ...v, [f.key]: e.target.value }))}
+            onKeyDown={(e) => e.key === "Enter" && submit()}
+          />
+        ))}
+        <Button className={s.alignEnd} loading={busy} onClick={submit}>Sign in with {plugin.name}</Button>
+        {error && <span className={s.error}>{error}</span>}
+      </div>
+    </Row>
+  );
+}
+
 /** Bundled and user plugins; a turned-off content source disappears from the catalogs, installed files stay. */
 function PluginsGroup() {
   const qc = useQueryClient();
@@ -227,6 +296,8 @@ function PluginsGroup() {
               p.description,
               p.permissions.hosts.length ? `Connects to ${p.permissions.hosts.join(", ")}.` : "No network access.",
               p.permissions.instances && "Reads your instances and when you play.",
+              p.permissions.presence && "Sets your Discord status.",
+              p.permissions.jvm && "Loads a Java agent into the game.",
             ]
               .filter(Boolean)
               .join(" ")}

@@ -9,6 +9,7 @@ import { useDebounced } from "@/hooks/useDebounced";
 import { usePlugins, useSource } from "@/hooks/useSource";
 import { pluginBase } from "@/plugins/bridge";
 import { PluginFrame } from "@/plugins/PluginHost";
+import { SourcePicker } from "@/plugins/SourcePicker";
 import { compact, errorMessage, megabytes } from "@/lib/format";
 import { useLauncher } from "@/store/LauncherContext";
 import type { ContentKind, Instance } from "@/types";
@@ -292,6 +293,7 @@ function BrowsePane(p: { source: SourceInfo; instance: Instance; kind: ContentKi
           <h3>Add from {source.name}</h3>
           <span className="mono">{version}</span>
         </div>
+        <SourcePicker />
         <SearchInput icon="travel_explore" label={`Search ${info.noun} on ${source.name}`} placeholder={`Search ${info.noun}`} value={query} onChange={setQuery} />
         <PillGroup label="Category" wrap className={s.cats}>
           {categories.map((c) => (

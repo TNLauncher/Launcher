@@ -10,6 +10,8 @@ import { call } from "@/api/ipc";
 interface PluginCall {
   id: number;
   plugin: string;
+  /** What the plugin registered: `source` or `account`. */
+  target: string;
   method: string;
   args: unknown[];
 }
@@ -71,7 +73,7 @@ function deliver(c: PluginCall) {
     bg.queue.push(c);
   } else {
     inFlight.set(c.id, c.plugin);
-    post(bg.win, { type: "call", callId: c.id, method: c.method, args: c.args });
+    post(bg.win, { type: "call", callId: c.id, target: c.target, method: c.method, args: c.args });
   }
 }
 
@@ -103,7 +105,7 @@ export function attachFrame(win: Window, plugin: string, background: boolean, in
 }
 
 /** Sends an event to every frame of plugins allowed to see instances (`tn.events.on`). */
-export function broadcast(name: "game-started" | "game-exited", payload: object) {
+export function broadcast(name: "game-launching" | "game-started" | "game-exited", payload: object) {
   for (const [win, f] of frames) if (f.instances) post(win, { type: "event", name, payload });
 }
 
