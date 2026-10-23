@@ -4,7 +4,7 @@
 //! - `commands`  — thin `#[tauri::command]` adapters: parse IPC input, call a service.
 //! - `services`  — use cases (create instance, launch, manage mods); own all side effects.
 //! - `minecraft` — protocol knowledge: Mojang/Fabric/Quilt metadata, installs, JVM command.
-//! - `plugins`   — switchable providers (content sources) behind the traits in `plugins::api`.
+//! - `plugins`   — JS plugins in sandboxed frames; Rust serves them and checks what they ask for.
 //! - `storage`   — JSON persistence of settings and instances.
 //! - `models`, `state`, `error` — shared types; `config` — build-time `TN_*` settings from .env.
 
@@ -18,7 +18,7 @@ pub mod services;
 pub mod state;
 pub mod storage;
 
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -43,9 +43,37 @@ pub fn run() {
                 responder.respond(res.expect("static response parts"));
             });
         })
+        // `plugin://localhost/<id>/<file>`: a plugin's files, with the SDK and a CSP built from its manifest.
+        .register_asynchronous_uri_scheme_protocol("plugin", |ctx, req, responder| {
+            let app = ctx.app_handle().clone();
+            tauri::async_runtime::spawn_blocking(move || {
+                let path = percent_encoding::percent_decode_str(req.uri().path()).decode_utf8_lossy().into_owned();
+                let res = match plugins::host::serve(&app.state::<state::AppState>(), &path) {
+                    Ok(f) => {
+                        // Plugin frames are sandboxed (opaque origin), so their module scripts load cross-origin.
+                        let mut b = tauri::http::Response::builder().header("Content-Type", f.mime).header("Access-Control-Allow-Origin", "*")
+                            // Plugin files change on disk between runs; never serve a stale copy.
+                            .header("Cache-Control", "no-store");
+                        if let Some(csp) = f.csp {
+                            b = b.header("Content-Security-Policy", csp);
+                        }
+                        b.body(f.bytes)
+                    }
+                    Err(_) => tauri::http::Response::builder().status(404).body(Vec::new()),
+                };
+                responder.respond(res.expect("static response parts"));
+            });
+        })
         .setup(|app| {
             let root = app.path().app_data_dir()?;
-            app.manage(state::AppState::new(root)?);
+            let mut state = state::AppState::new(root)?;
+            let handle = app.handle().clone();
+            let bridge = plugins::js::Bridge::new(move |call| {
+                let _ = handle.emit_to("main", "plugin-call", call);
+            });
+            let bundled = app.path().resource_dir()?.join("plugins");
+            state.plugins = plugins::Registry::load(&[(bundled, true), (state.paths.plugins_dir(), false)], std::sync::Arc::new(bridge));
+            app.manage(state);
             app.manage(services::discord::Discord::spawn());
             Ok(())
         })
@@ -73,6 +101,10 @@ pub fn run() {
             commands::mods::install_content,
             commands::plugins::list_plugins,
             commands::plugins::set_plugin_enabled,
+            commands::plugins::open_plugins_dir,
+            commands::plugins::plugin_host_ready,
+            commands::plugins::plugin_reply,
+            commands::plugins::plugin_request,
             commands::plugins::source_search,
             commands::plugins::source_project,
             commands::plugins::source_projects,

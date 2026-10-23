@@ -1,5 +1,6 @@
 //! The contract between the launcher and a content source (Modrinth, CurseForge...).
-//! Everything here crosses IPC as camelCase JSON, and later the WASM boundary too, so keep it plain data.
+//! Sources are JS plugins (see `js`), so every type here crosses JSON both ways: keep it plain data.
+//! Mirrored for plugin authors in packages/plugin-api/index.d.ts.
 use crate::error::Result;
 use futures::future::BoxFuture;
 use serde::{Deserialize, Serialize};
@@ -38,22 +39,7 @@ impl Choice {
     }
 }
 
-/// Static description the UI builds its filters from.
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SourceInfo {
-    pub id: String,
-    pub name: String,
-    /// Sort orders for search, first = default.
-    pub sorts: Vec<Choice>,
-    /// Browse categories per kind; a kind missing here is not offered by the source.
-    pub categories: HashMap<ProjectKind, Vec<Choice>>,
-    /// URL prefixes the launcher may download files from on this source's behalf.
-    #[serde(skip)]
-    pub hosts: Vec<String>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SearchQuery {
     pub kind: ProjectKind,
@@ -71,7 +57,7 @@ pub struct SearchQuery {
     pub limit: u32,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Hit {
     pub id: String,
@@ -92,7 +78,7 @@ pub struct Hit {
     pub color: Option<u32>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Page {
     pub hits: Vec<Hit>,
@@ -100,7 +86,7 @@ pub struct Page {
     pub total: u32,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Link {
     pub label: String,
@@ -109,7 +95,7 @@ pub struct Link {
     pub url: String,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Image {
     pub url: String,
@@ -119,7 +105,7 @@ pub struct Image {
     pub description: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Project {
     pub id: String,
@@ -136,7 +122,7 @@ pub struct Project {
     pub gallery: Vec<Image>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectSummary {
     pub id: String,
@@ -203,7 +189,7 @@ impl Version {
     }
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct VersionFilter {
     pub kind: ProjectKind,
@@ -212,7 +198,7 @@ pub struct VersionFilter {
 }
 
 /// A local file the source recognised by its hash.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Identified {
     pub project_id: String,
@@ -245,16 +231,15 @@ pub struct PackFile {
 
 /// A catalog of projects to search and install from. Methods return boxed futures so sources are object-safe.
 pub trait ContentSource: Send + Sync {
-    fn info(&self) -> &SourceInfo;
     fn search<'a>(&'a self, q: &'a SearchQuery) -> BoxFuture<'a, Result<Page>>;
     fn project<'a>(&'a self, id: &'a str) -> BoxFuture<'a, Result<Project>>;
     /// Any number of ids, in any order.
     fn projects<'a>(&'a self, ids: &'a [String]) -> BoxFuture<'a, Result<Vec<ProjectSummary>>>;
     /// Newest first.
     fn versions<'a>(&'a self, project: &'a str, f: &'a VersionFilter) -> BoxFuture<'a, Result<Vec<Version>>>;
-    // ponytail: SHA-1 only, which is what Modrinth needs; CurseForge identifies by murmur2, add a hash kind to SourceInfo then.
+    // ponytail: SHA-1 only, which is what Modrinth needs; CurseForge identifies by murmur2, add a hash kind to the manifest then.
     /// Keyed by the given SHA-1; unknown files are missing from the map.
     fn identify<'a>(&'a self, sha1: &'a [String]) -> BoxFuture<'a, Result<HashMap<String, Identified>>>;
-    /// `root` holds the archive's top-level files (its manifest), by name.
-    fn plan_pack(&self, root: &HashMap<String, Vec<u8>>) -> Result<PackPlan>;
+    /// `root` holds the archive's top-level text files (its manifest), by name.
+    fn plan_pack<'a>(&'a self, root: &'a HashMap<String, String>) -> BoxFuture<'a, Result<PackPlan>>;
 }

@@ -25,7 +25,8 @@ impl AppState {
         let http = http_client()?;
         Ok(Self {
             paths: Paths { root },
-            plugins: Registry::builtin(&http),
+            // Replaced in setup, where plugin folders and the window are known.
+            plugins: Registry::empty(std::sync::Arc::new(crate::plugins::js::Bridge::new(|_| {}))),
             http,
             store_lock: Mutex::new(()),
             running: Mutex::new(HashSet::new()),
@@ -55,6 +56,10 @@ impl Paths {
     }
     pub fn account_file(&self) -> PathBuf {
         self.root.join("account.json")
+    }
+    /// Plugins the user added; bundled ones live in the app's resources.
+    pub fn plugins_dir(&self) -> PathBuf {
+        self.root.join("plugins")
     }
     pub fn plugins_file(&self) -> PathBuf {
         self.root.join("disabled-plugins.json")

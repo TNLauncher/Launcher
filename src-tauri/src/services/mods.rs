@@ -9,7 +9,7 @@ use crate::plugins::{
     self,
     api::{DependencyKind, ProjectSummary, VersionFilter},
 };
-use crate::services::{instances, modpacks};
+use crate::services::instances;
 use crate::state::AppState;
 use serde::Serialize;
 use sha1::{Digest, Sha1};
@@ -201,7 +201,8 @@ pub fn delete(state: &AppState, id: &str, kind: ContentKind, file: &str) -> Resu
 /// Installs the newest build of `project` that fits the instance, plus its required dependencies for mods.
 /// Projects in `skip` (already installed, in any version) are left alone.
 pub async fn install(state: &AppState, source_id: &str, id: &str, kind: ContentKind, project: &str, skip: &[String]) -> Result<()> {
-    let source = plugins::source(state, source_id)?;
+    let plugin = plugins::enabled(state, source_id)?;
+    let source = plugin.source()?;
     let inst = instances::get(state, id)?;
     let dir = state.paths.content_dir(id, kind)?;
     let mut seen: HashSet<String> = skip.iter().filter(|p| *p != project).cloned().collect();
@@ -219,7 +220,7 @@ pub async fn install(state: &AppState, source_id: &str, id: &str, kind: ContentK
         }
         let latest = list.into_iter().next().ok_or_else(|| AppError::NotFound(format!("No build for Minecraft {}", inst.version)))?;
         let file = latest.primary_file().ok_or_else(|| AppError::NotFound("This version has no file".into()))?;
-        if !modpacks::allowed(&source.info().hosts, &file.url) {
+        if !plugin.may_download(&file.url) {
             return Err(AppError::Invalid(format!("{} is not an allowed download", file.url)));
         }
         http::download(&state.http, &file.url, &dir.join(safe_file(&file.filename)?), None).await?;
@@ -248,7 +249,8 @@ pub struct IdentifiedFile {
 
 /// Which of the files (name -> SHA-1, from `hashes`) the source knows, by file name.
 pub async fn identify(state: &AppState, source_id: &str, hashes: HashMap<String, String>) -> Result<HashMap<String, IdentifiedFile>> {
-    let source = plugins::source(state, source_id)?;
+    let plugin = plugins::enabled(state, source_id)?;
+    let source = plugin.source()?;
     let mut unique: Vec<String> = hashes.values().cloned().collect();
     unique.sort();
     unique.dedup();

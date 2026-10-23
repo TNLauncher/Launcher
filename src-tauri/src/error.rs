@@ -23,6 +23,8 @@ pub enum AppError {
     Conflict(String),
     #[error("{0}")]
     Unsupported(String),
+    #[error("Plugin error: {0}")]
+    Plugin(String),
 }
 
 impl AppError {
@@ -37,6 +39,7 @@ impl AppError {
             Self::Invalid(_) => "invalid",
             Self::Conflict(_) => "conflict",
             Self::Unsupported(_) => "unsupported",
+            Self::Plugin(_) => "plugin",
         }
     }
 }

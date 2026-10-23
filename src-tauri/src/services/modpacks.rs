@@ -33,10 +33,6 @@ fn safe_rel(path: &str) -> Result<&Path> {
     Ok(p)
 }
 
-pub(crate) fn allowed(hosts: &[String], url: &str) -> bool {
-    hosts.iter().any(|h| url.starts_with(h.as_str()))
-}
-
 fn loader_of(plan: &PackPlan) -> Result<Loader> {
     match plan.loader.as_str() {
         "" => Ok(Loader::Vanilla),
@@ -46,18 +42,18 @@ fn loader_of(plan: &PackPlan) -> Result<Loader> {
     }
 }
 
-fn jobs(dir: &Path, hosts: &[String], files: &[PackFile]) -> Result<Vec<Job>> {
+fn jobs(dir: &Path, allowed: &dyn Fn(&str) -> bool, files: &[PackFile]) -> Result<Vec<Job>> {
     files
         .iter()
         .map(|f| {
-            let url = f.urls.iter().find(|u| allowed(hosts, u)).ok_or_else(|| AppError::Invalid(format!("No allowed download for {}", f.path)))?;
+            let url = f.urls.iter().find(|u| allowed(u)).ok_or_else(|| AppError::Invalid(format!("No allowed download for {}", f.path)))?;
             Ok(Job { url: url.clone(), path: dir.join(safe_rel(&f.path)?), size: f.size })
         })
         .collect()
 }
 
-/// Top-level files of the archive, which is where pack formats keep their manifest.
-pub(crate) fn root_files(bytes: &[u8]) -> Result<HashMap<String, Vec<u8>>> {
+/// Top-level text files of the archive, which is where pack formats keep their manifest.
+fn root_files(bytes: &[u8]) -> Result<HashMap<String, String>> {
     let mut zip = zip::ZipArchive::new(Cursor::new(bytes))?;
     let mut out = HashMap::new();
     for i in 0..zip.len() {
@@ -65,9 +61,11 @@ pub(crate) fn root_files(bytes: &[u8]) -> Result<HashMap<String, Vec<u8>>> {
         if entry.is_dir() || entry.name().contains('/') || entry.size() > MAX_MANIFEST {
             continue;
         }
-        let mut buf = Vec::new();
-        entry.read_to_end(&mut buf)?;
-        out.insert(entry.name().to_string(), buf);
+        let mut buf = String::new();
+        // Binary files (icons) are not manifests: skip them.
+        if entry.read_to_string(&mut buf).is_ok() {
+            out.insert(entry.name().to_string(), buf);
+        }
     }
     Ok(out)
 }
@@ -100,8 +98,9 @@ pub async fn import(
     version: Option<&str>,
     progress: &(dyn Fn(ImportProgress) + Sync),
 ) -> Result<Instance> {
-    let source = plugins::source(state, source_id)?;
-    let hosts = &source.info().hosts;
+    let plugin = plugins::enabled(state, source_id)?;
+    let source = plugin.source()?;
+    let allowed = |url: &str| plugin.may_download(url);
     let filter = VersionFilter { kind: ProjectKind::Modpack, game_version: None, loader: None };
     let versions = source.versions(project, &filter).await?;
     let picked = match version {
@@ -110,12 +109,12 @@ pub async fn import(
     }
     .ok_or_else(|| AppError::NotFound("This modpack has no version the launcher can run".into()))?;
     let file = picked.primary_file().ok_or_else(|| AppError::NotFound("This modpack version has no file".into()))?;
-    if !allowed(hosts, &file.url) {
+    if !allowed(&file.url) {
         return Err(AppError::Invalid(format!("{} is not an allowed download", file.url)));
     }
 
     let bytes = http::fetch_bytes(&state.http, &file.url).await?;
-    let plan = source.plan_pack(&root_files(&bytes)?)?;
+    let plan = source.plan_pack(&root_files(&bytes)?).await?;
     let loader = loader_of(&plan)?;
     let instance = Instance {
         pack: Some(PackRef { source: source_id.into(), project: project.into(), version: picked.number.clone() }),
@@ -124,7 +123,7 @@ pub async fn import(
     let dir = state.paths.instance_dir(&instance.id)?;
 
     let result = async {
-        let jobs = jobs(&dir, hosts, &plan.files)?;
+        let jobs = jobs(&dir, &allowed, &plan.files)?;
         progress(ImportProgress { done: 0, total: jobs.len() });
         http::download_all(&state.http, jobs, &|done, total| progress(ImportProgress { done, total })).await?;
         extract_overrides(&bytes, &dir, &plan.overrides)?;
@@ -150,7 +149,7 @@ mod tests {
 
     #[test]
     fn skips_foreign_hosts() {
-        let hosts = vec!["https://cdn.modrinth.com/".to_string()];
+        let hosts = |u: &str| u.starts_with("https://cdn.modrinth.com/");
         let file = |url: &str| PackFile { path: "mods/a.jar".into(), urls: vec!["https://evil.com/a.jar".into(), url.into()], size: None };
         let dir = Path::new("/x");
         assert_eq!(jobs(dir, &hosts, &[file("https://cdn.modrinth.com/a.jar")]).unwrap()[0].url, "https://cdn.modrinth.com/a.jar");
