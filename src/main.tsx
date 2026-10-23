@@ -1,8 +1,6 @@
-// Global styles first: feature stylesheets imported by components must win the cascade.
+// Tokens declare the layer order (base, kit); feature modules stay unlayered and win.
 import "./styles/tokens.css";
 import "./styles/base.css";
-import "./styles/controls.css";
-import "./styles/dialog.css";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
