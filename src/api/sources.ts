@@ -20,10 +20,19 @@ export interface SourceInfo {
 }
 
 export interface PluginEntry {
+  /** Empty for a plugin that failed to load. */
   id: string;
   name: string;
+  version: string;
+  description: string;
   enabled: boolean;
+  /** Shipped with the launcher. */
+  bundled: boolean;
+  permissions: { hosts: string[]; downloads: string[] };
   source: SourceInfo | null;
+  pages: { id: string; title: string; icon: string; entry: string }[];
+  /** Why the plugin did not load. */
+  error: string | null;
 }
 
 export interface SearchQuery {
@@ -117,6 +126,8 @@ export const primaryFile = (v: Pick<Version, "files">) => v.files.find((f) => f.
 export const sources = {
   listPlugins: () => call<PluginEntry[]>("list_plugins"),
   setPluginEnabled: (id: string, enabled: boolean) => call<void>("set_plugin_enabled", { id, enabled }),
+  /** User plugins live there and load on the next start. */
+  openPluginsDir: () => call<void>("open_plugins_dir"),
 
   search: (source: string, query: SearchQuery) => call<Page>("source_search", { source, query }),
   project: (source: string, id: string) => call<Project>("source_project", { source, id }),

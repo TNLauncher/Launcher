@@ -1,5 +1,6 @@
 import logo from "@/assets/logo.png";
 import { Icon } from "@/components/ui/Icon";
+import { usePlugins } from "@/hooks/useSource";
 import { useLauncher } from "@/store/LauncherContext";
 import { useUi, type View } from "@/store/UiContext";
 import s from "./Sidebar.module.css";
@@ -17,13 +18,18 @@ export function Sidebar() {
   const { view, navigate } = useUi();
   const snapshot = useLauncher().snapshot;
   const name = snapshot?.account ?? (snapshot?.settings.username || "Player");
+  const pages: typeof NAV = (usePlugins().data ?? [])
+    .filter((p) => p.enabled)
+    .flatMap((p) => p.pages.map((pg) => ({ view: `plugin:${p.id}:${pg.id}` as View, icon: pg.icon, label: pg.title })));
+  // Plugin pages sit above Settings, which stays last.
+  const nav = [...NAV.slice(0, -1), ...pages, NAV[NAV.length - 1]];
 
   return (
     <aside className={s.sidebar}>
       <div>
         <img className={s.logo} src={logo} alt="TNLauncher" />
         <nav>
-          {NAV.map((n) => (
+          {nav.map((n) => (
             <button key={n.view} className={s.navBtn} aria-current={view === n.view ? "page" : undefined} onClick={() => navigate(n.view)}>
               <Icon name={n.icon} />
               <span className={s.tip}>{n.label}</span>

@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "test:plugins": "node --test plugins/*/main.test.js"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.104.5",

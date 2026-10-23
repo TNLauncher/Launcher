@@ -8,6 +8,7 @@ import { useLauncher } from "@/store/LauncherContext";
 import { launcher } from "@/api/launcher";
 import { sources } from "@/api/sources";
 import { usePlugins } from "@/hooks/useSource";
+import { usePluginFailures } from "@/plugins/bridge";
 import type { DeviceCode, Settings } from "@/types";
 import s from "./settings.module.css";
 
@@ -200,10 +201,11 @@ export function SettingsView() {
   );
 }
 
-/** Built-in plugins; a turned-off content source disappears from the catalogs, installed files stay. */
+/** Bundled and user plugins; a turned-off content source disappears from the catalogs, installed files stay. */
 function PluginsGroup() {
   const qc = useQueryClient();
   const plugins = usePlugins();
+  const failures = usePluginFailures();
   const [error, setError] = useState("");
   const toggle = (id: string, enabled: boolean) =>
     sources
@@ -211,14 +213,30 @@ function PluginsGroup() {
       .then(() => setError(""), (e) => setError(errorMessage(e)))
       .finally(() => qc.invalidateQueries());
   return (
-    <Group icon="extension" title="Plugins">
-      {plugins.data?.map((p) => (
-        <Row key={p.id} label={p.name} hint={p.source ? "Content source: browse and install mods, packs and modpacks." : "Plugin"}>
-          <div className={s.settingControl}>
-            <Switch label={`${p.enabled ? "Turn off" : "Turn on"} ${p.name}`} checked={p.enabled} onChange={(on) => toggle(p.id, on)} />
-          </div>
-        </Row>
-      ))}
+    <Group icon="extension" title="Plugins" aside="New plugins load on restart">
+      {plugins.data?.map((p) =>
+        p.error ? (
+          <Row key={`failed-${p.name}`} label={p.name} hint="Could not load this plugin.">
+            <span className={s.error}>{p.error}</span>
+          </Row>
+        ) : (
+          <Row
+            key={p.id}
+            label={`${p.name} ${p.version}${p.bundled ? "" : " · added by you"}`}
+            hint={[p.description, p.permissions.hosts.length ? `Connects to ${p.permissions.hosts.join(", ")}.` : "No network access."].filter(Boolean).join(" ")}
+          >
+            <div className={cx(s.settingControl, s.col)}>
+              <Switch label={`${p.enabled ? "Turn off" : "Turn on"} ${p.name}`} checked={p.enabled} onChange={(on) => toggle(p.id, on)} />
+              {p.enabled && failures[p.id] && <span className={s.error}>Failed to start: {failures[p.id]}</span>}
+            </div>
+          </Row>
+        )
+      )}
+      <Row label="Plugin folder" hint="Put a plugin's folder (manifest.json + its scripts) here and restart the launcher.">
+        <div className={s.settingControl}>
+          <Button icon="folder_open" onClick={() => sources.openPluginsDir().catch((e) => setError(errorMessage(e)))}>Open folder</Button>
+        </div>
+      </Row>
       {(error || plugins.error) && <span className={s.error}>{error || errorMessage(plugins.error)}</span>}
     </Group>
   );

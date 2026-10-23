@@ -3,12 +3,14 @@ import { lazy, Suspense, type ComponentType } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Titlebar } from "@/components/layout/Titlebar";
 import { HomeView } from "@/features/home/HomeView";
+import { PluginHost } from "@/plugins/PluginHost";
+import { PluginPage } from "@/plugins/PluginPage";
 import { LauncherProvider } from "@/store/LauncherContext";
 import { UiProvider, useUi, type View } from "@/store/UiContext";
 import s from "@/components/layout/Shell.module.css";
 
 // Home is the first screen and stays in the main chunk; the rest load on first visit.
-const VIEWS: Record<View, ComponentType> = {
+const VIEWS: Record<Exclude<View, `plugin:${string}`>, ComponentType> = {
   home: HomeView,
   instances: lazy(() => import("@/features/instances/InstancesView").then((m) => ({ default: m.InstancesView }))),
   modpacks: lazy(() => import("@/features/modpacks/ModpacksView").then((m) => ({ default: m.ModpacksView }))),
@@ -18,18 +20,24 @@ const VIEWS: Record<View, ComponentType> = {
 };
 const NewInstanceDialog = lazy(() => import("@/features/instances/NewInstanceDialog").then((m) => ({ default: m.NewInstanceDialog })));
 
+function CurrentView({ view }: { view: keyof typeof VIEWS }) {
+  const Current = VIEWS[view];
+  return <Current />;
+}
+
 function Shell() {
   const { view, newInstanceOpen } = useUi();
-  const Current = VIEWS[view];
+  const [, plugin, page] = view.split(":");
   return (
     <>
       <Sidebar />
       <Titlebar />
       <main className={s.main}>
         <Suspense>
-          <Current />
+          {page ? <PluginPage key={view} plugin={plugin} page={page} /> : <CurrentView view={view as keyof typeof VIEWS} />}
         </Suspense>
       </main>
+      <PluginHost />
       {newInstanceOpen && (
         <Suspense>
           <NewInstanceDialog />

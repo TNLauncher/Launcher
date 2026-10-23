@@ -1,0 +1,206 @@
+// TNLauncher plugin API, version 1. Mirrors src-tauri/src/plugins/{mod,api}.rs: keep them in sync.
+//
+// A plugin is a folder with `manifest.json` and an ES module (`main`, default `main.js`) exporting
+// `activate(tn)`. It runs in a sandboxed iframe: no Tauri, no network except `tn.net.fetch` to the
+// hosts its manifest lists. Pages it contributes are HTML files in the same folder, given the same
+// `tn` global plus the launcher's CSS variables and base styles.
+//
+// Pages are sandboxed with an opaque origin, so loading the plugin's own files is cross-origin:
+// use `<script type="module">` (or `crossorigin` on classic scripts), and `crossorigin` on
+// `<link rel="stylesheet">` and `<img>` pointing into the plugin folder. Inline scripts and styles work.
+
+export type ContentKind = "mod" | "resourcepack" | "shader";
+export type ProjectKind = ContentKind | "modpack";
+
+export interface Choice {
+  id: string;
+  label: string;
+}
+
+export interface Manifest {
+  /** `[a-z0-9-]`, unique. */
+  id: string;
+  name: string;
+  version: string;
+  /** Must be 1. */
+  api: 1;
+  description?: string;
+  /** ES module with `activate(tn)`; default `main.js`. */
+  main?: string;
+  contributes?: {
+    /** Makes the plugin a content source: `activate` must call `tn.sources.register`. */
+    source?: {
+      /** Search sort orders, first = default. */
+      sorts: Choice[];
+      /** Browse categories per kind; a kind missing here is not offered. */
+      categories: Partial<Record<ProjectKind, Choice[]>>;
+    };
+    /** Sidebar pages. */
+    pages?: { id: string; title: string; /** Material Symbols name. */ icon: string; /** HTML file in the plugin folder. */ entry: string }[];
+  };
+  permissions?: {
+    /** Hosts `tn.net.fetch` may reach and pages may show images from; `*.example.com` allowed. HTTPS only. */
+    hosts?: string[];
+    /** URL prefixes the launcher may download files from on the plugin's behalf. */
+    downloads?: string[];
+  };
+}
+
+export interface SearchQuery {
+  kind: ProjectKind;
+  query: string;
+  gameVersion?: string | null;
+  /** Content: the instance's loader. Modpacks: a filter, missing = any the launcher runs (fabric, quilt). */
+  loader?: string | null;
+  categories: string[];
+  sort: string;
+  offset: number;
+  limit: number;
+}
+
+export interface Hit {
+  id: string;
+  slug: string;
+  title: string;
+  author: string;
+  description: string;
+  iconUrl: string | null;
+  downloads: number;
+  follows: number;
+  categories: string[];
+  /** Oldest first. */
+  gameVersions: string[];
+  /** ISO date. */
+  updated: string;
+  bannerUrl: string | null;
+  /** 0xRRGGBB. */
+  color: number | null;
+}
+
+export interface Page {
+  hits: Hit[];
+  offset: number;
+  total: number;
+}
+
+export interface GalleryImage {
+  url: string;
+  rawUrl: string;
+  featured: boolean;
+  title: string | null;
+  description: string | null;
+}
+
+export interface Project {
+  id: string;
+  title: string;
+  description: string;
+  /** Markdown; HTML inside is sanitized by the launcher. */
+  body: string;
+  iconUrl: string | null;
+  color: number | null;
+  published: string;
+  license: string | null;
+  /** The project's page on the source first. */
+  links: { label: string; /** Material Symbols name. */ icon: string; url: string }[];
+  gallery: GalleryImage[];
+}
+
+export interface ProjectSummary {
+  id: string;
+  title: string;
+  description: string;
+  iconUrl: string | null;
+  kind: string;
+  url: string;
+}
+
+export interface VersionFile {
+  url: string;
+  filename: string;
+  primary: boolean;
+  size: number;
+}
+
+export interface Dependency {
+  projectId: string | null;
+  /** Set for files not hosted on the source. */
+  fileName: string | null;
+  kind: "required" | "optional" | "incompatible" | "embedded";
+}
+
+export interface Version {
+  id: string;
+  name: string;
+  number: string;
+  channel: "release" | "beta" | "alpha";
+  gameVersions: string[];
+  loaders: string[];
+  published: string;
+  changelog: string | null;
+  files: VersionFile[];
+  dependencies: Dependency[];
+}
+
+export interface VersionFilter {
+  kind: ProjectKind;
+  gameVersion: string | null;
+  loader: string | null;
+}
+
+export interface Identified {
+  projectId: string;
+  versionNumber: string;
+}
+
+/** What a modpack archive asks for; the launcher downloads and unpacks it. */
+export interface PackPlan {
+  name: string;
+  gameVersion: string;
+  /** `fabric`, `quilt`, or "" for vanilla. */
+  loader: string;
+  loaderVersion: string;
+  files: { /** Relative to the instance. */ path: string; /** Mirrors; the first on an allowed download host is used. */ urls: string[]; size: number | null }[];
+  /** Archive folders copied over the instance, later ones win. */
+  overrides: string[];
+}
+
+/** What `tn.sources.register` takes. Throw to report an error. */
+export interface ContentSource {
+  search(query: SearchQuery): Promise<Page>;
+  project(id: string): Promise<Project>;
+  /** Any number of ids, any order. */
+  projects(ids: string[]): Promise<ProjectSummary[]>;
+  /** Newest first. */
+  versions(project: string, filter: VersionFilter): Promise<Version[]>;
+  /** Keyed by the given SHA-1; unknown files are left out. */
+  identify(sha1: string[]): Promise<Record<string, Identified>>;
+  /** `root`: the archive's top-level text files by name. */
+  planPack(root: Record<string, string>): Promise<PackPlan>;
+}
+
+export interface FetchInit {
+  method?: string;
+  headers?: Record<string, string>;
+  body?: string;
+}
+
+export interface FetchResponse {
+  status: number;
+  ok: boolean;
+  contentType: string;
+  text(): string;
+  json<T = unknown>(): T;
+}
+
+export interface TN {
+  apiVersion: 1;
+  sources: { register(source: ContentSource): void };
+  net: { fetch(url: string, init?: FetchInit): Promise<FetchResponse> };
+  /** Printed to the launcher's log. */
+  log(...args: unknown[]): Promise<void>;
+}
+
+declare global {
+  const tn: TN;
+}
