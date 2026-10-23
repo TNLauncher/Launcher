@@ -2,19 +2,15 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { memo, useCallback, useRef, useState } from "react";
 import { launcher } from "@/api/launcher";
 import { installContent, searchContent, type ModHit } from "@/api/modrinth";
-import { Banner } from "@/components/ui/Banner";
-import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { EmptyState } from "@/components/ui/EmptyState";
-import { Icon } from "@/components/ui/Icon";
-import { Switch } from "@/components/ui/Switch";
-import { Tab, Tabs } from "@/components/ui";
+import { Banner, Button, Chip, ConfirmDialog, EmptyState, Icon, IconButton, Pill, PillGroup, SearchInput, Skeleton, Switch, Tab, Tabs } from "@/components/ui";
+import { cx } from "@/lib/cx";
 import { Screenshots } from "@/features/screenshots/Screenshots";
 import { useDebounced } from "@/hooks/useDebounced";
 import { compact, errorMessage, megabytes } from "@/lib/format";
 import { useLauncher } from "@/store/LauncherContext";
 import type { ContentKind, Instance } from "@/types";
 import { label, useContent, type ContentItem } from "./useContent";
-import "./content.css";
+import s from "./content.module.css";
 
 interface KindInfo {
   label: string;
@@ -63,7 +59,7 @@ export function InstanceContent({ instance }: { instance: Instance }) {
   const irisMissing = kind === "shader" && modded && !!content.mod.items && !content.mod.identifying && !content.mod.installedProjects.has(IRIS);
 
   return (
-    <div className="content">
+    <div>
       <Tabs label="Instance content">
         {ORDER.map((k) => (
           <Tab key={k} selected={tab === k} onSelect={() => setTab(k)} icon={KINDS[k].icon} count={content[k].items?.length ?? ""}>
@@ -84,7 +80,7 @@ export function InstanceContent({ instance }: { instance: Instance }) {
       ) : (
         <>
           {irisMissing && <IrisNotice instance={instance} onInstalled={content.mod.reload} />}
-          <div className="content-split">
+          <div className={s.contentSplit}>
             <InstalledPane key={kind} instance={instance} kind={kind} content={current} />
             <BrowsePane key={`${kind}-browse`} instance={instance} kind={kind} installed={current.installedProjects} onInstalled={current.reload} />
           </div>
@@ -105,13 +101,12 @@ function IrisNotice({ instance, onInstalled }: { instance: Instance; onInstalled
       .finally(() => setBusy(false));
   };
   return (
-    <div className="content-notice" role="status">
+    <div className={s.contentNotice} role="status">
       <Icon name={error ? "error" : "info"} />
       <span>{error || "Shaders need the Iris mod (with Sodium). Without it this folder is ignored."}</span>
-      <button className="btn small primary" disabled={busy} onClick={install}>
-        <Icon name={busy ? "progress_activity" : "download"} spin={busy} />
+      <Button variant="primary" size="sm" icon="download" loading={busy} onClick={install}>
         Install Iris
-      </button>
+      </Button>
     </div>
   );
 }
@@ -140,9 +135,9 @@ function InstalledPane({ instance, kind, content }: { instance: Instance; kind: 
   const enabled = items?.filter((i) => i.enabled).length ?? 0;
 
   return (
-    <section className="cpane" aria-label={`Installed ${info.noun}`}>
-      <div className="cpane-head">
-        <div className="cpane-title">
+    <section className={s.cpane} aria-label={`Installed ${info.noun}`}>
+      <div className={s.cpaneHead}>
+        <div className={s.cpaneTitle}>
           <h3>Installed</h3>
           {items && (
             <span className="mono">
@@ -151,51 +146,44 @@ function InstalledPane({ instance, kind, content }: { instance: Instance; kind: 
             </span>
           )}
           {content.identifying && (
-            <span className="identifying">
+            <span className={s.identifying}>
               <Icon name="progress_activity" spin />
               Matching with Modrinth
             </span>
           )}
-          <button className="icon-btn" title={`Open ${info.folder} folder`} aria-label={`Open ${info.folder} folder`} onClick={() => act(launcher.openInstanceDir(instance.id, info.folder))}>
-            <Icon name="folder_open" />
-          </button>
+          <IconButton icon="folder_open" label={`Open ${info.folder} folder`} className={s.pushEnd} onClick={() => act(launcher.openInstanceDir(instance.id, info.folder))} />
         </div>
         {!!items?.length && (
-          <label className="search">
-            <Icon name="search" />
-            <input className="input" aria-label={`Filter installed ${info.noun}`} placeholder={`Filter ${info.noun}`} value={filter} onChange={(e) => setFilter(e.target.value)} />
-          </label>
+          <SearchInput label={`Filter installed ${info.noun}`} placeholder={`Filter ${info.noun}`} value={filter} onChange={setFilter} />
         )}
-        {running && <span className="identifying">Close the game to change installed {info.noun}.</span>}
+        {running && <span className={s.identifying}>Close the game to change installed {info.noun}.</span>}
         {(error || content.error) && <Banner message={error || errorMessage(content.error)} onDismiss={() => setError("")} />}
       </div>
 
-      <fieldset className="cpane-list" disabled={running}>
+      <fieldset className={s.cpaneList} disabled={running}>
         {!items ? (
-          Array.from({ length: 4 }, (_, i) => <div key={i} className="skeleton" style={{ height: 52, flexShrink: 0 }} />)
+          Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className={s.listSkeleton} height={52} />)
         ) : !items.length ? (
           <EmptyState icon={info.icon}>No {info.noun} yet. Find some on the right.</EmptyState>
         ) : !shown.length ? (
           <EmptyState icon="search_off">Nothing matches “{filter}”.</EmptyState>
         ) : (
           shown.map((i) => (
-            <div key={i.file} className={`citem ${i.enabled ? "" : "off"}`}>
+            <div key={i.file} className={cx(s.citem, !i.enabled && s.off)}>
               <ItemIcon item={i} instanceId={instance.id} kind={kind} />
-              <div className="citem-text">
-                <div className="citem-name">
+              <div className={s.citemText}>
+                <div className={s.citemName}>
                   <b title={i.project?.description}>{label(i)}</b>
-                  {!i.enabled && <span className="chip">Disabled</span>}
+                  {!i.enabled && <Chip className={s.smallChip}>Disabled</Chip>}
                 </div>
-                <span className="citem-sub mono" title={i.file}>
+                <span className={cx(s.citemSub, "mono")} title={i.file}>
                   {i.versionNumber && <>{i.versionNumber} · </>}
                   {megabytes(i.size)}
                   {!i.project && !content.identifying && " · not on Modrinth"}
                 </span>
               </div>
-              <div className="citem-actions">
-                <button className="icon-btn danger" title="Remove" aria-label={`Remove ${label(i)}`} onClick={() => setRemoving(i)}>
-                  <Icon name="delete" />
-                </button>
+              <div className={s.citemActions}>
+                <IconButton icon="delete" label={`Remove ${label(i)}`} title="Remove" variant="danger" className={s.reveal} onClick={() => setRemoving(i)} />
                 <Switch label={`${i.enabled ? "Disable" : "Enable"} ${label(i)}`} checked={i.enabled} onChange={() => act(launcher.toggleContent(instance.id, kind, i.file))} />
               </div>
             </div>
@@ -225,7 +213,7 @@ function ItemIcon({ item, instanceId, kind }: { item: ContentItem; instanceId: s
   // The jar icon is tried before Modrinth answers; remember a failure per URL so the Modrinth one still shows.
   const [failed, setFailed] = useState<string | null>(null);
   return (
-    <span className="citem-icon">
+    <span className={s.citemIcon}>
       <Icon name={KINDS[kind].icon} />
       {src && src !== failed && <img src={src} alt="" loading="lazy" onError={() => setFailed(src)} />}
     </span>
@@ -268,30 +256,27 @@ function BrowsePane({ instance, kind, installed, onInstalled }: { instance: Inst
   );
 
   return (
-    <section className="cpane browse" aria-label={`Add ${info.noun} from Modrinth`}>
-      <div className="cpane-head">
-        <div className="cpane-title">
+    <section className={s.cpane} aria-label={`Add ${info.noun} from Modrinth`}>
+      <div className={s.cpaneHead}>
+        <div className={s.cpaneTitle}>
           <h3>Add from Modrinth</h3>
           <span className="mono">{version}</span>
         </div>
-        <label className="search">
-          <Icon name="travel_explore" />
-          <input className="input" aria-label={`Search ${info.noun} on Modrinth`} placeholder={`Search ${info.noun}`} value={query} onChange={(e) => setQuery(e.target.value)} />
-        </label>
-        <div className="pills" role="group" aria-label="Category">
+        <SearchInput icon="travel_explore" label={`Search ${info.noun} on Modrinth`} placeholder={`Search ${info.noun}`} value={query} onChange={setQuery} />
+        <PillGroup label="Category" wrap className={s.cats}>
           {info.categories.map(([key, name]) => (
-            <button key={key} className="pill" aria-pressed={category === key} onClick={() => setCategory(key)}>
+            <Pill key={key} pressed={category === key} onClick={() => setCategory(key)}>
               {name}
-            </button>
+            </Pill>
           ))}
-        </div>
+        </PillGroup>
       </div>
 
-      <div className={`cpane-list ${hits.isPlaceholderData ? "stale" : ""}`}>
+      <div className={cx(s.cpaneList, hits.isPlaceholderData && s.stale)}>
         {hits.isError ? (
           <Banner message={`Modrinth search failed: ${errorMessage(hits.error)}`} onRetry={() => hits.refetch()} />
         ) : !hits.data ? (
-          Array.from({ length: 4 }, (_, i) => <div key={i} className="skeleton" style={{ height: 84, flexShrink: 0 }} />)
+          Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className={s.listSkeleton} height={84} />)
         ) : !hits.data.length ? (
           <EmptyState icon="search_off">No {info.noun} for Minecraft {version}{debounced && ` match “${debounced}”`}.</EmptyState>
         ) : (
@@ -307,32 +292,32 @@ function BrowsePane({ instance, kind, installed, onInstalled }: { instance: Inst
 const ResultCard = memo(function ResultCard({ hit, icon, state, onInstall }: { hit: ModHit; icon: string; state?: InstallState; onInstall(id: string): void }) {
   const failed = typeof state === "object";
   return (
-    <div className="cresult">
-      <span className="citem-icon big">{hit.icon_url ? <img src={hit.icon_url} alt="" loading="lazy" /> : <Icon name={icon} />}</span>
-      <div className="citem-text">
-        <div className="citem-name">
+    <div className={s.cresult}>
+      <span className={cx(s.citemIcon, s.big)}>{hit.icon_url ? <img src={hit.icon_url} alt="" loading="lazy" /> : <Icon name={icon} />}</span>
+      <div className={s.citemText}>
+        <div className={s.citemName}>
           <b>{hit.title}</b>
-          <span className="by">by {hit.author}</span>
+          <span className={s.by}>by {hit.author}</span>
         </div>
-        <p className="cresult-desc">{hit.description}</p>
-        <span className="citem-sub mono"><Icon name="download" />{compact(hit.downloads)}</span>
+        <p className={s.cresultDesc}>{hit.description}</p>
+        <span className={cx(s.citemSub, "mono")}><Icon name="download" />{compact(hit.downloads)}</span>
       </div>
       {state === "installed" ? (
-        <button className="btn small installed" disabled>
-          <Icon name="check" />
+        <Button size="sm" icon="check" className={cx(s.cresultBtn, s.installed)} disabled>
           Installed
-        </button>
+        </Button>
       ) : (
-        <button
-          className="btn small"
-          disabled={state === "installing"}
+        <Button
+          size="sm"
+          icon={failed ? "refresh" : "download"}
+          className={s.cresultBtn}
+          loading={state === "installing"}
           title={failed ? state.error : undefined}
           aria-label={`Install ${hit.title}`}
           onClick={() => onInstall(hit.project_id)}
         >
-          <Icon name={state === "installing" ? "progress_activity" : failed ? "refresh" : "download"} spin={state === "installing"} />
           {state === "installing" ? "Installing" : failed ? "Retry" : "Install"}
-        </button>
+        </Button>
       )}
     </div>
   );
