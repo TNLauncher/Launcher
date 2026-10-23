@@ -49,8 +49,8 @@ pub fn plugin_reply(state: State<'_, AppState>, id: u64, ok: bool, value: Value)
 
 /// A request from a plugin frame; `plugin` is the frame the frontend saw send it, never the plugin's own word.
 #[tauri::command]
-pub async fn plugin_request(state: State<'_, AppState>, plugin: String, method: String, params: Value) -> Result<Value> {
-    host::request(&state, &plugin, &method, params).await
+pub async fn plugin_request(app: tauri::AppHandle, state: State<'_, AppState>, plugin: String, method: String, params: Value) -> Result<Value> {
+    host::request(&app, &state, &plugin, &method, params).await
 }
 
 #[tauri::command]

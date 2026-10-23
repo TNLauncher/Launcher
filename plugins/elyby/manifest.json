@@ -1,0 +1,20 @@
+{
+  "id": "elyby",
+  "name": "Ely.by",
+  "version": "1.0.0",
+  "api": 1,
+  "description": "Ely.by accounts: skins and Ely.by servers, through authlib-injector.",
+  "contributes": {
+    "account": {
+      "fields": [
+        { "key": "username", "label": "Login or e-mail", "type": "text" },
+        { "key": "password", "label": "Password", "hint": "With two-factor auth on, enter password:code.", "type": "secret" }
+      ]
+    }
+  },
+  "permissions": {
+    "hosts": ["authserver.ely.by", "authlib-injector.yushi.moe"],
+    "downloads": ["https://authlib-injector.yushi.moe/"],
+    "jvm": true
+  }
+}

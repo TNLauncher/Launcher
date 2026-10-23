@@ -6,7 +6,7 @@ use super::api::*;
 use crate::error::{AppError, Result};
 use futures::future::BoxFuture;
 use futures::FutureExt;
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -23,6 +23,8 @@ const TIMEOUT: Duration = Duration::from_secs(60);
 pub struct Call {
     pub id: u64,
     pub plugin: String,
+    /// What the plugin registered: `source` or `account`.
+    pub target: &'static str,
     pub method: &'static str,
     /// Positional arguments of the plugin function.
     pub args: Vec<Value>,
@@ -62,11 +64,11 @@ impl Bridge {
         }
     }
 
-    pub async fn call(&self, plugin: &str, method: &'static str, args: Vec<Value>) -> Result<Value> {
+    pub async fn call(&self, plugin: &str, target: &'static str, method: &'static str, args: Vec<Value>) -> Result<Value> {
         let id = self.next.fetch_add(1, Ordering::Relaxed);
         let (tx, rx) = oneshot::channel();
         self.pending.lock().unwrap().insert(id, tx);
-        self.send(Call { id, plugin: plugin.into(), method, args });
+        self.send(Call { id, plugin: plugin.into(), target, method, args });
         let answer = tokio::time::timeout(TIMEOUT, rx).await;
         self.pending.lock().unwrap().remove(&id);
         match answer {
@@ -93,7 +95,7 @@ pub struct JsSource {
 impl JsSource {
     fn call<O: DeserializeOwned>(&self, method: &'static str, args: Vec<Value>) -> BoxFuture<'_, Result<O>> {
         async move {
-            let v = self.bridge.call(&self.plugin, method, args).await?;
+            let v = self.bridge.call(&self.plugin, "source", method, args).await?;
             serde_json::from_value(v).map_err(|e| AppError::Plugin(format!("{}.{method} returned bad data: {e}", self.plugin)))
         }
         .boxed()
@@ -122,6 +124,62 @@ impl ContentSource for JsSource {
     }
     fn plan_pack<'a>(&'a self, root: &'a HashMap<String, String>) -> BoxFuture<'a, Result<PackPlan>> {
         self.call("planPack", vec![arg(root)])
+    }
+}
+
+/// An account provider plugin (`tn.accounts.register`). Its answers are untrusted: see `services::account`.
+pub struct JsAccount {
+    pub plugin: String,
+    pub bridge: Arc<Bridge>,
+}
+
+/// What `login` returns: who signed in, and whatever the plugin keeps to start sessions later.
+#[derive(Debug, Deserialize)]
+pub struct Login {
+    pub name: String,
+    pub uuid: String,
+    #[serde(default)]
+    pub data: Value,
+}
+
+/// What `session` returns before each launch.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PluginSession {
+    pub name: String,
+    pub uuid: String,
+    pub token: String,
+    /// `mojang` (Yggdrasil) or `legacy`.
+    pub user_type: String,
+    /// Replaces the stored `data`, e.g. after a token refresh.
+    #[serde(default)]
+    pub data: Value,
+    pub java_agent: Option<JavaAgent>,
+}
+
+/// A jar the launcher downloads (from the plugin's download hosts) and loads with `-javaagent:<jar>=<options>`.
+#[derive(Debug, Deserialize)]
+pub struct JavaAgent {
+    pub url: String,
+    pub filename: String,
+    #[serde(default)]
+    pub options: String,
+}
+
+impl JsAccount {
+    async fn call<O: DeserializeOwned>(&self, method: &'static str, args: Vec<Value>) -> Result<O> {
+        let v = self.bridge.call(&self.plugin, "account", method, args).await?;
+        serde_json::from_value(v).map_err(|e| AppError::Plugin(format!("{}.{method} returned bad data: {e}", self.plugin)))
+    }
+
+    /// `fields` are the sign-in form's values by key.
+    pub async fn login(&self, fields: Value) -> Result<Login> {
+        self.call("login", vec![fields]).await
+    }
+
+    /// `account` is `{ name, uuid, data }` as stored.
+    pub async fn session(&self, account: Value) -> Result<PluginSession> {
+        self.call("session", vec![account]).await
     }
 }
 

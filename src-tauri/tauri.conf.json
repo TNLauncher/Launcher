@@ -37,7 +37,13 @@
     ],
     "resources": {
       "../plugins/modrinth/manifest.json": "plugins/modrinth/manifest.json",
-      "../plugins/modrinth/main.js": "plugins/modrinth/main.js"
+      "../plugins/modrinth/main.js": "plugins/modrinth/main.js",
+      "../plugins/curseforge/manifest.json": "plugins/curseforge/manifest.json",
+      "../plugins/curseforge/main.js": "plugins/curseforge/main.js",
+      "../plugins/elyby/manifest.json": "plugins/elyby/manifest.json",
+      "../plugins/elyby/main.js": "plugins/elyby/main.js",
+      "../plugins/discord/manifest.json": "plugins/discord/manifest.json",
+      "../plugins/discord/main.js": "plugins/discord/main.js"
     }
   }
 }

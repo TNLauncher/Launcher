@@ -1,5 +1,4 @@
 //! Install → spawn → watch. Progress streams over a Channel; game output and exit are global events.
-use super::discord::{Discord, Presence};
 use super::{instances, now};
 use crate::error::{AppError, Result};
 use crate::minecraft::{command, install, java, loader, version, Stage};
@@ -62,10 +61,6 @@ impl Drop for RunningGuard {
         let state = self.app.state::<AppState>();
         let mut running = state.running.lock().unwrap();
         running.remove(&self.id);
-        // Covers both a normal exit and a launch that failed before the game started.
-        if running.is_empty() {
-            self.app.state::<Discord>().set(Presence::Idle);
-        }
     }
 }
 
@@ -81,7 +76,6 @@ pub async fn launch(app: &AppHandle, id: &str, on_event: Channel<LaunchEvent>) -
         instances::update(&state, id, |i| i.loader_version = v.clone())?;
         inst.loader_version = v;
     }
-    app.state::<Discord>().set(Presence::Launching { name: inst.name.clone() });
     let root = &state.paths.root;
     let game_dir = state.paths.instance_dir(id)?;
     let natives = game_dir.join(".natives");
@@ -131,14 +125,6 @@ pub async fn launch(app: &AppHandle, id: &str, on_event: Channel<LaunchEvent>) -
     let started = now();
     instances::update(&state, id, |i| i.last_played = started)?;
     let _ = on_event.send(LaunchEvent::Started);
-    let mods = super::mods::list(&state, id, crate::models::ContentKind::Mod).map(|m| m.iter().filter(|m| m.enabled).count()).unwrap_or(0);
-    app.state::<Discord>().set(Presence::Playing {
-        name: inst.name.clone(),
-        version: inst.version.clone(),
-        loader: inst.loader,
-        mods,
-        since: started,
-    });
     apply_after_launch(app, settings.after_launch);
 
     let (app, id) = (app.clone(), id.to_string());

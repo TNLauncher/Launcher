@@ -109,6 +109,9 @@ pub async fn import(
     }
     .ok_or_else(|| AppError::NotFound("This modpack has no version the launcher can run".into()))?;
     let file = picked.primary_file().ok_or_else(|| AppError::NotFound("This modpack version has no file".into()))?;
+    if file.url.is_empty() {
+        return Err(AppError::Unsupported("The author of this modpack does not allow launchers to download it.".into()));
+    }
     if !allowed(&file.url) {
         return Err(AppError::Invalid(format!("{} is not an allowed download", file.url)));
     }

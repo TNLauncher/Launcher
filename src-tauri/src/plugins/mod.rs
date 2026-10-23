@@ -58,6 +58,15 @@ pub struct Contributes {
     /// Options the user sets in Settings; the plugin reads them with `tn.settings.get()`.
     #[serde(default)]
     pub settings: Vec<SettingSpec>,
+    /// Makes the plugin an account provider: the sign-in form's fields. It must `tn.accounts.register` one.
+    pub account: Option<AccountSpec>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AccountSpec {
+    /// Text or secret fields; toggles are not offered here.
+    pub fields: Vec<SettingSpec>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -89,6 +98,19 @@ pub struct SourceSpec {
     pub sorts: Vec<Choice>,
     /// Browse categories per kind; a kind missing here is not offered by the source.
     pub categories: HashMap<ProjectKind, Vec<Choice>>,
+    /// How `identify` receives installed files.
+    #[serde(default)]
+    pub hash: HashAlgo,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum HashAlgo {
+    /// Hex SHA-1 (Modrinth).
+    #[default]
+    Sha1,
+    /// CurseForge's fingerprint, as a decimal string: MurmurHash2 (seed 1) of the file minus whitespace bytes.
+    Murmur2,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -114,6 +136,12 @@ pub struct Permissions {
     /// Read the instance list (`tn.instances`) and game start/exit events.
     #[serde(default)]
     pub instances: bool,
+    /// Set the Discord status (`tn.presence`).
+    #[serde(default)]
+    pub presence: bool,
+    /// Load a Java agent into the game (account providers like Ely.by need authlib-injector). Runs code in the game.
+    #[serde(default)]
+    pub jvm: bool,
 }
 
 pub struct Plugin {
@@ -122,12 +150,18 @@ pub struct Plugin {
     /// Shipped with the launcher rather than added by the user.
     pub bundled: bool,
     pub source: Option<Arc<dyn ContentSource>>,
+    pub account: Option<js::JsAccount>,
 }
 
 impl Plugin {
     /// Whether the launcher may download `url` for this plugin.
     pub fn may_download(&self, url: &str) -> bool {
         self.manifest.permissions.downloads.iter().any(|h| url.starts_with(h.as_str()))
+    }
+
+    /// The account provider, or an error naming the plugin.
+    pub fn account(&self) -> Result<&js::JsAccount> {
+        self.account.as_ref().ok_or_else(|| AppError::Unsupported(format!("{} is not an account provider", self.manifest.name)))
     }
 
     /// The content source, or an error naming the plugin.
@@ -170,7 +204,8 @@ impl Registry {
                         let source = manifest.contributes.source.as_ref().map(|_| {
                             Arc::new(js::JsSource { plugin: manifest.id.clone(), bridge: reg.bridge.clone() }) as Arc<dyn ContentSource>
                         });
-                        reg.plugins.push(Arc::new(Plugin { manifest, dir: folder, bundled: *bundled, source }));
+                        let account = manifest.contributes.account.as_ref().map(|_| js::JsAccount { plugin: manifest.id.clone(), bridge: reg.bridge.clone() });
+                        reg.plugins.push(Arc::new(Plugin { manifest, dir: folder, bundled: *bundled, source, account }));
                     }
                     Err(e) => reg.failed.push(Failed { name, error: e.to_string() }),
                 }
@@ -227,6 +262,8 @@ pub struct PluginEntry {
     pub pages: Vec<PageSpec>,
     pub instance_tabs: Vec<PageSpec>,
     pub settings: Vec<SettingSpec>,
+    /// Sign-in form fields when the plugin provides accounts.
+    pub account: Option<AccountSpec>,
     /// Why the plugin did not load; it is then off.
     pub error: Option<String>,
 }
@@ -248,6 +285,7 @@ pub fn list(state: &AppState) -> Vec<PluginEntry> {
             pages: m.contributes.pages.clone(),
             instance_tabs: m.contributes.instance_tabs.clone(),
             settings: m.contributes.settings.clone(),
+            account: m.contributes.account.clone(),
             error: None,
         }
     });
@@ -264,6 +302,7 @@ pub fn list(state: &AppState) -> Vec<PluginEntry> {
         pages: vec![],
         instance_tabs: vec![],
         settings: vec![],
+        account: None,
         error: Some(f.error.clone()),
     });
     loaded.chain(failed).collect()

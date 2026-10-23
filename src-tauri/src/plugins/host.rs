@@ -108,6 +108,17 @@ pub fn host_allowed(hosts: &[String], url: &str) -> bool {
         })
 }
 
+/// Instances as plugins see them: plus `mods`, the number of enabled mod jars.
+fn with_mods(state: &AppState, list: Vec<crate::models::Instance>) -> Result<Value> {
+    let counts = crate::services::instances::mod_counts(state, &list);
+    let mut v = serde_json::to_value(&list)?;
+    for i in v.as_array_mut().into_iter().flatten() {
+        let n = i["id"].as_str().and_then(|id| counts.get(id)).copied().unwrap_or(0);
+        i["mods"] = n.into();
+    }
+    Ok(v)
+}
+
 fn str_param(params: &Value, name: &str) -> Result<String> {
     params.get(name).and_then(Value::as_str).map(String::from).ok_or_else(|| AppError::Invalid(format!("Missing {name}")))
 }
@@ -132,7 +143,8 @@ struct FetchInit {
 }
 
 /// A request a plugin frame sent through the bridge. `plugin` is who the frontend saw send it.
-pub async fn request(state: &AppState, plugin: &str, method: &str, params: Value) -> Result<Value> {
+pub async fn request(app: &tauri::AppHandle, state: &AppState, plugin: &str, method: &str, params: Value) -> Result<Value> {
+    use tauri::Manager;
     let plugin = super::enabled(state, plugin)?;
     let m = &plugin.manifest;
     match method {
@@ -165,8 +177,24 @@ pub async fn request(state: &AppState, plugin: &str, method: &str, params: Value
         }
         "settings.get" => Ok(Value::Object(super::data::settings(state, &plugin))),
         "instances.list" | "instances.get" if !m.permissions.instances => Err(AppError::Plugin(format!("{} may not read instances", m.name))),
-        "instances.list" => Ok(serde_json::to_value(crate::services::instances::list(state))?),
-        "instances.get" => Ok(serde_json::to_value(crate::services::instances::get(state, &str_param(&params, "id")?)?)?),
+        "instances.list" => with_mods(state, crate::services::instances::list(state)),
+        "instances.get" => {
+            let one = vec![crate::services::instances::get(state, &str_param(&params, "id")?)?];
+            Ok(with_mods(state, one)?.as_array_mut().and_then(|a| a.pop()).unwrap_or(Value::Null))
+        }
+        "presence.set" | "presence.clear" if !m.permissions.presence => Err(AppError::Plugin(format!("{} may not set the Discord status", m.name))),
+        "presence.set" => {
+            let p: crate::services::discord::Presence = serde_json::from_value(params)?;
+            if !p.valid() {
+                return Err(AppError::Invalid("Discord status lines must be 2–128 characters".into()));
+            }
+            app.state::<crate::services::discord::Discord>().set(Some(p));
+            Ok(Value::Null)
+        }
+        "presence.clear" => {
+            app.state::<crate::services::discord::Discord>().set(None);
+            Ok(Value::Null)
+        }
         // A link the user follows: web pages only, opened in the system browser.
         "open" => {
             let url = str_param(&params, "url")?;

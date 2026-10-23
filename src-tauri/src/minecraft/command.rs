@@ -34,7 +34,7 @@ pub fn build(version: &Value, o: &LaunchOptions) -> Command {
         "auth_session": o.session.token,
         "clientid": "",
         "auth_xuid": "",
-        "user_type": if o.session.msa { "msa" } else { "legacy" },
+        "user_type": o.session.user_type,
         "user_properties": "{}",
         "version_type": version["type"],
         "resolution_width": o.width.to_string(),
@@ -84,6 +84,7 @@ pub fn build(version: &Value, o: &LaunchOptions) -> Command {
     cmd.current_dir(o.game_dir)
         .arg(format!("-Xmx{}M", o.ram_mb))
         .args(o.jvm_args.split_whitespace())
+        .args(&o.session.jvm_args)
         .args(jvm)
         .arg(version["mainClass"].as_str().unwrap_or_default())
         .args(game);

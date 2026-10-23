@@ -3,7 +3,8 @@
 (() => {
   const pending = new Map();
   let next = 1;
-  let source = null;
+  /** What the plugin registered, by call target. */
+  const registered = { source: null, account: null };
   const listeners = new Map();
   const post = (msg) => parent.postMessage({ tn: 1, ...msg }, "*");
   const message = (err) => String((err && err.message) || err);
@@ -35,9 +36,10 @@
       }
     } else if (m.type === "call") {
       try {
-        const fn = source && source[m.method];
-        if (typeof fn !== "function") throw new Error(`${m.method} is not implemented`);
-        const value = await fn.apply(source, m.args);
+        const impl = registered[m.target];
+        const fn = impl && impl[m.method];
+        if (typeof fn !== "function") throw new Error(`${m.target}.${m.method} is not implemented`);
+        const value = await fn.apply(impl, m.args);
         post({ type: "result", callId: m.callId, ok: true, value: value === undefined ? null : value });
       } catch (err) {
         post({ type: "result", callId: m.callId, ok: false, error: message(err) });
@@ -68,12 +70,22 @@
         return () => set.delete(cb);
       },
     }),
+    presence: Object.freeze({
+      set: (p) => request("presence.set", p),
+      clear: () => request("presence.clear", null),
+    }),
     /** Opens a web page in the system browser. */
     open: (url) => request("open", { url: String(url) }),
     sources: Object.freeze({
       register(impl) {
-        if (source) throw new Error("A content source is already registered");
-        source = impl;
+        if (registered.source) throw new Error("A content source is already registered");
+        registered.source = impl;
+      },
+    }),
+    accounts: Object.freeze({
+      register(impl) {
+        if (registered.account) throw new Error("An account provider is already registered");
+        registered.account = impl;
       },
     }),
     net: Object.freeze({

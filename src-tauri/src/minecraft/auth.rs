@@ -14,12 +14,15 @@ pub struct Session {
     pub name: String,
     pub uuid: String,
     pub token: String,
-    pub msa: bool,
+    /// `msa`, `mojang` (Yggdrasil servers like Ely.by) or `legacy` (offline).
+    pub user_type: &'static str,
+    /// Extra JVM flags the account needs, e.g. an authlib-injector `-javaagent`.
+    pub jvm_args: Vec<String>,
 }
 
 impl Session {
     pub fn offline(name: &str) -> Self {
-        Self { name: name.into(), uuid: offline_uuid(name), token: "0".into(), msa: false }
+        Self { name: name.into(), uuid: offline_uuid(name), token: "0".into(), user_type: "legacy", jvm_args: vec![] }
     }
 }
 
@@ -37,7 +40,7 @@ pub struct Account {
 
 impl Account {
     pub fn session(&self) -> Session {
-        Session { name: self.name.clone(), uuid: self.uuid.clone(), token: self.token.clone(), msa: true }
+        Session { name: self.name.clone(), uuid: self.uuid.clone(), token: self.token.clone(), user_type: "msa", jvm_args: vec![] }
     }
     /// True while the Minecraft token has at least a minute left.
     pub fn fresh(&self) -> bool {

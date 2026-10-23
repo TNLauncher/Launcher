@@ -1,0 +1,202 @@
+{
+  "id": "curseforge",
+  "name": "CurseForge",
+  "version": "1.0.0",
+  "api": 1,
+  "description": "Mods, resource packs, shaders and modpacks from curseforge.com. Needs your own API key from console.curseforge.com.",
+  "contributes": {
+    "source": {
+      "hash": "murmur2",
+      "sorts": [
+        {
+          "id": "2",
+          "label": "Popularity"
+        },
+        {
+          "id": "6",
+          "label": "Downloads"
+        },
+        {
+          "id": "3",
+          "label": "Recently updated"
+        },
+        {
+          "id": "11",
+          "label": "Newest"
+        },
+        {
+          "id": "4",
+          "label": "Name"
+        }
+      ],
+      "categories": {
+        "mod": [
+          {
+            "id": "6814",
+            "label": "Performance"
+          },
+          {
+            "id": "5191",
+            "label": "Utility & QoL"
+          },
+          {
+            "id": "406",
+            "label": "World Gen"
+          },
+          {
+            "id": "412",
+            "label": "Technology"
+          },
+          {
+            "id": "419",
+            "label": "Magic"
+          },
+          {
+            "id": "422",
+            "label": "Adventure and RPG"
+          },
+          {
+            "id": "434",
+            "label": "Armor, Tools, and Weapons"
+          },
+          {
+            "id": "423",
+            "label": "Map and Information"
+          },
+          {
+            "id": "424",
+            "label": "Cosmetic"
+          },
+          {
+            "id": "421",
+            "label": "API and Library"
+          }
+        ],
+        "resourcepack": [
+          {
+            "id": "393",
+            "label": "16x"
+          },
+          {
+            "id": "394",
+            "label": "32x"
+          },
+          {
+            "id": "395",
+            "label": "64x"
+          },
+          {
+            "id": "396",
+            "label": "128x"
+          },
+          {
+            "id": "400",
+            "label": "Photo Realistic"
+          },
+          {
+            "id": "403",
+            "label": "Traditional"
+          },
+          {
+            "id": "402",
+            "label": "Medieval"
+          },
+          {
+            "id": "401",
+            "label": "Modern"
+          },
+          {
+            "id": "404",
+            "label": "Animated"
+          },
+          {
+            "id": "4465",
+            "label": "Mod Support"
+          }
+        ],
+        "shader": [
+          {
+            "id": "6555",
+            "label": "Vanilla"
+          },
+          {
+            "id": "6553",
+            "label": "Realistic"
+          },
+          {
+            "id": "6554",
+            "label": "Fantasy"
+          }
+        ],
+        "modpack": [
+          {
+            "id": "4475",
+            "label": "Adventure and RPG"
+          },
+          {
+            "id": "4472",
+            "label": "Tech"
+          },
+          {
+            "id": "4473",
+            "label": "Magic"
+          },
+          {
+            "id": "4478",
+            "label": "Quests"
+          },
+          {
+            "id": "4736",
+            "label": "Skyblock"
+          },
+          {
+            "id": "4484",
+            "label": "Multiplayer"
+          },
+          {
+            "id": "4483",
+            "label": "Combat / PvP"
+          },
+          {
+            "id": "4481",
+            "label": "Small / Light"
+          },
+          {
+            "id": "4482",
+            "label": "Extra Large"
+          },
+          {
+            "id": "5128",
+            "label": "Vanilla+"
+          },
+          {
+            "id": "4476",
+            "label": "Exploration"
+          },
+          {
+            "id": "4479",
+            "label": "Hardcore"
+          }
+        ]
+      }
+    },
+    "settings": [
+      {
+        "key": "apiKey",
+        "label": "API key",
+        "hint": "Create one at console.curseforge.com; CurseForge requires it for every request.",
+        "type": "secret"
+      }
+    ]
+  },
+  "permissions": {
+    "hosts": [
+      "api.curseforge.com",
+      "media.forgecdn.net"
+    ],
+    "downloads": [
+      "https://edge.forgecdn.net/",
+      "https://mediafilez.forgecdn.net/"
+    ]
+  }
+}

@@ -89,7 +89,7 @@ mod tests {
             "contributes": { "settings": [{ "key": "apiKey", "label": "API key", "type": "secret" }, { "key": "on", "label": "On", "type": "toggle" }] }
         }))
         .unwrap();
-        let plugin = Plugin { manifest, dir: root.clone(), bundled: false, source: None };
+        let plugin = Plugin { manifest, dir: root.clone(), bundled: false, source: None, account: None };
 
         assert_eq!(storage_get(&state, &plugin, "k"), Value::Null);
         storage_set(&state, &plugin, "k", json!({ "a": 1 })).unwrap();

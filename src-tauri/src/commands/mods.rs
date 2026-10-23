@@ -13,8 +13,9 @@ pub fn list_content(state: State<'_, AppState>, id: String, kind: ContentKind) -
 /// Files of one kind the source recognises, by file name. Hashing reads every file, so it runs off the main thread.
 #[tauri::command]
 pub async fn identify_content(app: tauri::AppHandle, source: String, id: String, kind: ContentKind) -> Result<HashMap<String, IdentifiedFile>> {
+    let algo = crate::plugins::enabled(&app.state::<AppState>(), &source)?.manifest.contributes.source.as_ref().map(|s| s.hash).unwrap_or_default();
     let handle = app.clone();
-    let hashes = tauri::async_runtime::spawn_blocking(move || mods::hashes(&handle.state::<AppState>(), &id, kind)).await??;
+    let hashes = tauri::async_runtime::spawn_blocking(move || mods::hashes(&handle.state::<AppState>(), &id, kind, algo)).await??;
     mods::identify(&app.state::<AppState>(), &source, hashes).await
 }
 

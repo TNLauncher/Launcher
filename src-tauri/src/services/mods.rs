@@ -8,6 +8,7 @@ use crate::models::{ContentKind, Loader, ModFile};
 use crate::plugins::{
     self,
     api::{DependencyKind, ProjectSummary, VersionFilter},
+    HashAlgo,
 };
 use crate::services::instances;
 use crate::state::AppState;
@@ -45,18 +46,47 @@ pub fn list(state: &AppState, id: &str, kind: ContentKind) -> Result<Vec<ModFile
     Ok(files)
 }
 
-/// SHA-1 of every listed file, keyed by file name: Modrinth identifies projects by it.
-pub fn hashes(state: &AppState, id: &str, kind: ContentKind) -> Result<HashMap<String, String>> {
+/// Hash of every listed file, keyed by file name: content sources identify projects by it.
+pub fn hashes(state: &AppState, id: &str, kind: ContentKind, algo: HashAlgo) -> Result<HashMap<String, String>> {
     let dir = state.paths.content_dir(id, kind)?;
     list(state, id, kind)?
         .into_iter()
         .map(|f| {
-            let mut hasher = Sha1::new();
-            std::io::copy(&mut std::fs::File::open(dir.join(&f.file))?, &mut hasher)?;
-            let hex = hasher.finalize().iter().map(|b| format!("{b:02x}")).collect();
-            Ok((f.file, hex))
+            let path = dir.join(&f.file);
+            let hash = match algo {
+                HashAlgo::Sha1 => {
+                    let mut hasher = Sha1::new();
+                    std::io::copy(&mut std::fs::File::open(path)?, &mut hasher)?;
+                    hasher.finalize().iter().map(|b| format!("{b:02x}")).collect()
+                }
+                // ponytail: reads the whole file into memory; jars are small, stream it if packs get huge.
+                HashAlgo::Murmur2 => curseforge_fingerprint(&std::fs::read(path)?).to_string(),
+            };
+            Ok((f.file, hash))
         })
         .collect()
+}
+
+/// CurseForge's file fingerprint: 32-bit MurmurHash2, seed 1, over the bytes minus tab, LF, CR and space.
+pub fn curseforge_fingerprint(data: &[u8]) -> u32 {
+    const M: u32 = 0x5bd1_e995;
+    let bytes: Vec<u8> = data.iter().copied().filter(|b| !matches!(b, 9 | 10 | 13 | 32)).collect();
+    let mut h: u32 = 1 ^ bytes.len() as u32;
+    let (chunks, tail) = bytes.as_chunks::<4>();
+    for c in chunks {
+        let mut k = u32::from_le_bytes(*c).wrapping_mul(M);
+        k ^= k >> 24;
+        h = h.wrapping_mul(M) ^ k.wrapping_mul(M);
+    }
+    if !tail.is_empty() {
+        for (i, b) in tail.iter().enumerate() {
+            h ^= (*b as u32) << (8 * i);
+        }
+        h = h.wrapping_mul(M);
+    }
+    h ^= h >> 13;
+    h = h.wrapping_mul(M);
+    h ^ (h >> 15)
 }
 
 pub fn toggle(state: &AppState, id: &str, kind: ContentKind, file: &str) -> Result<()> {
@@ -220,6 +250,9 @@ pub async fn install(state: &AppState, source_id: &str, id: &str, kind: ContentK
         }
         let latest = list.into_iter().next().ok_or_else(|| AppError::NotFound(format!("No build for Minecraft {}", inst.version)))?;
         let file = latest.primary_file().ok_or_else(|| AppError::NotFound("This version has no file".into()))?;
+        if file.url.is_empty() {
+            return Err(AppError::Unsupported(format!("The author of {} does not allow launchers to download it; get it from its page.", file.filename)));
+        }
         if !plugin.may_download(&file.url) {
             return Err(AppError::Invalid(format!("{} is not an allowed download", file.url)));
         }
@@ -325,7 +358,7 @@ mod tests {
         // Present but not in options.txt: off.
         let files = super::list(&state, "inst", ContentKind::Resourcepack).unwrap();
         assert_eq!(files.iter().map(|f| (f.file.as_str(), f.enabled)).collect::<Vec<_>>(), [("a.zip", false), ("b.zip.disabled", false)]);
-        assert_eq!(super::hashes(&state, "inst", ContentKind::Resourcepack).unwrap()["a.zip"], "a9993e364706816aba3e25717850c26c9cd0d89d");
+        assert_eq!(super::hashes(&state, "inst", ContentKind::Resourcepack, crate::plugins::HashAlgo::Sha1).unwrap()["a.zip"], "a9993e364706816aba3e25717850c26c9cd0d89d");
         assert!(super::list(&state, "inst", ContentKind::Mod).unwrap().is_empty());
         std::fs::remove_dir_all(root).unwrap();
     }
@@ -367,6 +400,15 @@ mod tests {
         super::toggle(&state, "inst", ContentKind::Shader, "Ünï: x.zip").unwrap();
         assert!(on(ContentKind::Shader).is_empty());
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn curseforge_fingerprint_matches_reference() {
+        // Values from the murmurhash2_32_gc reference (Gary Court) with seed 1, run on the same bytes.
+        assert_eq!(super::curseforge_fingerprint(b""), 1540447798);
+        assert_eq!(super::curseforge_fingerprint(b"hello world"), 2824650221);
+        assert_eq!(super::curseforge_fingerprint(b"hello\r\n world \t"), 2824650221, "whitespace is skipped");
+        assert_eq!(super::curseforge_fingerprint(b"abcdefg"), 184182053);
     }
 
     #[test]
