@@ -33,19 +33,20 @@
 .offline-status { min-height: 16px; font-size: 12px; color: var(--subtle); }
 
 .side {
-  min-height: 0; overflow-y: auto; padding: 28px 28px 32px;
+  min-height: 0; overflow-y: auto; padding: 28px 28px 24px;
   background: var(--view); border-left: 1px solid var(--card-border);
-  display: flex; flex-direction: column;
+  display: flex; flex-direction: column; gap: 20px;
 }
-.side h1 { margin: 0 0 20px; font-size: 26px; line-height: 32px; font-weight: 300; letter-spacing: -0.02em; }
+.side h1 { margin: 0; font-size: 26px; line-height: 32px; font-weight: 300; letter-spacing: -0.02em; }
 
 .list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .row { position: relative; }
 .pick {
   width: 100%; display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 16px; text-align: left;
   background: rgb(99 99 102 / 0.1); border: 1px solid var(--card-border); box-shadow: var(--highlight);
-  transition: background var(--quick) var(--butter), border-color var(--quick) var(--butter), padding var(--quick) var(--butter);
+  transition: background var(--quick) var(--butter), border-color var(--quick) var(--butter), padding var(--quick) var(--butter), transform var(--soft) var(--spring);
 }
+.pick:not([aria-pressed="true"]):active { transform: scale(0.98); transition: transform var(--press) var(--butter); }
 /* Room for the delete button only while it shows. */
 .row:has(.remove):is(:hover, :focus-within) .pick { padding-right: 48px; }
 .pick:hover { background: var(--panel); border-color: rgb(255 255 255 / 0.15); }
@@ -61,20 +62,25 @@
 .remove { position: absolute; right: 8px; top: 50%; translate: 0 -50%; opacity: 0; transition: opacity 120ms var(--ease); }
 .row:hover .remove, .row:focus-within .remove { opacity: 1; }
 
-.add { margin-top: 32px; padding-top: 20px; border-top: 1px solid var(--card-border); display: flex; flex-direction: column; gap: 16px; }
-.add-head { display: flex; flex-direction: column; gap: 12px; }
-.form { display: flex; flex-direction: column; gap: 14px; }
-.form > button { align-self: flex-start; }
+/* Pinned to the bottom of the sidebar as its own surface card, leaving the profile list room above. */
+.add {
+  margin-top: auto; padding: 16px; border-radius: var(--r-md);
+  background: var(--window); border: 1px solid var(--card-border); box-shadow: var(--highlight);
+  display: flex; flex-direction: column; gap: 14px;
+}
+.add-head { display: flex; align-items: center; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap; }
+.form { display: flex; flex-direction: column; gap: 12px; }
+.form > button { width: 100%; }
 .form-hint { margin: 0; font-size: 12px; line-height: 17px; color: var(--subtle); }
 .field { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--muted); }
 .field-hint { font-size: 11px; color: var(--subtle); }
 
-.code { display: flex; flex-direction: column; gap: 8px; padding: 16px; border-radius: 16px; background: var(--panel); border: 1px solid var(--card-border); box-shadow: var(--highlight); font-size: 12px; }
+.code { display: flex; flex-direction: column; gap: 8px; padding: 14px; border-radius: var(--r-sm); background: rgb(0 0 0 / 0.2); border: 1px solid var(--card-border); font-size: 12px; }
 .code-row { display: flex; align-items: center; justify-content: space-between; }
 .code-link { align-self: flex-start; padding: 0; font-family: var(--mono); font-size: 11px; }
-.code-row strong { font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: 0.14em; color: var(--fg); }
+.code-row strong { font-size: 22px; line-height: 28px; font-weight: 600; letter-spacing: 0.14em; color: var(--fg); }
 
-.error { margin: 4px 0 0; color: var(--critical); font-size: 12px; }
+.error { margin: 0; color: var(--critical); font-size: 12px; }
 
 @media (max-width: 1000px) {
   .view { grid-template-columns: 1fr; height: auto; }
@@ -82,4 +88,5 @@
   .turntable { margin-top: 0; }
   .identity { position: static; align-self: stretch; margin-top: 16px; }
   .side { border-left: 0; border-top: 1px solid var(--card-border); overflow: visible; }
+  .add { margin-top: 4px; }
 }

@@ -182,7 +182,7 @@ function ProfileRow(p: { account?: Account; name: string; provider: string; sele
   const { name, provider, selected } = p;
   return (
     <li className={s.row}>
-      <button type="button" className={s.pick} aria-pressed={selected} onClick={selected ? undefined : p.onUse}>
+      <button type="button" className={cx(s.pick, "sheen")} aria-pressed={selected} onClick={selected ? undefined : p.onUse}>
         <SkinHead skin={skin} name={name} size={36} />
         <span className={s.rowText}>
           <span className={s.rowName}>{name}</span>
@@ -208,12 +208,14 @@ function AddProfile({ onSignedIn }: { onSignedIn(): Promise<unknown> }) {
     <section className={s.add} aria-labelledby="add-profile">
       <div className={s.addHead}>
         <h2 id="add-profile">Add a profile</h2>
-        <PillGroup label="Sign in with">
-          <Pill pressed={!plugin} onClick={() => setTab("microsoft")}>Microsoft</Pill>
-          {providers.map((p) => (
-            <Pill key={p.id} pressed={plugin?.id === p.id} onClick={() => setTab(p.id)}>{p.name}</Pill>
-          ))}
-        </PillGroup>
+        {providers.length > 0 && (
+          <PillGroup label="Sign in with">
+            <Pill pressed={!plugin} onClick={() => setTab("microsoft")}>Microsoft</Pill>
+            {providers.map((p) => (
+              <Pill key={p.id} pressed={plugin?.id === p.id} onClick={() => setTab(p.id)}>{p.name}</Pill>
+            ))}
+          </PillGroup>
+        )}
       </div>
       {plugin ? <PluginSignIn key={plugin.id} plugin={plugin} onSignedIn={onSignedIn} /> : <MicrosoftSignIn onSignedIn={onSignedIn} />}
     </section>
