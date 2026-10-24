@@ -14,7 +14,7 @@ body {
 input, textarea, .selectable { -webkit-user-select: text; user-select: text; cursor: auto; }
 img, a { -webkit-user-drag: none; }
 ::selection { background: var(--accent-fill); color: #fff; }
-::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-thumb { background: rgb(255 255 255 / 0.12); border-radius: 999px; }
 button, input, select, textarea { font: inherit; color: inherit; caret-color: var(--accent); }
 button { cursor: pointer; border: 0; background: none; }

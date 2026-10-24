@@ -1,5 +1,6 @@
 @layer kit {
-.group { display: flex; gap: 6px; overflow-x: auto; }
+.group { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+.group::-webkit-scrollbar { display: none; }
 .wrap { flex-wrap: wrap; overflow: visible; }
 .pill {
   height: 28px; padding: 0 12px; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0;

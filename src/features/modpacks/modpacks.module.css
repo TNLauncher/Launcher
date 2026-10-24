@@ -6,7 +6,7 @@
   display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 16px;
   background: var(--window); border: 1px solid var(--card-border);
 }
-.packs-filter-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.packs-filter-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; min-width: 0; }
 .packs-search { flex: 1; min-width: 160px; }
 .packs-version { width: 148px; }
 .packs-sort { width: 168px; margin-left: auto; }
@@ -141,7 +141,6 @@ button.mod-cell:hover { background: var(--card-hover); }
 
 @media (max-width: 1100px) {
   .pack-columns { grid-template-columns: minmax(0, 1fr) 264px; gap: 20px; }
-  .packs-filter-row:first-child { flex-wrap: wrap; }
   .packs-sort { margin-left: 0; }
 }
 @media (max-width: 900px) {
