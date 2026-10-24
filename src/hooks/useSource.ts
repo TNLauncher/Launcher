@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useMemo, useRef, useSyncExternalStore } from "react";
+import { useCallback, useMemo, useRef } from "react";
+import { create } from "zustand";
 import { sources, type Hit, type ProjectKind, type SourceInfo } from "@/api/sources";
 
 export const usePlugins = () => useQuery({ queryKey: ["plugins"], queryFn: sources.listPlugins, staleTime: Infinity });
@@ -7,7 +8,6 @@ export const usePlugins = () => useQuery({ queryKey: ["plugins"], queryFn: sourc
 const CHOICE_KEY = "source";
 /** Used until the user picks one; any other enabled source otherwise. */
 const DEFAULT_SOURCE = "modrinth";
-const listeners = new Set<() => void>();
 
 function readChoice(): string {
   try {
@@ -17,6 +17,8 @@ function readChoice(): string {
   }
 }
 
+const useSourceStore = create<{ chosen: string }>(() => ({ chosen: readChoice() }));
+
 /** Makes `id` the source catalogs browse, remembered across starts. */
 export function chooseSource(id: string) {
   try {
@@ -24,7 +26,7 @@ export function chooseSource(id: string) {
   } catch {
     /* storage unavailable: the choice lasts this session only */
   }
-  listeners.forEach((f) => f());
+  useSourceStore.setState({ chosen: id });
 }
 
 /** Enabled content sources. */
@@ -35,7 +37,7 @@ export function useSources(): SourceInfo[] {
 /** The content source catalogs browse; null while loading or when every source is turned off. */
 export function useSource(): SourceInfo | null {
   const list = useSources();
-  const chosen = useSyncExternalStore((f) => (listeners.add(f), () => listeners.delete(f)), readChoice);
+  const chosen = useSourceStore((s) => s.chosen);
   return list.find((s) => s.id === chosen) ?? list.find((s) => s.id === DEFAULT_SOURCE) ?? list[0] ?? null;
 }
 

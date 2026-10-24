@@ -3,7 +3,7 @@
 // frame a message came from, never by what the message says. Protocol: src-tauri/src/plugins/sdk.js.
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { useSyncExternalStore } from "react";
+import { create } from "zustand";
 import { call } from "@/api/ipc";
 
 /** A `plugin-call` event from Rust: run `method(...args)` in the plugin's background frame. */
@@ -40,20 +40,16 @@ const inFlight = new Map<number, string>();
 /** Frames whose plugin finished `activate`; kept on the window so a remount (StrictMode) stays ready. */
 const readyFrames = new WeakSet<Window>();
 
-let failures: Record<string, string> = {};
-const subscribers = new Set<() => void>();
+const useFailuresStore = create<{ failures: Record<string, string> }>(() => ({ failures: {} }));
 function setFailure(plugin: string, error: string | null) {
-  const { [plugin]: _, ...rest } = failures;
-  failures = error ? { ...rest, [plugin]: error } : rest;
-  subscribers.forEach((f) => f());
+  useFailuresStore.setState((s) => {
+    const { [plugin]: _, ...rest } = s.failures;
+    return { failures: error ? { ...rest, [plugin]: error } : rest };
+  });
 }
 
 /** Plugins whose `activate` threw, by id. */
-export const usePluginFailures = () =>
-  useSyncExternalStore(
-    (f) => (subscribers.add(f), () => subscribers.delete(f)),
-    () => failures
-  );
+export const usePluginFailures = () => useFailuresStore((s) => s.failures);
 
 /** The `plugin` scheme root for this platform (`plugin://localhost/`, `http://plugin.localhost/` on Windows). */
 export const pluginBase = convertFileSrc("", "plugin");
