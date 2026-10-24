@@ -13,8 +13,11 @@ pub fn get(state: &AppState, id: &str) -> Result<Instance> {
     list(state).into_iter().find(|i| i.id == id).ok_or_else(|| AppError::NotFound("Instance not found".into()))
 }
 
-pub async fn create(state: &AppState, name: &str, version: &str, loader: Loader) -> Result<Instance> {
-    let loader_version = loader::latest(&state.http, version, loader).await?;
+pub async fn create(state: &AppState, name: &str, version: &str, loader: Loader, loader_version: Option<String>) -> Result<Instance> {
+    let loader_version = match loader_version.filter(|v| !v.is_empty() && loader != Loader::Vanilla) {
+        Some(v) => v,
+        None => loader::latest(&state.http, version, loader).await?,
+    };
     let instance = new(name, version, loader, loader_version);
     add(state, &instance)?;
     Ok(instance)

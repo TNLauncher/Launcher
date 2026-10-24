@@ -8,14 +8,21 @@ use tauri::{ipc::Channel, AppHandle, State};
 use tauri_plugin_opener::OpenerExt;
 
 #[tauri::command]
-pub async fn create_instance(state: State<'_, AppState>, name: String, version: String, loader: Loader) -> Result<Instance> {
-    instances::create(&state, &name, &version, loader).await
+/// `loader_version: None` = the loader's newest stable build.
+pub async fn create_instance(state: State<'_, AppState>, name: String, version: String, loader: Loader, loader_version: Option<String>) -> Result<Instance> {
+    instances::create(&state, &name, &version, loader, loader_version).await
 }
 
-/// The loader version a new instance would get; fails with `unsupported` when the loader skips that game version.
+/// Game versions the loader runs; `None` = all of them (vanilla).
 #[tauri::command]
-pub async fn loader_version(state: State<'_, AppState>, version: String, loader: Loader) -> Result<String> {
-    loader::latest(&state.http, &version, loader).await
+pub async fn loader_games(state: State<'_, AppState>, loader: Loader) -> Result<Option<Vec<String>>> {
+    loader::games(&state.http, loader).await
+}
+
+/// Loader builds for a game version, newest first.
+#[tauri::command]
+pub async fn loader_builds(state: State<'_, AppState>, version: String, loader: Loader) -> Result<Vec<loader::Build>> {
+    loader::builds(&state.http, &version, loader).await
 }
 
 /// Creates an instance from a modpack project; `version` is a version id, `None` = newest.
