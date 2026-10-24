@@ -1,54 +1,90 @@
 # TNLauncher
 
-Minecraft launcher: Tauri 2 + React 19 + Vite. Vanilla, Fabric, Quilt, Forge, NeoForge and LiteLoader instances,
-Java runtimes downloaded from Mojang. Only official Microsoft accounts owning a licensed copy of Minecraft: Java Edition are supported.
+A fast, lightweight desktop launcher for **Minecraft: Java Edition**, built with **Tauri 2** (Rust) and **React 19** (TypeScript).
+
+---
+
+## Features
+
+- **Official Microsoft Authentication** — Sign in securely with your Microsoft account via OAuth 2.0 Device Code flow. Requires a valid, licensed copy of *Minecraft: Java Edition*.
+- **Isolated Instances** — Create and manage separate game instances with per-instance memory, Java runtime, window size, environment variables, and wrapper commands.
+- **Mod Loaders** — First-class support for **Vanilla**, **Fabric**, **Quilt**, **Forge**, **NeoForge**, and **LiteLoader**.
+- **Automatic Java Runtimes** — Automatically downloads and verifies the official Mojang Java runtime required by each Minecraft version, or lets you specify a custom Java installation.
+- **Content & Modpack Management** — Manage mods, resource packs, shaders, screenshots, and live game logs per instance.
+- **Sandboxed Plugin System** — Extensible through isolated iframe plugins with strict Content Security Policy (CSP) and manifest-declared host/download permissions.
+
+---
+
+## Authentication & Security
+
+TNLauncher **only supports official Microsoft accounts** with an active *Minecraft: Java Edition* license:
+
+1. **OAuth 2.0 Device Code Flow** (`login.microsoftonline.com`) — Users authenticate directly in their system browser on Microsoft's official sign-in page. TNLauncher never sees or collects user passwords.
+2. **Xbox Live & XSTS Token Exchange** (`user.auth.xboxlive.com`, `xsts.auth.xboxlive.com`) — Exchanges the Microsoft token for an Xbox Live token and XSTS authorization ticket.
+3. **Minecraft Services Login & Ownership Verification** (`api.minecraftservices.com`) — Authenticates with Minecraft Services and verifies game ownership against `/minecraft/profile` before allowing any profile to be added or launched.
+
+Unauthenticated or offline launches are not supported.
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+- [Node.js](https://nodejs.org/) 20+
+- [Rust](https://rustup.rs/) (stable)
+- Platform dependencies for [Tauri 2](https://v2.tauri.app/start/prerequisites/)
+
+### Development & Build
 
 ```sh
+# Install frontend dependencies
 npm install
-npm run tauri dev      # app with hot reload
-npm run tauri build    # release bundle
-cd src-tauri && cargo test                                   # unit tests
-cd src-tauri && cargo test --test launch_e2e -- --ignored    # real install + launch (~800 MB)
+
+# Run in development mode with hot reload
+npm run tauri dev
+
+# Build production installer / bundle
+npm run tauri build
+
+# Run typechecks and backend unit tests
+npm run typecheck
+cd src-tauri && cargo test
 ```
 
-## Configuration
+### Configuration
 
-`.env` in the project root feeds both sides, Vite-style: `.env` < `.env.local` < `.env.<mode>` <
-`.env.<mode>.local` < shell. Mode is `development` for `tauri dev`, `production` for `tauri build`.
-`VITE_*` reach the frontend (`import.meta.env`), `TN_*` are baked into the Rust binary (`src-tauri/src/config.rs`).
-Put personal values in `*.local` files, they are git-ignored.
+Environment variables are read from `.env` files in the project root (`.env` < `.env.local` < `.env.<mode>` < `.env.<mode>.local`):
 
-| Variable | |
+| Variable | Description |
 |---|---|
-| `TN_MS_CLIENT_ID` | Azure app id for Microsoft sign-in |
+| `TN_MS_CLIENT_ID` | Microsoft Entra (Azure) Application Client ID for OAuth 2.0 Device Code sign-in |
 
-## Layout
+---
 
-```
-src/                         React frontend
-  api/                       the only place that talks to Tauri or remote APIs
-    ipc.ts                   invoke wrapper, turns backend errors into BackendError
-    launcher.ts              typed wrappers for every Rust command
-    mojang.ts, modrinth.ts   remote JSON (fetched through Rust)
-  store/                     React context: backend snapshot (LauncherContext), navigation (UiContext)
-  components/ui, layout      shared building blocks and the app shell
-  features/<screen>/         one folder per screen: components + its CSS
-  styles/                    tokens and global CSS (Fabric Graphite design system)
-  types/                     mirrors of the Rust models
+## Architecture
 
-src-tauri/src/               Rust backend (crate tnlauncher_lib)
-  lib.rs                     builder: plugins, managed state, command registry
-  commands/                  #[tauri::command] adapters, one file per feature
-  services/                  use cases: instances, mods, launcher (install → spawn → watch)
-  minecraft/                 protocol code, no Tauri types: version/loader metadata, java, install, command
-  storage.rs                 JSON persistence (atomic writes)
-  models/, state.rs, error.rs
-src-tauri/tests/             integration tests against the public crate API
+```text
+src/                         React 19 + TypeScript frontend
+  api/                       Typed IPC wrappers for Tauri commands
+  store/                     Zustand stores: backend state snapshot & UI navigation
+  components/ui, layout      Design system components and application shell
+  features/<screen>/         Feature views: Home, Profiles, Instances, Modpacks, Mods, Console, Settings
+  plugins/                   Sandboxed iframe plugin host and postMessage bridge
+  types/                     TypeScript mirrors of Rust domain models
+
+src-tauri/src/               Rust backend (Tauri 2)
+  commands/                  Thin #[tauri::command] IPC handlers
+  services/                  Application use cases (accounts, instances, launcher, mods, modpacks, skins)
+  minecraft/                 Mojang & mod loader metadata, OAuth2/XSTS auth, asset/library installer, JVM builder
+  plugins/                   Plugin manifest validator, CSP host serving, and RPC bridge
+  storage.rs                 Atomic JSON persistence
 ```
 
-Dependencies only point downward: `commands → services → minecraft / storage → models`.
-A new feature usually means one file in `services/`, one in `commands/`, its line in `lib.rs`,
-a wrapper in `src/api/launcher.ts` and a folder in `src/features/`.
+---
 
-Errors cross IPC as `{ kind, message }` (`error.rs`). Launch progress streams over a
-`tauri::ipc::Channel`; the game exiting is a global `game-exit` event.
+## Disclaimer
+
+> **NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.**
+>
+> Minecraft is a trademark of Mojang Synergies AB. All Mojang and Microsoft assets, APIs, and trademarks remain the property of their respective owners.
