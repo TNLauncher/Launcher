@@ -5,8 +5,9 @@
 .label { font-size: 12px; color: var(--muted); }
 .label-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 20px; }
 .field { display: flex; flex-direction: column; gap: 6px; }
-/* Settles at the bottom of the loader list, so the picks sit level with where the list ends. */
-.side { display: flex; flex-direction: column; justify-content: flex-end; gap: 18px; padding-bottom: 4px; }
+/* Name level with the top of the loader list, versions level with its bottom. */
+.side { display: flex; flex-direction: column; justify-content: space-between; gap: 18px; padding: 5px 0 4px; }
+.versions { display: flex; flex-direction: column; gap: 18px; }
 
 .loaders { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 4px; border: 1px solid var(--card-border); border-radius: var(--r-md); background: rgb(0 0 0 / 0.14); }
 .loaders legend { float: left; width: 100%; padding: 2px 8px 6px; }

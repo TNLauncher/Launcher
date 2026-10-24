@@ -95,13 +95,6 @@ export function NewInstanceDialog() {
         </>
       }
     >
-      <label className={s.field}>
-        <span className={s.labelRow}>
-          <span className={s.label}>Name</span>
-          <span className={s.optional}>Optional</span>
-        </span>
-        <Input placeholder={fallbackName || "My world"} maxLength={48} value={name} onChange={(e) => setName(e.target.value)} />
-      </label>
       <div className={s.body}>
         <fieldset className={s.loaders}>
           <legend className={s.label}>Mod loader</legend>
@@ -118,36 +111,46 @@ export function NewInstanceDialog() {
         </fieldset>
 
         <div className={s.side}>
-          <div className={s.field}>
-            <div className={s.labelRow}>
-              <span className={s.label}>Minecraft version</span>
-              <label className={s.snap}>
-                Snapshots
-                <Switch checked={snapshots} onChange={setSnapshots} label="Show snapshots" />
-              </label>
+          <label className={s.field}>
+            <span className={s.labelRow}>
+              <span className={s.label}>Name</span>
+              <span className={s.optional}>Optional</span>
+            </span>
+            <Input placeholder={fallbackName || "My world"} maxLength={48} value={name} onChange={(e) => setName(e.target.value)} />
+          </label>
+
+          <div className={s.versions}>
+            <div className={s.field}>
+              <div className={s.labelRow}>
+                <span className={s.label}>Minecraft version</span>
+                <label className={s.snap}>
+                  Snapshots
+                  <Switch checked={snapshots} onChange={setSnapshots} label="Show snapshots" />
+                </label>
+              </div>
+              <Select label="Minecraft version" value={chosen} onChange={setVersion}
+                placeholder={versionsLoading ? "Loading versions…" : modded ? `No versions with ${loaderName}` : "No versions"}
+                options={shown.map((v) => ({ value: v.id, label: v.id, hint: v.type === "snapshot" ? "snapshot" : undefined }))} />
+              {!modded ? (
+                <p className={s.status}><Icon name="deployed_code" />Plain Minecraft, as Mojang ships it</p>
+              ) : (
+                games.isSuccess && <p className={s.status}><Icon name="filter_alt" />Only versions {loaderName} supports</p>
+              )}
             </div>
-            <Select label="Minecraft version" value={chosen} onChange={setVersion}
-              placeholder={versionsLoading ? "Loading versions…" : modded ? `No versions with ${loaderName}` : "No versions"}
-              options={shown.map((v) => ({ value: v.id, label: v.id, hint: v.type === "snapshot" ? "snapshot" : undefined }))} />
-            {!modded ? (
-              <p className={s.status}><Icon name="deployed_code" />Plain Minecraft, as Mojang ships it</p>
-            ) : (
-              games.isSuccess && <p className={s.status}><Icon name="filter_alt" />Only versions {loaderName} supports</p>
+
+            {modded && (
+              <div className={s.field}>
+                <span className={s.label}>{loaderName} version</span>
+                <Select label={`${loaderName} version`} value={chosenBuild} onChange={setBuild}
+                  placeholder={!chosen ? "Pick a Minecraft version" : builds.isPending ? "Loading builds…" : `No ${loaderName} builds`}
+                  options={(builds.data ?? []).map((b) => ({
+                    value: b.version,
+                    label: b.version,
+                    hint: b.version === recommended ? "recommended" : PRERELEASE.test(b.version) ? "beta" : undefined,
+                  }))} />
+              </div>
             )}
           </div>
-
-          {modded && (
-            <div className={s.field}>
-              <span className={s.label}>{loaderName} version</span>
-              <Select label={`${loaderName} version`} value={chosenBuild} onChange={setBuild}
-                placeholder={!chosen ? "Pick a Minecraft version" : builds.isPending ? "Loading builds…" : `No ${loaderName} builds`}
-                options={(builds.data ?? []).map((b) => ({
-                  value: b.version,
-                  label: b.version,
-                  hint: b.version === recommended ? "recommended" : PRERELEASE.test(b.version) ? "beta" : undefined,
-                }))} />
-            </div>
-          )}
         </div>
       </div>
       {games.isError && <Banner message={`Could not load ${loaderName} versions: ${errorMessage(games.error)}`} onRetry={() => games.refetch()} />}
