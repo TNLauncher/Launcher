@@ -24,25 +24,6 @@ use tauri::{Emitter, Manager};
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        // `instance://localhost/<what>/<instance id>/<file>`: `modicon` -> the icon packed inside that
-        // mod jar, `screenshot` -> that screenshot.
-        .register_asynchronous_uri_scheme_protocol("instance", |ctx, req, responder| {
-            let app = ctx.app_handle().clone();
-            tauri::async_runtime::spawn_blocking(move || {
-                let path = percent_encoding::percent_decode_str(req.uri().path()).decode_utf8_lossy().into_owned();
-                let state = app.state::<state::AppState>();
-                let found = match path.trim_start_matches('/').splitn(3, '/').collect::<Vec<_>>()[..] {
-                    ["modicon", id, file] => services::mods::icon(&state, id, file).ok(),
-                    ["screenshot", id, file] => services::screenshots::read(&state, id, file).ok().map(|b| (b, "image/png")),
-                    _ => None,
-                };
-                let res = match found {
-                    Some((bytes, mime)) => tauri::http::Response::builder().header("Content-Type", mime).body(bytes),
-                    None => tauri::http::Response::builder().status(404).body(Vec::new()),
-                };
-                responder.respond(res.expect("static response parts"));
-            });
-        })
         // `plugin://localhost/<id>/<file>`: a plugin's files, with the SDK and a CSP built from its manifest.
         .register_asynchronous_uri_scheme_protocol("plugin", |ctx, req, responder| {
             let app = ctx.app_handle().clone();
@@ -101,6 +82,8 @@ pub fn run() {
             commands::instances::open_instance_dir,
             commands::instances::list_screenshots,
             commands::instances::delete_screenshot,
+            commands::instances::screenshot_bytes,
+            commands::instances::mod_icon,
             commands::game::launch,
             commands::game::stop_game,
             commands::game::read_game_log,

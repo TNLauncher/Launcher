@@ -4,7 +4,7 @@ use crate::models::{Instance, InstanceSettings, Loader, Screenshot};
 use crate::services::modpacks::{self, ImportProgress};
 use crate::services::{instances, mods, screenshots};
 use crate::state::AppState;
-use tauri::{ipc::Channel, AppHandle, State};
+use tauri::{ipc::{Channel, Response}, AppHandle, State};
 use tauri_plugin_opener::OpenerExt;
 
 #[tauri::command]
@@ -87,4 +87,16 @@ pub fn list_screenshots(state: State<'_, AppState>, id: String) -> Result<Vec<Sc
 #[tauri::command]
 pub fn delete_screenshot(state: State<'_, AppState>, id: String, file: String) -> Result<()> {
     screenshots::delete(&state, &id, &file)
+}
+
+/// Raw PNG bytes. Images go through IPC: WebKitGTK won't display custom-scheme URLs on the dev server's http origin.
+#[tauri::command]
+pub fn screenshot_bytes(state: State<'_, AppState>, id: String, file: String) -> Result<Response> {
+    Ok(Response::new(screenshots::read(&state, &id, &file)?))
+}
+
+/// The icon packed inside a mod jar; errors when the mod has none.
+#[tauri::command]
+pub fn mod_icon(state: State<'_, AppState>, id: String, file: String) -> Result<Response> {
+    Ok(Response::new(mods::icon(&state, &id, &file)?.0))
 }
