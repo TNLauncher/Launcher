@@ -51,7 +51,9 @@ export interface PluginSetting {
   key: string;
   label: string;
   hint: string;
-  type: "text" | "secret" | "toggle";
+  type: "text" | "secret" | "toggle" | "select";
+  default?: string | boolean;
+  options?: Choice[];
 }
 
 export interface SearchQuery {
@@ -151,6 +153,8 @@ export const primaryFile = (v: Pick<Version, "files">) => v.files.find((f) => f.
 
 export const sources = {
   listPlugins: () => call<PluginEntry[]>("list_plugins"),
+  reloadPlugins: () => call<PluginEntry[]>("reload_plugins"),
+  removePlugin: (id: string) => call<PluginEntry[]>("remove_plugin", { id }),
   setPluginEnabled: (id: string, enabled: boolean) => call<void>("set_plugin_enabled", { id, enabled }),
   /** Values of a plugin's declared settings. */
   settings: (id: string) => call<Record<string, string | boolean>>("plugin_settings", { id }),

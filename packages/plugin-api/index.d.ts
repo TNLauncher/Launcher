@@ -42,7 +42,16 @@ export interface Manifest {
     /** Makes the plugin an account provider: these fields make up its sign-in form. `activate` must call `tn.accounts.register`. */
     account?: { fields: { key: string; label: string; hint?: string; type: "text" | "secret" }[] };
     /** Options the user fills in Settings; read them with `tn.settings.get()`. */
-    settings?: { /** `[A-Za-z0-9_-]`. */ key: string; label: string; hint?: string; type: "text" | "secret" | "toggle" }[];
+    settings?: {
+      /** `[A-Za-z0-9_-]`. */
+      key: string;
+      label: string;
+      hint?: string;
+      type: "text" | "secret" | "toggle" | "select";
+      default?: string | boolean;
+      /** Required when `type` is `select`. */
+      options?: Choice[];
+    }[];
   };
   permissions?: {
     /** Hosts `tn.net.fetch` may reach and pages may show images from; `*.example.com` allowed. HTTPS only. */
@@ -90,8 +99,14 @@ export interface GameEvents {
   /** Play was pressed; downloads may follow. */
   "game-launching": { instanceId: string };
   "game-started": { instanceId: string };
+  /** One line of game stdout/stderr (`err` = stderr). Needs `permissions.instances`. */
+  "game-log": { instanceId: string; line: string; err: boolean };
   /** The game stopped, or failed to start (`code` null). */
   "game-exited": { instanceId: string; code: number | null };
+  /** Fired in every frame of this plugin when `tn.storage.set` writes or removes a key. */
+  "storage-changed": { key: string; value: unknown };
+  /** Fired in every frame of this plugin when the user changes a setting in Settings. */
+  "settings-changed": { key: string; value: string | boolean };
 }
 
 /** What Discord shows (`tn.presence.set`); each line 2–128 characters. */
@@ -280,8 +295,12 @@ export interface FetchResponse {
   status: number;
   ok: boolean;
   contentType: string;
+  /** Response headers with lowercase names. */
+  headers: Record<string, string>;
   text(): string;
   json<T = unknown>(): T;
+  bytes(): Uint8Array;
+  arrayBuffer(): ArrayBuffer;
 }
 
 export interface TN {
@@ -294,12 +313,22 @@ export interface TN {
     /** `null`/`undefined` removes the key. */
     set(key: string, value: unknown): Promise<void>;
   };
-  /** Values of `contributes.settings`, defaulted ("" / false). */
+  /** Values of `contributes.settings`, defaulted (`default` or "" / false). */
   settings: { get(): Promise<Record<string, string | boolean>> };
   /** Needs `permissions.instances`. */
-  instances: { list(): Promise<Instance[]>; get(id: string): Promise<Instance> };
-  /** Needs `permissions.instances`. Returns a function that stops listening. */
-  events: { on<K extends keyof GameEvents>(name: K, cb: (payload: GameEvents[K]) => void): () => void };
+  instances: {
+    list(): Promise<Instance[]>;
+    get(id: string): Promise<Instance>;
+    /** Tail of the instance's last `launcher.log`; "" if never launched. */
+    readLog(id: string): Promise<string>;
+  };
+  /** Needs `permissions.instances` for game events. Returns a function that stops listening. */
+  events: {
+    on<K extends keyof GameEvents>(name: K, cb: (payload: GameEvents[K]) => void): () => void;
+    on<T = unknown>(name: string, cb: (payload: T) => void): () => void;
+    /** Sends a custom event to every frame (`main` and open pages) of this plugin. */
+    emit(name: string, payload?: unknown): void;
+  };
   /** Needs `permissions.presence`. Last call wins among plugins. */
   presence: { set(p: Presence): Promise<void>; clear(): Promise<void> };
   /** Opens an http(s) page in the system browser. */

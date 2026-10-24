@@ -1,6 +1,7 @@
 // Game output per instance, outside React state: thousands of lines per second must not re-render the app.
 import { useSyncExternalStore } from "react";
 import { launcher } from "@/api/launcher";
+import { broadcast } from "@/plugins/bridge";
 
 export type Level = "debug" | "info" | "warn" | "error";
 
@@ -69,6 +70,7 @@ export const gameLogs = {
   /** Starts collecting output; call once, the result unsubscribes. */
   listen: () =>
     launcher.onGameLog(({ id, line, err }) => {
+      broadcast("game-log", { instanceId: id, line, err });
       const s = session(id);
       push(s, line, err);
       changed(s);

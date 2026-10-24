@@ -40,16 +40,19 @@ const inFlight = new Map<number, string>();
 /** Frames whose plugin finished `activate`; kept on the window so a remount (StrictMode) stays ready. */
 const readyFrames = new WeakSet<Window>();
 
-const useFailuresStore = create<{ failures: Record<string, string> }>(() => ({ failures: {} }));
+const usePluginStore = create<{ failures: Record<string, string>; revision: number }>(() => ({ failures: {}, revision: 0 }));
 function setFailure(plugin: string, error: string | null) {
-  useFailuresStore.setState((s) => {
+  usePluginStore.setState((s) => {
     const { [plugin]: _, ...rest } = s.failures;
     return { failures: error ? { ...rest, [plugin]: error } : rest };
   });
 }
 
 /** Plugins whose `activate` threw, by id. */
-export const usePluginFailures = () => useFailuresStore((s) => s.failures);
+export const usePluginFailures = () => usePluginStore((s) => s.failures);
+/** Bumped on `reloadPlugins` so every mounted plugin frame remounts with fresh files from disk. */
+export const usePluginRevision = () => usePluginStore((s) => s.revision);
+export const bumpPluginRevision = () => usePluginStore.setState((s) => ({ failures: {}, revision: s.revision + 1 }));
 
 /** The `plugin` scheme root for this platform (`plugin://localhost/`, `http://plugin.localhost/` on Windows). */
 export const pluginBase = convertFileSrc("", "plugin");
@@ -101,8 +104,13 @@ export function attachFrame(win: Window, plugin: string, background: boolean, in
 }
 
 /** Sends an event to every frame of plugins allowed to see instances (`tn.events.on`). */
-export function broadcast(name: "game-launching" | "game-started" | "game-exited", payload: object) {
+export function broadcast(name: "game-launching" | "game-started" | "game-log" | "game-exited", payload: object) {
   for (const [win, f] of frames) if (f.instances) post(win, { type: "event", name, payload });
+}
+
+/** Sends an event to every frame (`main` and open pages) of one plugin. */
+export function emitToPlugin(plugin: string, name: string, payload: unknown) {
+  for (const [win, f] of frames) if (f.plugin === plugin) post(win, { type: "event", name, payload });
 }
 
 window.addEventListener("message", (e) => {
@@ -129,12 +137,26 @@ window.addEventListener("message", (e) => {
       if (!bg || inFlight.get(m.callId) !== frame.plugin) return;
       void reply(m.callId, !!m.ok, m.ok ? m.value : String(m.error));
       break;
-    case "request":
-      call<unknown>("plugin_request", { plugin: frame.plugin, method: String(m.method), params: m.params ?? null }).then(
-        (value) => post(win, { type: "response", id: m.id, ok: true, value }),
+    case "emit":
+      emitToPlugin(frame.plugin, String(m.name), m.payload ?? null);
+      break;
+    case "request": {
+      const method = String(m.method);
+      const params = m.params ?? null;
+      call<unknown>("plugin_request", { plugin: frame.plugin, method, params }).then(
+        (value) => {
+          post(win, { type: "response", id: m.id, ok: true, value });
+          if (method === "storage.set" && params && typeof params === "object" && "key" in params) {
+            emitToPlugin(frame.plugin, "storage-changed", {
+              key: (params as { key: unknown }).key,
+              value: (params as { value?: unknown }).value ?? null,
+            });
+          }
+        },
         (err) => post(win, { type: "response", id: m.id, ok: false, error: errorText(err) })
       );
       break;
+    }
   }
 });
 
