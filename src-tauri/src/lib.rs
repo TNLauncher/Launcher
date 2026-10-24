@@ -88,6 +88,7 @@ pub fn run() {
             commands::account::remove_account,
             commands::account::microsoft_login,
             commands::account::plugin_login,
+            commands::account::account_skin,
             commands::instances::create_instance,
             commands::instances::import_modpack,
             commands::instances::rename_instance,

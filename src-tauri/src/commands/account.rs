@@ -1,6 +1,7 @@
 use crate::error::Result;
 use crate::minecraft::auth::DeviceCode;
 use crate::services::account::{self, AccountView};
+use crate::services::skins::{self, SkinView};
 use crate::state::AppState;
 use serde_json::Value;
 use tauri::{ipc::Channel, AppHandle, State};
@@ -36,4 +37,10 @@ pub async fn microsoft_login(app: AppHandle, state: State<'_, AppState>, on_code
 #[tauri::command]
 pub async fn plugin_login(state: State<'_, AppState>, plugin: String, fields: Value) -> Result<String> {
     account::login_plugin(&state, &plugin, fields).await
+}
+
+/// The account's skin as a data URL; None when it has none.
+#[tauri::command]
+pub async fn account_skin(state: State<'_, AppState>, id: String) -> Result<Option<SkinView>> {
+    skins::skin(&state, &id).await
 }

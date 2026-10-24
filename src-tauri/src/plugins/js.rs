@@ -166,6 +166,15 @@ pub struct JavaAgent {
     pub options: String,
 }
 
+/// A skin texture: what `skin` returns, and what the UI renders.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct Skin {
+    pub url: String,
+    /// Alex model: 3px arms.
+    #[serde(default)]
+    pub slim: bool,
+}
+
 impl JsAccount {
     async fn call<O: DeserializeOwned>(&self, method: &'static str, args: Vec<Value>) -> Result<O> {
         let v = self.bridge.call(&self.plugin, "account", method, args).await?;
@@ -180,6 +189,11 @@ impl JsAccount {
     /// `account` is `{ name, uuid, data }` as stored.
     pub async fn session(&self, account: Value) -> Result<PluginSession> {
         self.call("session", vec![account]).await
+    }
+
+    /// Optional: the account's skin, or null.
+    pub async fn skin(&self, account: Value) -> Result<Option<Skin>> {
+        self.call("skin", vec![account]).await
     }
 }
 

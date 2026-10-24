@@ -75,6 +75,10 @@ impl Paths {
     pub fn favorites_file(&self) -> PathBuf {
         self.root.join("favorites.json")
     }
+    /// Skin textures by URL hash, and each account's last known skin.
+    pub fn skins_dir(&self) -> PathBuf {
+        self.root.join("cache").join("skins")
+    }
     pub fn instances_file(&self) -> PathBuf {
         self.root.join("instances.json")
     }

@@ -13,7 +13,7 @@
     }
   },
   "permissions": {
-    "hosts": ["authserver.ely.by", "authlib-injector.yushi.moe"],
+    "hosts": ["authserver.ely.by", "skinsystem.ely.by", "ely.by", "authlib-injector.yushi.moe"],
     "downloads": ["https://authlib-injector.yushi.moe/"],
     "jvm": true
   }

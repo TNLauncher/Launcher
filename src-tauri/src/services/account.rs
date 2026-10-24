@@ -45,6 +45,7 @@ pub struct AccountView {
     /// "Microsoft" or the plugin's name.
     pub provider_name: String,
     pub name: String,
+    pub uuid: String,
     pub selected: bool,
 }
 
@@ -92,9 +93,15 @@ pub fn list(state: &AppState) -> Vec<AccountView> {
             provider: a.provider.clone(),
             provider_name: provider_name(state, &a.provider),
             name: a.name.clone(),
+            uuid: a.uuid.clone(),
             selected: all.selected.as_deref() == Some(&a.id),
         })
         .collect()
+}
+
+/// A stored account, tokens included; stays in Rust.
+pub(crate) fn find(state: &AppState, id: &str) -> Result<Account> {
+    load(state).accounts.into_iter().find(|a| a.id == id).ok_or_else(|| AppError::NotFound("Account not found".into()))
 }
 
 /// The account the next launch uses; `None` = offline.

@@ -5,6 +5,7 @@
 
 const AUTH = "https://authserver.ely.by/auth";
 const AUTHLIB_API = "https://authserver.ely.by/api/authlib-injector";
+const SKINS = "https://skinsystem.ely.by/textures";
 const AUTHLIB_LATEST = "https://authlib-injector.yushi.moe/artifact/latest.json";
 
 /** @param {TN} tn */
@@ -51,6 +52,13 @@ export function activate(tn) {
         }
       }
       return { name, uuid: account.uuid, token: accessToken, userType: "mojang", data: { accessToken, clientToken }, javaAgent: await agent() };
+    },
+
+    async skin(account) {
+      // 204 = no skin set.
+      const res = await tn.net.fetch(`${SKINS}/${encodeURIComponent(account.name)}`);
+      const skin = res.ok && res.status !== 204 ? /** @type {any} */ (res.json()).SKIN : null;
+      return skin?.url ? { url: skin.url, slim: skin.metadata?.model === "slim" } : null;
     },
   });
 }

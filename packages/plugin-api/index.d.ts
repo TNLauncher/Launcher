@@ -266,6 +266,8 @@ export interface AccountProvider {
   login(fields: Record<string, string>): Promise<{ name: string; uuid: string; data?: unknown }>;
   /** Before each launch: validate or refresh, then say how to start the game. */
   session(account: StoredAccount): Promise<AccountSession>;
+  /** Optional: the skin shown in Profiles; `slim` = Alex model. The launcher fetches `url` itself, so its host must be in `permissions.hosts`. */
+  skin?(account: StoredAccount): Promise<{ url: string; slim?: boolean } | null>;
 }
 
 export interface FetchInit {

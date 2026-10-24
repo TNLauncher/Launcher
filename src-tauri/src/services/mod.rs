@@ -7,6 +7,7 @@ pub mod launcher;
 pub mod modpacks;
 pub mod mods;
 pub mod screenshots;
+pub mod skins;
 
 /// Unix time in seconds.
 pub fn now() -> u64 {
