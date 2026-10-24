@@ -65,7 +65,10 @@ fn plan_libraries(root: &Path, version: &Value) -> Result<LibraryPlan> {
 
         if let Some(art) = lib["downloads"].get("artifact") {
             let path = libs.join(art["path"].as_str().map(String::from).unwrap_or_else(|| maven_path(name)));
-            plan.jobs.push(Job { url: art["url"].as_str().unwrap_or_default().into(), path: path.clone(), size: art["size"].as_u64() });
+            // No url = the loader installer already generated the file.
+            if let Some(url) = art["url"].as_str().filter(|u| !u.is_empty()) {
+                plan.jobs.push(Job { url: url.into(), path: path.clone(), size: art["size"].as_u64() });
+            }
             plan.classpath.push(path);
         } else if lib.get("downloads").is_none() {
             // Fabric/Quilt style: maven coordinates + repository url.

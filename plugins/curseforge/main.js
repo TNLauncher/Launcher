@@ -13,12 +13,12 @@ const MINECRAFT = 432;
 export const CLASS = /** @type {const} */ ({ mod: 6, resourcepack: 12, shader: 6552, modpack: 4471 });
 /** Instance folder per class; anything else lands in mods/. */
 const FOLDER = /** @type {Record<number, string>} */ ({ 6: "mods", 12: "resourcepacks", 6552: "shaderpacks" });
-const LOADER_TYPE = /** @type {Record<string, number>} */ ({ forge: 1, fabric: 4, quilt: 5, neoforge: 6 });
-const LOADER_NAME = /** @type {Record<number, string>} */ ({ 1: "forge", 4: "fabric", 5: "quilt", 6: "neoforge" });
+const LOADER_TYPE = /** @type {Record<string, number>} */ ({ forge: 1, liteloader: 3, fabric: 4, quilt: 5, neoforge: 6 });
+const LOADER_NAME = /** @type {Record<number, string>} */ ({ 1: "forge", 3: "liteloader", 4: "fabric", 5: "quilt", 6: "neoforge" });
 const CHANNEL = /** @type {const} */ ({ 1: "release", 2: "beta", 3: "alpha" });
 const RELATION = /** @type {const} */ ({ 1: "embedded", 2: "optional", 3: "required", 5: "incompatible" });
 /** Loaders the launcher can run modpacks on. */
-const PACK_LOADERS = ["fabric", "quilt"];
+const PACK_LOADERS = ["fabric", "quilt", "forge", "neoforge"];
 /** Search can't page past this (index + pageSize <= 10,000). */
 const MAX_RESULTS = 10000;
 const NAME_SORT = "4";
@@ -39,7 +39,6 @@ export function searchParams(q) {
     pageSize: String(Math.min(q.limit, 50)),
   };
   if (q.gameVersion) p.gameVersion = q.gameVersion;
-  // ponytail: modpacks without a loader filter also list Forge packs, which fail to import; filter once CurseForge's list syntax is confirmed.
   if (q.loader && (q.kind === "mod" || q.kind === "modpack") && LOADER_TYPE[q.loader]) p.modLoaderType = String(LOADER_TYPE[q.loader]);
   if (q.categories.length === 1) p.categoryId = q.categories[0];
   else if (q.categories.length > 1) p.categoryIds = JSON.stringify(q.categories.map(Number));

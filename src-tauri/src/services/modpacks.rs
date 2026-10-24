@@ -38,6 +38,8 @@ fn loader_of(plan: &PackPlan) -> Result<Loader> {
         "" => Ok(Loader::Vanilla),
         "fabric" => Ok(Loader::Fabric),
         "quilt" => Ok(Loader::Quilt),
+        "forge" => Ok(Loader::Forge),
+        "neoforge" => Ok(Loader::NeoForge),
         other => Err(AppError::Unsupported(format!("{other} modpacks are not supported"))),
     }
 }
@@ -166,6 +168,7 @@ mod tests {
         let plan = |l: &str| PackPlan { name: "p".into(), game_version: "1.21".into(), loader: l.into(), loader_version: String::new(), files: vec![], overrides: vec![] };
         assert_eq!(loader_of(&plan("")).unwrap(), Loader::Vanilla);
         assert_eq!(loader_of(&plan("quilt")).unwrap(), Loader::Quilt);
-        assert!(loader_of(&plan("neoforge")).is_err());
+        assert_eq!(loader_of(&plan("neoforge")).unwrap(), Loader::NeoForge);
+        assert!(loader_of(&plan("liteloader")).is_err());
     }
 }

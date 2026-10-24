@@ -6,7 +6,7 @@ import { facets, plan } from "./main.js";
 test("builds facets", () => {
   const q = (kind, loader) => ({ kind, query: "", gameVersion: "1.21", loader, categories: ["magic"], sort: "", offset: 0, limit: 20 });
   const f = facets(q("modpack", null));
-  assert.deepEqual(f[2], ["categories:fabric", "categories:quilt"]);
+  assert.deepEqual(f[2], ["categories:fabric", "categories:quilt", "categories:forge", "categories:neoforge"]);
   assert.deepEqual(f[3], ["categories:magic"]);
   assert.deepEqual(facets(q("mod", "fabric"))[2], ["categories:fabric"]);
   assert.equal(facets(q("resourcepack", null)).length, 3);
@@ -22,5 +22,6 @@ test("plans packs", () => {
   assert.deepEqual([p.gameVersion, p.loader, p.loaderVersion, p.files.length], ["1.21", "fabric", "1.0", 1]);
   assert.equal(plan(index("quilt-loader", "required")).loader, "quilt");
   assert.equal(plan(index("fabric-loader", "unsupported")).files.length, 0);
-  assert.throws(() => plan(index("forge", "required")));
+  assert.equal(plan(index("neoforge", "required")).loader, "neoforge");
+  assert.equal(plan(index("forge", "required")).loader, "forge");
 });

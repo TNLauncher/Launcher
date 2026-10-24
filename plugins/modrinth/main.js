@@ -9,7 +9,7 @@
 const API = "https://api.modrinth.com/v2";
 const IDS_PER_REQUEST = 100;
 /** Loaders the launcher can run modpacks on. */
-const PACK_LOADERS = ["fabric", "quilt"];
+const PACK_LOADERS = ["fabric", "quilt", "forge", "neoforge"];
 
 /**
  * Version loaders each kind is published under; null = don't filter.
@@ -55,7 +55,8 @@ export function plan(index) {
   let loaderVersion = "";
   if (deps["fabric-loader"]) [loader, loaderVersion] = ["fabric", deps["fabric-loader"]];
   else if (deps["quilt-loader"]) [loader, loaderVersion] = ["quilt", deps["quilt-loader"]];
-  else if (deps.forge || deps.neoforge) throw new Error("Forge and NeoForge modpacks are not supported");
+  else if (deps.neoforge) [loader, loaderVersion] = ["neoforge", deps.neoforge];
+  else if (deps.forge) [loader, loaderVersion] = ["forge", deps.forge];
   return {
     name: index.name,
     gameVersion: deps.minecraft,

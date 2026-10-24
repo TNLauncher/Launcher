@@ -7,6 +7,9 @@ pub enum Loader {
     Vanilla,
     Fabric,
     Quilt,
+    Forge,
+    NeoForge,
+    LiteLoader,
 }
 
 /// A separate game directory with its own version, loader, mods and worlds.

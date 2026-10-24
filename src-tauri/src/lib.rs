@@ -3,7 +3,7 @@
 //! Layers, top to bottom:
 //! - `commands`  — thin `#[tauri::command]` adapters: parse IPC input, call a service.
 //! - `services`  — use cases (create instance, launch, manage mods); own all side effects.
-//! - `minecraft` — protocol knowledge: Mojang/Fabric/Quilt metadata, installs, JVM command.
+//! - `minecraft` — protocol knowledge: Mojang and mod loader metadata, installs, JVM command.
 //! - `plugins`   — JS plugins in sandboxed frames; Rust serves them and checks what they ask for.
 //! - `storage`   — JSON persistence of settings and instances.
 //! - `models`, `state`, `error` — shared types; `config` — build-time `TN_*` settings from .env.

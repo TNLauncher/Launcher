@@ -269,6 +269,9 @@ fn loader_name(l: Loader) -> &'static str {
         Loader::Vanilla => "minecraft",
         Loader::Fabric => "fabric",
         Loader::Quilt => "quilt",
+        Loader::Forge => "forge",
+        Loader::NeoForge => "neoforge",
+        Loader::LiteLoader => "liteloader",
     }
 }
 

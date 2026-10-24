@@ -5,6 +5,7 @@ pub mod auth;
 pub mod command;
 pub mod http;
 pub mod install;
+pub mod installer;
 pub mod java;
 pub mod loader;
 pub mod rules;
@@ -18,6 +19,7 @@ use serde::Serialize;
 pub enum Stage {
     Resolving,
     Java,
+    Loader,
     Libraries,
     Assets,
     Starting,
