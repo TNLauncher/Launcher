@@ -18,13 +18,13 @@ export function Banner({ message, onRetry, onDismiss }: Props) {
       {(onRetry || onDismiss) && (
         <div className={s.actions}>
           {onRetry && (
-            <button onClick={onRetry}>
+            <button type="button" onClick={onRetry}>
               <Icon name="refresh" />
               Retry
             </button>
           )}
           {onDismiss && (
-            <button onClick={onDismiss}>
+            <button type="button" onClick={onDismiss}>
               <Icon name="close" />
               Dismiss
             </button>

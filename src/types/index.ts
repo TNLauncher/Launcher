@@ -1,6 +1,11 @@
 // Mirrors of the Rust models (src-tauri/src/models). Keep in sync when those change.
 
 export type Loader = "vanilla" | "fabric" | "quilt" | "forge" | "neoforge" | "liteloader";
+export interface LoaderBuild {
+  version: string;
+  /** Recommended: Forge's promoted build, everyone else's non-beta. */
+  stable: boolean;
+}
 export type AfterLaunch = "hide" | "keep" | "close";
 
 export interface Settings {

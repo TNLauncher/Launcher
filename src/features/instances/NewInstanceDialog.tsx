@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { launcher } from "@/api/launcher";
-import { BackendError } from "@/api/ipc";
 import { getVersions, type ManifestVersion } from "@/api/mojang";
 import { Banner, Button, Dialog, Icon, Input, Select, Switch, toast } from "@/components/ui";
 import { cx } from "@/lib/cx";
@@ -19,6 +18,7 @@ const LOADER_HINT: Record<Loader, string> = {
   neoforge: "Modern Forge, 1.20.2 and up",
   liteloader: "Legacy, up to 1.12.2",
 };
+const PRERELEASE = /alpha|beta|rc|pre|snapshot/i;
 
 /** Mounted only while open, so every opening starts from fresh state. */
 export function NewInstanceDialog() {
@@ -29,6 +29,7 @@ export function NewInstanceDialog() {
   const [version, setVersion] = useState("");
   const [snapshots, setSnapshots] = useState(false);
   const [loader, setLoader] = useState<Loader>("vanilla");
+  const [build, setBuild] = useState("");
   const [error, setError] = useState("");
   const [creating, setCreating] = useState(false);
 
@@ -36,24 +37,26 @@ export function NewInstanceDialog() {
     getVersions().then(setVersions, (e) => setError(`Could not load versions: ${errorMessage(e)}`));
   }, []);
 
-  const shown = (versions ?? []).filter((v) => v.type === "release" || (snapshots && v.type === "snapshot"));
-  const chosen = shown.some((v) => v.id === version) ? version : (shown[0]?.id ?? "");
   const modded = loader !== "vanilla";
-  const check = useQuery({
-    queryKey: ["loaderVersion", chosen, loader],
-    queryFn: () => launcher.loaderVersion(chosen, loader),
-    enabled: modded && !!chosen,
-    retry: (n, e) => !(e instanceof BackendError && e.kind === "unsupported") && n < 1,
-  });
-  const unsupported = check.error instanceof BackendError && check.error.kind === "unsupported";
-  const fallbackName = modded ? `${chosen} ${LOADERS[loader]}` : chosen;
+  const loaderName = LOADERS[loader];
+  // The game versions this loader runs; Mojang's manifest stays the source of order and release type.
+  const games = useQuery({ queryKey: ["loaderGames", loader], queryFn: () => launcher.loaderGames(loader), enabled: modded });
+  const supported = modded ? (games.data ? new Set(games.data) : null) : undefined;
+  const shown = supported === null ? [] : (versions ?? []).filter((v) => (v.type === "release" || (snapshots && v.type === "snapshot")) && (!supported || supported.has(v.id)));
+  const chosen = shown.some((v) => v.id === version) ? version : (shown[0]?.id ?? "");
+
+  const builds = useQuery({ queryKey: ["loaderBuilds", chosen, loader], queryFn: () => launcher.loaderBuilds(chosen, loader), enabled: modded && !!chosen });
+  const recommended = builds.data?.find((b) => b.stable)?.version ?? builds.data?.[0]?.version ?? "";
+  const chosenBuild = builds.data?.some((b) => b.version === build) ? build : recommended;
+  const fallbackName = modded ? `${chosen} ${loaderName}` : chosen;
+  const versionsLoading = !versions || (modded && games.isPending);
 
   async function submit() {
-    if (!chosen || unsupported) return;
+    if (!chosen || (modded && !chosenBuild)) return;
     setCreating(true);
     setError("");
     try {
-      const inst = await launcher.createInstance(name.trim() || fallbackName, chosen, loader);
+      const inst = await launcher.createInstance(name.trim() || fallbackName, chosen, loader, modded ? chosenBuild : null);
       select(inst.id);
       await refresh();
       closeNewInstance();
@@ -86,7 +89,7 @@ export function NewInstanceDialog() {
       actions={
         <>
           <Button onClick={closeNewInstance}>Cancel</Button>
-          <Button type="submit" variant="primary" disabled={creating || !chosen || unsupported || (modded && check.isPending)}>
+          <Button type="submit" variant="primary" disabled={creating || !chosen || (modded && !chosenBuild)}>
             {creating ? "Creating…" : "Create"}
           </Button>
         </>
@@ -117,22 +120,27 @@ export function NewInstanceDialog() {
               </label>
             </div>
             <Select label="Minecraft version" value={chosen} onChange={setVersion}
-              placeholder={versions ? "No versions" : "Loading versions…"}
+              placeholder={versionsLoading ? "Loading versions…" : modded ? `No versions with ${loaderName}` : "No versions"}
               options={shown.map((v) => ({ value: v.id, label: v.id, hint: v.type === "snapshot" ? "snapshot" : undefined }))} />
-            <p className={s.status} aria-live="polite" data-tone={!modded ? "muted" : check.isSuccess ? "ok" : check.isError ? "bad" : "muted"}>
-              {!modded ? (
-                <><Icon name="deployed_code" />Plain Minecraft, as Mojang ships it</>
-              ) : !chosen ? null : check.isPending ? (
-                <><Icon name="progress_activity" spin />Looking up {LOADERS[loader]} for {chosen}…</>
-              ) : check.isSuccess ? (
-                <><Icon name="check_circle" fill />{LOADERS[loader]} {check.data} will be installed</>
-              ) : unsupported ? (
-                <><Icon name="block" />{errorMessage(check.error)}</>
-              ) : (
-                <><Icon name="wifi_off" />Could not check {LOADERS[loader]}: {errorMessage(check.error)}</>
-              )}
-            </p>
+            {!modded ? (
+              <p className={s.status}><Icon name="deployed_code" />Plain Minecraft, as Mojang ships it</p>
+            ) : (
+              games.isSuccess && <p className={s.status}><Icon name="filter_alt" />Only versions {loaderName} supports</p>
+            )}
           </div>
+
+          {modded && (
+            <div className={s.field}>
+              <span className={s.label}>{loaderName} version</span>
+              <Select label={`${loaderName} version`} value={chosenBuild} onChange={setBuild}
+                placeholder={!chosen ? "Pick a Minecraft version" : builds.isPending ? "Loading builds…" : `No ${loaderName} builds`}
+                options={(builds.data ?? []).map((b) => ({
+                  value: b.version,
+                  label: b.version,
+                  hint: b.version === recommended ? "recommended" : PRERELEASE.test(b.version) ? "beta" : undefined,
+                }))} />
+            </div>
+          )}
 
           <label className={s.field}>
             <span className={s.labelRow}>
@@ -143,6 +151,8 @@ export function NewInstanceDialog() {
           </label>
         </div>
       </div>
+      {games.isError && <Banner message={`Could not load ${loaderName} versions: ${errorMessage(games.error)}`} onRetry={() => games.refetch()} />}
+      {builds.isError && <Banner message={`Could not load ${loaderName} builds: ${errorMessage(builds.error)}`} onRetry={() => builds.refetch()} />}
       {error && <Banner message={error} />}
     </Dialog>
   );

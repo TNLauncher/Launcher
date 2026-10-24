@@ -2,7 +2,7 @@
 import { Channel, convertFileSrc } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { call } from "./ipc";
-import type { Account, ContentKind, DeviceCode, GameExit, GameLog, Instance, InstanceSettings, LaunchEvent, Loader, ModFile, Screenshot, Settings, Skin, Snapshot } from "@/types";
+import type { Account, ContentKind, DeviceCode, GameExit, GameLog, Instance, InstanceSettings, LaunchEvent, Loader, LoaderBuild, ModFile, Screenshot, Settings, Skin, Snapshot } from "@/types";
 
 export const launcher = {
   getState: () => call<Snapshot>("get_state"),
@@ -23,10 +23,13 @@ export const launcher = {
   /** Signs in through an account provider plugin; `fields` are its form's values. Resolves with the player name. */
   pluginLogin: (plugin: string, fields: Record<string, string>) => call<string>("plugin_login", { plugin, fields }),
 
-  createInstance: (name: string, version: string, loader: Loader) =>
-    call<Instance>("create_instance", { name, version, loader }),
-  /** The loader version a new instance would get; rejects with kind `unsupported` when the loader skips `version`. */
-  loaderVersion: (version: string, loader: Loader) => call<string>("loader_version", { version, loader }),
+  /** `loaderVersion: null` = the loader's newest stable build. */
+  createInstance: (name: string, version: string, loader: Loader, loaderVersion: string | null) =>
+    call<Instance>("create_instance", { name, version, loader, loaderVersion }),
+  /** Game versions the loader runs; null = all (vanilla). */
+  loaderGames: (loader: Loader) => call<string[] | null>("loader_games", { loader }),
+  /** Loader builds for a game version, newest first. */
+  loaderBuilds: (version: string, loader: Loader) => call<LoaderBuild[]>("loader_builds", { version, loader }),
   renameInstance: (id: string, name: string) => call<void>("rename_instance", { id, name }),
   /** `icon` is a `data:image/...` URL, or "" to reset. */
   setInstanceIcon: (id: string, icon: string) => call<void>("set_instance_icon", { id, icon }),
