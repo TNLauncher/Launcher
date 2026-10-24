@@ -5,9 +5,10 @@
 }
 .scene:active { cursor: grabbing; }
 .enter, .model, .joint, .limb, .box { position: absolute; width: 0; height: 0; transform-style: preserve-3d; }
+/* Transform-only: `opacity < 1` is a CSS grouping property that flattens `preserve-3d` into a 2D plane. */
 .enter { animation: enter 900ms cubic-bezier(0.16, 1, 0.3, 1); }
 @keyframes enter {
-  from { transform: rotateY(-110deg) translateY(10px); opacity: 0.4; }
+  from { transform: rotateY(-110deg) translateY(10px); }
 }
 
 /* The 1px transparent border puts each face's visible edge inside its layer, where WebKit's texture

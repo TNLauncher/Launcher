@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from "react";
 import { cx } from "@/lib/cx";
 import type { Skin } from "@/types";
 import { useSheet } from "./Skin";
@@ -81,9 +81,15 @@ export function SkinModel({ skin, px, label, onTurn }: { skin: Skin | null | und
   const scene = useRef<HTMLDivElement>(null);
   const model = useRef<HTMLDivElement>(null);
   const turn = useRef({ ...REST });
+  const prevSheet = useRef(sheet);
   const drag = useRef<{ x: number; y: number; t: number; v: number } | null>(null);
   const spin = useRef(0);
   const [dragging, setDragging] = useState(false);
+  // A new skin swings in from the resting angle, not from wherever the last one was left.
+  if (prevSheet.current !== sheet) {
+    prevSheet.current = sheet;
+    turn.current = { ...REST };
+  }
   // The window hides while the game runs; the idle loop should not keep the compositor busy behind it.
   const [hidden, setHidden] = useState(document.hidden);
   useEffect(() => {
@@ -107,13 +113,11 @@ export function SkinModel({ skin, px, label, onTurn }: { skin: Skin | null | und
     turn.current = { ...REST };
     apply();
   };
-  // A new skin swings in from the resting angle, not from wherever the last one was left.
   useEffect(() => {
     cancelAnimationFrame(spin.current);
-    turn.current = { ...REST };
   }, [sheet]);
-  // The model element is new after each remount (skin change), so re-apply the angle every render.
-  useEffect(apply);
+  // Sync before paint in case `turn` moved imperatively (coast/drag) since the last render.
+  useLayoutEffect(apply);
   useEffect(() => () => cancelAnimationFrame(spin.current), []);
 
   const onPointerDown = (e: PointerEvent) => {
@@ -166,6 +170,7 @@ export function SkinModel({ skin, px, label, onTurn }: { skin: Skin | null | und
       aria-label={label}
       aria-valuemin={0}
       aria-valuemax={359}
+      aria-valuenow={Math.round(((turn.current.y % 360) + 360) % 360)}
       tabIndex={0}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
@@ -176,7 +181,7 @@ export function SkinModel({ skin, px, label, onTurn }: { skin: Skin | null | und
     >
       {/* Keyed so a new skin swings in once it is ready; nothing is drawn while it loads. */}
       {sheet !== undefined && <div key={sheet ?? "bare"} className={s.enter}>
-        <div ref={model} className={s.model}>
+        <div ref={model} className={s.model} style={{ transform: `rotateX(${turn.current.x}deg) rotateY(${turn.current.y}deg)` }}>
           {parts(!!skin?.slim).map((p) => {
             const y = p.hang === "down" ? p.box[1] / 2 : p.hang === "up" ? -p.box[1] / 2 : 0;
             return (

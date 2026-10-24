@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { useEffect, useRef, useState } from "react";
 import { View } from "@/components/layout/View";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { Button, ConfirmDialog, Dot, Icon, IconButton, Input, Pill, PillGroup, Skeleton } from "@/components/ui";
@@ -92,15 +92,16 @@ function useCopy(): [boolean, (text: string) => void] {
 }
 
 /** Skin pixel size: whole screen pixels per texel keep the edges crisp; the model takes about half the stage. */
-function useModelScale(stage: RefObject<HTMLElement | null>) {
-  const [px, setPx] = useState(9);
+const modelScale = () =>
+  window.innerWidth <= 1000 ? 8 : Math.max(8, Math.min(13, Math.floor((window.innerHeight - 40) / 64)));
+
+function useModelScale() {
+  const [px, setPx] = useState(modelScale);
   useEffect(() => {
-    const el = stage.current;
-    if (!el) return;
-    const ro = new ResizeObserver(([e]) => setPx(Math.max(8, Math.min(13, Math.floor(e.contentRect.height / 64)))));
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [stage]);
+    const onResize = () => setPx(modelScale());
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
   return px;
 }
 
@@ -109,11 +110,10 @@ function Stage({ account, offlineName }: { account: Account | null; offlineName:
   const skin = useSkin(account);
   const name = account?.name ?? offlineName;
   const online = !!account && account.provider !== "offline";
-  const stage = useRef<HTMLElement>(null);
-  const px = useModelScale(stage);
+  const px = useModelScale();
   const [turned, setTurned] = useState(false);
   return (
-    <section ref={stage} className={s.stage} aria-label="Active profile">
+    <section className={s.stage} aria-label="Active profile">
       <div className={s.turntable}>
         <SkinModel skin={skin} px={px} label={`${name}'s skin`} onTurn={() => setTurned(true)} />
         <div className={s.floor} />
