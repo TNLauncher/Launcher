@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { View } from "@/components/layout/View";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { Button, ConfirmDialog, Dot, Icon, IconButton, Input, Pill, PillGroup, Skeleton } from "@/components/ui";
@@ -14,14 +14,10 @@ import { SkinHead, useSkin } from "./Skin";
 import { SkinModel } from "./SkinModel";
 import s from "./profiles.module.css";
 
-const USERNAME = /^[A-Za-z0-9_]{3,16}$/;
-const SAVE_DELAY = 400;
-
 /** Player accounts: the one launches use on a turntable, every signed-in one to switch to, and sign-in. */
 export function ProfilesView() {
   const loaded = useLauncher((st) => st.snapshot !== null);
   const active = useLauncher((st) => st.snapshot?.account ?? null);
-  const offlineName = useLauncher((st) => st.snapshot?.settings.username || "Player");
   const refresh = useLauncher((st) => st.refresh);
   const qc = useQueryClient();
   const accounts = useQuery({ queryKey: ["accounts"], queryFn: launcher.listAccounts });
@@ -34,29 +30,27 @@ export function ProfilesView() {
   const act = (p: Promise<unknown>) => p.then(done, (e) => setError(errorMessage(e)));
 
   if (!loaded) return <View />;
-  const hasSavedOffline = accounts.data?.some((a) => a.provider === "offline");
 
   return (
     <View className={s.view}>
-      <Stage account={active} offlineName={offlineName} />
+      <Stage account={active} />
 
       <div className={s.side}>
         <h1>Profiles</h1>
 
-        <ul className={s.list} aria-label="Profiles">
-          {accounts.isPending ? (
-            [0, 1].map((i) => <li key={i}><Skeleton height={56} /></li>)
-          ) : (
-            <>
-              {accounts.data?.map((a) => (
-                <ProfileRow key={a.id} account={a} name={a.name} provider={a.providerName} selected={a.selected} onUse={() => act(launcher.selectAccount(a.id))} onRemove={() => setRemoving(a)} />
-              ))}
-              {(!hasSavedOffline || !active) && (
-                <ProfileRow name={offlineName} provider="Offline" selected={!active} onUse={() => act(launcher.selectAccount(null))} />
-              )}
-            </>
-          )}
-        </ul>
+        {accounts.isPending ? (
+          <ul className={s.list} aria-label="Profiles">
+            {[0, 1].map((i) => <li key={i}><Skeleton height={56} /></li>)}
+          </ul>
+        ) : accounts.data?.length ? (
+          <ul className={s.list} aria-label="Profiles">
+            {accounts.data.map((a) => (
+              <ProfileRow key={a.id} account={a} selected={a.selected} onUse={() => act(launcher.selectAccount(a.id))} onRemove={() => setRemoving(a)} />
+            ))}
+          </ul>
+        ) : (
+          <p className="subtle">No profiles yet. Sign in below to launch the game.</p>
+        )}
         {(error || accounts.error) && <p className={s.error} role="alert">{error || errorMessage(accounts.error)}</p>}
 
         <AddProfile onSignedIn={done} />
@@ -73,9 +67,7 @@ export function ProfilesView() {
           setRemoving(null);
         }}
       >
-        {removing?.provider === "offline"
-          ? "The launcher forgets this offline profile. Your worlds and instances stay."
-          : `The launcher forgets this ${removing?.providerName} sign-in. Your worlds and instances stay; sign in again to play with it.`}
+        The launcher forgets this {removing?.providerName} sign-in. Your worlds and instances stay; sign in again to play with it.
       </ConfirmDialog>
     </View>
   );
@@ -107,16 +99,15 @@ function useModelScale() {
 }
 
 /** The active profile on a turntable. */
-function Stage({ account, offlineName }: { account: Account | null; offlineName: string }) {
+function Stage({ account }: { account: Account | null }) {
   const skin = useSkin(account);
-  const name = account?.name ?? offlineName;
-  const online = !!account && account.provider !== "offline";
+  const name = account?.name ?? "No profile";
   const px = useModelScale();
   const [turned, setTurned] = useState(false);
   return (
     <section className={s.stage} aria-label="Active profile">
       <div className={s.turntable}>
-        <SkinModel skin={skin} px={px} label={`${name}'s skin`} onTurn={() => setTurned(true)} />
+        <SkinModel skin={skin} px={px} label={account ? `${account.name}'s skin` : "Default skin"} onTurn={() => setTurned(true)} />
         <div className={s.floor} />
       </div>
       <span className={s.hint} data-gone={turned || undefined} aria-hidden>Drag to turn · double-click to reset</span>
@@ -124,10 +115,10 @@ function Stage({ account, offlineName }: { account: Account | null; offlineName:
       <div className={s.identity}>
         <h2 className={cx(s.name, "selectable")}>{name}</h2>
         <div className={s.status}>
-          <Dot tone={online ? "green" : "neutral"} />
-          {online ? `Signed in with ${account.providerName} · used for every launch` : "Offline · used for every launch, offline-mode servers only"}
+          <Dot tone={account ? "green" : "neutral"} />
+          {account ? `Signed in with ${account.providerName} · used for every launch` : "Not signed in · add a profile on the right to play"}
         </div>
-        {account ? <Uuid uuid={account.uuid} /> : <OfflineName />}
+        {account && <Uuid uuid={account.uuid} />}
       </div>
     </section>
   );
@@ -148,54 +139,16 @@ function Uuid({ uuid }: { uuid: string }) {
   );
 }
 
-/** The name offline play uses; an invalid one is kept in the field but never saved. */
-function OfflineName() {
-  const username = useLauncher((st) => st.snapshot!.settings.username);
-  const saveSettings = useLauncher((st) => st.saveSettings);
-  const [value, setValue] = useState(username);
-  const [status, setStatus] = useState("");
-  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
-  useEffect(() => () => clearTimeout(timer.current), []);
-  const valid = USERNAME.test(value);
-
-  function change(next: string) {
-    setValue(next);
-    clearTimeout(timer.current);
-    if (!USERNAME.test(next)) return setStatus("");
-    setStatus("Saving…");
-    timer.current = setTimeout(() => {
-      const settings = useLauncher.getState().snapshot!.settings;
-      saveSettings({ ...settings, username: next }).then(
-        () => setStatus("Saved"),
-        (e) => setStatus(`Could not save: ${errorMessage(e)}`)
-      );
-    }, SAVE_DELAY);
-  }
-
-  return (
-    <label className={s.offline}>
-      <span className={s.offlineLabel}>
-        Player name <span className="subtle">for singleplayer and offline-mode servers</span>
-      </span>
-      <Input maxLength={16} spellCheck={false} aria-invalid={!valid} aria-describedby="offline-name-status" value={value} onChange={(e) => change(e.target.value)} />
-      <span id="offline-name-status" className={cx(s.offlineStatus, !valid && s.error)} aria-live="polite">
-        {valid ? status : "3–16 letters, digits or underscores."}
-      </span>
-    </label>
-  );
-}
-
-/** No `account` = the offline profile. */
-function ProfileRow(p: { account?: Account; name: string; provider: string; selected: boolean; onUse(): void; onRemove?(): void }) {
-  const skin = useSkin(p.account);
-  const { name, provider, selected } = p;
+function ProfileRow(p: { account: Account; selected: boolean; onUse(): void; onRemove(): void }) {
+  const { account, selected } = p;
+  const skin = useSkin(account);
   return (
     <li className={s.row}>
       <button type="button" className={cx(s.pick, "sheen")} aria-pressed={selected} onClick={selected ? undefined : p.onUse}>
-        <SkinHead skin={skin} name={name} size={36} />
+        <SkinHead skin={skin} name={account.name} size={36} />
         <span className={s.rowText}>
-          <span className={s.rowName}>{name}</span>
-          <span className={s.rowSub}>{provider}</span>
+          <span className={s.rowName}>{account.name}</span>
+          <span className={s.rowSub}>{account.providerName}</span>
         </span>
         {selected ? (
           <span className={s.current}><Icon name="check_circle" fill />Active</span>
@@ -203,79 +156,31 @@ function ProfileRow(p: { account?: Account; name: string; provider: string; sele
           <span className={s.use}>Use</span>
         )}
       </button>
-      {p.onRemove && <IconButton className={s.remove} icon="delete" label={`Remove ${name}`} variant="danger" onClick={p.onRemove} />}
+      <IconButton className={s.remove} icon="delete" label={`Remove ${account.name}`} variant="danger" onClick={p.onRemove} />
     </li>
   );
 }
 
-/** Microsoft sign-in, account provider plugins and offline profiles, one at a time. */
+/** Microsoft sign-in and the forms of account provider plugins, one at a time. */
 function AddProfile({ onSignedIn }: { onSignedIn(): Promise<unknown> }) {
   const providers = (usePlugins().data ?? []).filter((p) => p.enabled && p.account);
   const [tab, setTab] = useState("microsoft");
   const plugin = providers.find((p) => p.id === tab);
-  const offline = tab === "offline";
   return (
     <section className={s.add} aria-labelledby="add-profile">
       <div className={s.addHead}>
         <h2 id="add-profile">Add a profile</h2>
-        <PillGroup label="Add profile with">
-          <Pill pressed={!plugin && !offline} onClick={() => setTab("microsoft")}>Microsoft</Pill>
-          {providers.map((p) => (
-            <Pill key={p.id} pressed={plugin?.id === p.id} onClick={() => setTab(p.id)}>{p.name}</Pill>
-          ))}
-          <Pill pressed={offline} onClick={() => setTab("offline")}>Offline</Pill>
-        </PillGroup>
+        {providers.length > 0 && (
+          <PillGroup label="Sign in with">
+            <Pill pressed={!plugin} onClick={() => setTab("microsoft")}>Microsoft</Pill>
+            {providers.map((p) => (
+              <Pill key={p.id} pressed={plugin?.id === p.id} onClick={() => setTab(p.id)}>{p.name}</Pill>
+            ))}
+          </PillGroup>
+        )}
       </div>
-      {offline ? (
-        <OfflineAdd onSignedIn={onSignedIn} />
-      ) : plugin ? (
-        <PluginSignIn key={plugin.id} plugin={plugin} onSignedIn={onSignedIn} />
-      ) : (
-        <MicrosoftSignIn onSignedIn={onSignedIn} />
-      )}
+      {plugin ? <PluginSignIn key={plugin.id} plugin={plugin} onSignedIn={onSignedIn} /> : <MicrosoftSignIn onSignedIn={onSignedIn} />}
     </section>
-  );
-}
-
-function OfflineAdd({ onSignedIn }: { onSignedIn(): Promise<unknown> }) {
-  const [name, setName] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const trimmed = name.trim();
-  const valid = USERNAME.test(trimmed);
-  const dirty = trimmed.length > 0 && !valid;
-
-  const submit = () => {
-    if (!valid || busy) return;
-    setBusy(true);
-    launcher
-      .addOfflineAccount(trimmed)
-      .then(() => (setName(""), setError(""), onSignedIn()), (e) => setError(errorMessage(e)))
-      .finally(() => setBusy(false));
-  };
-
-  return (
-    <form className={s.form} onSubmit={(e) => (e.preventDefault(), submit())}>
-      <p className={s.formHint}>For singleplayer and offline-mode servers, without signing in.</p>
-      <label className={s.field}>
-        <span>Username</span>
-        <Input
-          maxLength={16}
-          spellCheck={false}
-          autoComplete="off"
-          placeholder="Player"
-          aria-invalid={dirty}
-          aria-describedby="add-offline-hint"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-        <span id="add-offline-hint" className={cx(s.fieldHint, dirty && s.error)}>
-          3–16 letters, digits or underscores.
-        </span>
-      </label>
-      <Button type="submit" variant="primary" disabled={!valid} loading={busy}>Add offline profile</Button>
-      {error && <p className={s.error} role="alert">{error}</p>}
-    </form>
   );
 }
 

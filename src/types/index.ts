@@ -16,7 +16,6 @@ export interface Settings {
   height: number;
   fullscreen: boolean;
   afterLaunch: AfterLaunch;
-  username: string;
 }
 
 export interface Instance {
@@ -96,7 +95,7 @@ export interface Skin {
 
 export interface Snapshot {
   settings: Settings;
-  /** The account launches use; null = offline. */
+  /** The active account; null when not signed in. */
   account: Account | null;
   instances: Instance[];
   modCounts: Record<string, number>;

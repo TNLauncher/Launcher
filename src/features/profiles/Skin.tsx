@@ -6,16 +6,15 @@ import type { Account, Skin } from "@/types";
 import { readySheets, skinSheet } from "./texture";
 import s from "./skin.module.css";
 
-/** The account's skin; null offline or when it has none (or it failed to load), undefined while loading. */
+/** The account's skin; null when there is no account or it has no skin (or failed to load), undefined while loading. */
 export function useSkin(account: Account | null | undefined): Skin | null | undefined {
-  const online = !!account && account.provider !== "offline";
   const q = useQuery({
     queryKey: ["skin", account?.id],
     queryFn: () => launcher.accountSkin(account!.id),
-    enabled: online,
+    enabled: !!account,
     staleTime: Infinity,
   });
-  if (!online) return null;
+  if (!account) return null;
   return q.isPending ? undefined : q.data ?? null;
 }
 

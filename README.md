@@ -1,7 +1,7 @@
 # TNLauncher
 
-Minecraft launcher: Tauri 2 + React 19 + Vite. Vanilla, Fabric and Quilt instances, Modrinth mods and modpacks,
-Java runtimes downloaded from Mojang. Offline or Microsoft accounts.
+Minecraft launcher: Tauri 2 + React 19 + Vite. Vanilla, Fabric, Quilt, Forge, NeoForge and LiteLoader instances,
+Java runtimes downloaded from Mojang. Only official Microsoft accounts owning a licensed copy of Minecraft: Java Edition are supported.
 
 ```sh
 npm install

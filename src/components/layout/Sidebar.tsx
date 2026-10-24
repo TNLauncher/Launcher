@@ -48,8 +48,7 @@ export function Sidebar() {
   const view = useUi((st) => st.route.view);
   const navigate = useUi((st) => st.navigate);
   const account = useLauncher((st) => st.snapshot?.account);
-  const username = useLauncher((st) => st.snapshot?.settings.username);
-  const name = account?.name ?? (username || "Player");
+  const name = account?.name ?? "?";
   const skin = useSkin(account);
   const nav = useNav();
   const active = nav.findIndex((n) => n.view === view);
@@ -72,7 +71,7 @@ export function Sidebar() {
       </div>
       <button className={s.avatar} onClick={() => navigate("profiles")} onPointerEnter={() => preloadView("profiles")} aria-label="Profiles">
         <SkinHead skin={skin} name={name} size={32} className={s.head} />
-        <span className={`${s.tip} mono`}>{name} · {account?.providerName ?? "Offline"}</span>
+        <span className={`${s.tip} mono`}>{account ? `${account.name} · ${account.providerName}` : "Not signed in"}</span>
       </button>
     </aside>
   );

@@ -15,7 +15,7 @@ import s from "./settings.module.css";
 // Keep in sync with Settings::default() in src-tauri/src/models/settings.rs.
 export const DEFAULT_JVM_ARGS =
   "-XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UnlockExperimentalVMOptions -XX:+DisableExplicitGC";
-const DEFAULTS: Omit<Settings, "username"> = {
+const DEFAULTS: Settings = {
   javaPath: "",
   ramMb: 4096,
   jvmArgs: DEFAULT_JVM_ARGS,
@@ -50,9 +50,7 @@ export function SettingsView() {
     setStatus("Saving…");
     clearTimeout(timer.current);
     timer.current = setTimeout(() => {
-      // The player name is edited in Profiles; never write back the copy this form loaded.
-      const username = useLauncher.getState().snapshot!.settings.username;
-      saveSettings({ ...next, username }).then(
+      saveSettings(next).then(
         () => setStatus("All changes saved"),
         (e) => setStatus(`Could not save: ${errorMessage(e)}`)
       );
@@ -137,7 +135,7 @@ export function SettingsView() {
           update({ ...DEFAULTS });
         }}
       >
-        Memory, Java, window and launcher options go back to defaults. Your player name stays.
+        Memory, Java, window and launcher options go back to defaults.
       </ConfirmDialog>
     </View>
   );

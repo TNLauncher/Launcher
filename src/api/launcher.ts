@@ -15,10 +15,8 @@ export const launcher = {
     return call<string>("microsoft_login", { onCode: channel });
   },
   listAccounts: () => call<Account[]>("list_accounts"),
-  /** null = play offline. */
-  selectAccount: (id: string | null) => call<void>("select_account", { id }),
+  selectAccount: (id: string) => call<void>("select_account", { id }),
   removeAccount: (id: string) => call<void>("remove_account", { id }),
-  addOfflineAccount: (name: string) => call<string>("add_offline_account", { name }),
   /** null = the account has no skin. */
   accountSkin: (id: string) => call<Skin | null>("account_skin", { id }),
   /** Signs in through an account provider plugin; `fields` are its form's values. Resolves with the player name. */
