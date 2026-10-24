@@ -30,7 +30,17 @@ pub fn delete_content(state: State<'_, AppState>, id: String, kind: ContentKind,
 }
 
 /// `skip`: projects already installed, so dependencies are not added twice.
+/// `version`: optional version id (`None` = newest). `replace`: optional existing file name to replace in place.
 #[tauri::command]
-pub async fn install_content(state: State<'_, AppState>, source: String, id: String, kind: ContentKind, project: String, skip: Vec<String>) -> Result<()> {
-    mods::install(&state, &source, &id, kind, &project, &skip).await
+pub async fn install_content(
+    state: State<'_, AppState>,
+    source: String,
+    id: String,
+    kind: ContentKind,
+    project: String,
+    version: Option<String>,
+    replace: Option<String>,
+    skip: Vec<String>,
+) -> Result<()> {
+    mods::install(&state, &source, &id, kind, &project, version.as_deref(), replace.as_deref(), &skip).await
 }

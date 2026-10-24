@@ -228,16 +228,26 @@ pub fn delete(state: &AppState, id: &str, kind: ContentKind, file: &str) -> Resu
     Ok(())
 }
 
-/// Installs the newest build of `project` that fits the instance, plus its required dependencies for mods.
-/// Projects in `skip` (already installed, in any version) are left alone.
-pub async fn install(state: &AppState, source_id: &str, id: &str, kind: ContentKind, project: &str, skip: &[String]) -> Result<()> {
+/// Installs a build (`version`: a version id, or `None` for the newest) of `project` that fits the instance,
+/// plus its required dependencies for mods. When `replace` is set, replaces that local file while preserving
+/// its enabled/disabled state. Projects in `skip` (already installed, in any version) are left alone.
+pub async fn install(
+    state: &AppState,
+    source_id: &str,
+    id: &str,
+    kind: ContentKind,
+    project: &str,
+    version: Option<&str>,
+    replace: Option<&str>,
+    skip: &[String],
+) -> Result<()> {
     let plugin = plugins::enabled(state, source_id)?;
     let source = plugin.source()?;
     let inst = instances::get(state, id)?;
     let dir = state.paths.content_dir(id, kind)?;
     let mut seen: HashSet<String> = skip.iter().filter(|p| *p != project).cloned().collect();
-    let mut queue = vec![project.to_string()];
-    while let Some(project) = queue.pop() {
+    let mut queue = vec![(project.to_string(), version, replace)];
+    while let Some((project, wanted_version, replace_file)) = queue.pop() {
         if !seen.insert(project.clone()) {
             continue;
         }
@@ -248,20 +258,86 @@ pub async fn install(state: &AppState, source_id: &str, id: &str, kind: ContentK
             filter.game_version = None;
             list = source.versions(&project, &filter).await?;
         }
-        let latest = list.into_iter().next().ok_or_else(|| AppError::NotFound(format!("No build for Minecraft {}", inst.version)))?;
-        let file = latest.primary_file().ok_or_else(|| AppError::NotFound("This version has no file".into()))?;
+        let picked = match wanted_version {
+            Some(vid) => list.into_iter().find(|v| v.id == vid).ok_or_else(|| AppError::NotFound(format!("Version {vid} not found for Minecraft {}", inst.version)))?,
+            None => list.into_iter().next().ok_or_else(|| AppError::NotFound(format!("No build for Minecraft {}", inst.version)))?,
+        };
+        let file = picked.primary_file().ok_or_else(|| AppError::NotFound("This version has no file".into()))?;
         if file.url.is_empty() {
             return Err(AppError::Unsupported(format!("The author of {} does not allow launchers to download it; get it from its page.", file.filename)));
         }
         if !plugin.may_download(&file.url) {
             return Err(AppError::Invalid(format!("{} is not an allowed download", file.url)));
         }
-        http::download(&state.http, &file.url, &dir.join(safe_file(&file.filename)?), None).await?;
+        let new_plain = safe_file(&file.filename)?;
+        let (target_name, old_to_remove, swap_pack_entry) = match replace_file {
+            Some(old) => {
+                let old = safe_file(old)?;
+                if kind == ContentKind::Mod {
+                    let was_disabled = old.ends_with(DISABLED);
+                    let target = if was_disabled { format!("{new_plain}{DISABLED}") } else { new_plain.to_string() };
+                    let remove = (old != target).then(|| old.to_string());
+                    (target, remove, None)
+                } else {
+                    let was_disabled_ext = old.ends_with(DISABLED);
+                    if was_disabled_ext {
+                        let target = format!("{new_plain}{DISABLED}");
+                        let remove = (old != target).then(|| old.to_string());
+                        (target, remove, None)
+                    } else {
+                        let instance_dir = state.paths.instance_dir(id)?;
+                        let was_active = active(&instance_dir, kind)?.is_some_and(|a| a.contains(old));
+                        let remove = (old != new_plain).then(|| old.to_string());
+                        let swap = (was_active && old != new_plain).then(|| (old.to_string(), new_plain.to_string()));
+                        (new_plain.to_string(), remove, swap)
+                    }
+                }
+            }
+            None => (new_plain.to_string(), None, None),
+        };
+        http::download(&state.http, &file.url, &dir.join(&target_name), None).await?;
+        if let Some((old_entry, new_entry)) = swap_pack_entry {
+            let instance_dir = state.paths.instance_dir(id)?;
+            let _ = replace_pack_entry(&instance_dir, kind, &old_entry, &new_entry);
+        }
+        if let Some(old) = old_to_remove {
+            let _ = std::fs::remove_file(dir.join(old));
+        }
         if kind == ContentKind::Mod {
-            queue.extend(latest.dependencies.into_iter().filter(|d| d.kind == DependencyKind::Required).filter_map(|d| d.project_id));
+            queue.extend(
+                picked
+                    .dependencies
+                    .into_iter()
+                    .filter(|d| d.kind == DependencyKind::Required)
+                    .filter_map(|d| d.project_id.map(|pid| (pid, None, None))),
+            );
         }
     }
     Ok(())
+}
+
+/// Updates `options.txt` or `config/iris.properties` in place when an active pack/shader changes its file name.
+fn replace_pack_entry(instance: &Path, kind: ContentKind, old_file: &str, new_file: &str) -> Result<()> {
+    match kind {
+        ContentKind::Resourcepack => {
+            let options = instance.join("options.txt");
+            let Ok(text) = std::fs::read_to_string(&options) else { return Ok(()) };
+            let old_entry = format!("file/{old_file}");
+            let new_entry = format!("file/{new_file}");
+            let mut packs = resource_packs(&text);
+            if let Some(pos) = packs.iter().position(|p| *p == old_entry) {
+                packs[pos] = new_entry;
+                let line = format!("resourcePacks:{}", serde_json::to_string(&packs)?);
+                std::fs::write(options, set_line(&text, "resourcePacks:", &line))?;
+            }
+            Ok(())
+        }
+        ContentKind::Shader => {
+            let props_path = instance.join("config").join("iris.properties");
+            set_shader(&props_path, new_file, true)
+        }
+        ContentKind::Mod => Ok(()),
+    }
 }
 
 fn loader_name(l: Loader) -> &'static str {
@@ -419,5 +495,22 @@ mod tests {
         assert!(super::safe_file("../evil.jar").is_err());
         assert!(super::safe_file(".hidden").is_err());
         assert!(super::safe_file("sodium-0.6.jar").is_ok());
+    }
+
+    #[test]
+    fn replaces_pack_entries_preserving_order() {
+        use crate::models::ContentKind;
+        let root = std::env::temp_dir().join(format!("tn-replace-{}", std::process::id()));
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::write(root.join("options.txt"), "fov:0.0\nresourcePacks:[\"vanilla\",\"file/pack-1.0.zip\",\"file/other.zip\"]\n").unwrap();
+        super::replace_pack_entry(&root, ContentKind::Resourcepack, "pack-1.0.zip", "pack-2.0.zip").unwrap();
+        let options = std::fs::read_to_string(root.join("options.txt")).unwrap();
+        assert_eq!(options, "fov:0.0\nresourcePacks:[\"vanilla\",\"file/pack-2.0.zip\",\"file/other.zip\"]\n");
+
+        super::replace_pack_entry(&root, ContentKind::Shader, "old-shader.zip", "new-shader.zip").unwrap();
+        let props = std::fs::read_to_string(root.join("config/iris.properties")).unwrap();
+        assert!(props.contains("shaderPack=new-shader.zip\n"), "{props}");
+        assert!(props.contains("enableShaders=true\n"), "{props}");
+        std::fs::remove_dir_all(root).unwrap();
     }
 }
