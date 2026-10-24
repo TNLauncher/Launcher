@@ -22,6 +22,7 @@ pub fn load_settings(state: &AppState) -> Settings {
 }
 
 pub fn save_settings(state: &AppState, settings: &Settings) -> Result<()> {
+    let _guard = state.store_lock.lock().unwrap();
     write(&state.paths.settings_file(), settings)
 }
 
@@ -31,6 +32,7 @@ pub fn load_account(state: &AppState) -> Option<Account> {
 }
 
 pub fn save_account(state: &AppState, account: Option<&Account>) -> Result<()> {
+    let _guard = state.store_lock.lock().unwrap();
     write(&state.paths.account_file(), &account)
 }
 
@@ -40,6 +42,7 @@ pub fn load_disabled_plugins(state: &AppState) -> Vec<String> {
 }
 
 pub fn save_disabled_plugins(state: &AppState, ids: &[String]) -> Result<()> {
+    let _guard = state.store_lock.lock().unwrap();
     write(&state.paths.plugins_file(), &ids)
 }
 
