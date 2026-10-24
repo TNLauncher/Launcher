@@ -1,16 +1,37 @@
 import { startTransition, useCallback, useEffect, useState, type SetStateAction } from "react";
 import { create } from "zustand";
 import type { Hit } from "@/api/sources";
+import type { ContentKind } from "@/types";
 import { preloadView } from "@/views";
 
 /** `plugin:<plugin id>:<page id>` = a page a plugin contributes. */
 export type View = "home" | "profiles" | "instances" | "modpacks" | "mods" | "console" | "settings" | `plugin:${string}:${string}`;
+
+/** Summary of a content item (mod, resource pack, shader) opened on its detail page. */
+export interface ContentTarget {
+  source: string;
+  kind: ContentKind;
+  instanceId: string;
+  project: {
+    id: string;
+    title: string;
+    description: string;
+    iconUrl: string | null;
+    author?: string;
+    downloads?: number;
+    follows?: number;
+    updated?: string;
+    bannerUrl?: string | null;
+    color?: number | null;
+  };
+}
 
 /** A screen: a section, optionally with one of its detail pages open. */
 export interface Route {
   view: View;
   instance?: string;
   pack?: { source: string; hit: Hit };
+  content?: ContentTarget;
 }
 
 export interface UiState {
@@ -48,7 +69,14 @@ const newEntry = (route: Route, ui: Entry["ui"] = {}) => {
 };
 
 const sameRoute = (a: Route, b: Route) =>
-  a.view === b.view && a.instance === b.instance && a.pack?.source === b.pack?.source && a.pack?.hit.id === b.pack?.hit.id;
+  a.view === b.view &&
+  a.instance === b.instance &&
+  a.pack?.source === b.pack?.source &&
+  a.pack?.hit.id === b.pack?.hit.id &&
+  a.content?.source === b.content?.source &&
+  a.content?.kind === b.content?.kind &&
+  a.content?.instanceId === b.content?.instanceId &&
+  a.content?.project.id === b.content?.project.id;
 
 let scroller: HTMLElement | null = null;
 /** The element whose scroll position each history entry remembers. */
@@ -118,10 +146,15 @@ export const useUi = create<UiState>((set) => ({
     go({ key, idx });
   },
 
-  // With nothing behind a detail page, Back still leads somewhere: up to its section.
+  // With nothing behind a detail page, Back still leads somewhere: up to its parent or section.
   back: () => {
-    if (pending.idx > 0) history.back();
-    else useUi.getState().navigate(entries.get(pending.key)!.route.view);
+    if (pending.idx > 0) {
+      history.back();
+    } else {
+      const cur = entries.get(pending.key)!.route;
+      if (cur.content && cur.instance) useUi.getState().navigate(cur.view, { instance: cur.instance });
+      else useUi.getState().navigate(cur.view);
+    }
   },
 
   forward: () => {
@@ -154,7 +187,7 @@ export function useUiInit() {
       if (e.altKey && e.key === "ArrowLeft") back();
       else if (e.altKey && e.key === "ArrowRight") forward();
       // Esc leaves a detail page, unless something on it (a field, a dialog, an open select) claims the key.
-      else if (e.key === "Escape" && (route.instance || route.pack) && !e.defaultPrevented && !typing(e.target) && !document.querySelector("dialog[open]")) back();
+      else if (e.key === "Escape" && (route.instance || route.pack || route.content) && !e.defaultPrevented && !typing(e.target) && !document.querySelector("dialog[open]")) back();
       else return;
       e.preventDefault();
     };

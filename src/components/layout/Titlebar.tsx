@@ -14,7 +14,7 @@ export function Titlebar() {
   const navigate = useUi((st) => st.navigate);
   const back = useUi((st) => st.back);
   const forward = useUi((st) => st.forward);
-  const { section, detail } = useRouteLabel()(route);
+  const { section, detail, subdetail } = useRouteLabel()(route);
   return (
     <header className={s.titlebar} data-tauri-drag-region>
       <div className={s.lead} data-tauri-drag-region>
@@ -27,7 +27,15 @@ export function Titlebar() {
           </button>
         </div>
         <nav className={s.crumbs} aria-label="Breadcrumb" data-tauri-drag-region>
-          {detail ? (
+          {subdetail && detail ? (
+            <>
+              <button className={s.crumb} onClick={() => navigate(route.view)}>{section}</button>
+              <Icon name="chevron_right" className={s.sep} />
+              <button className={s.crumb} onClick={() => navigate(route.view, { instance: route.instance })}>{detail}</button>
+              <Icon name="chevron_right" className={s.sep} />
+              <span className={s.current} aria-current="page" data-tauri-drag-region>{subdetail}</span>
+            </>
+          ) : detail ? (
             <>
               <button className={s.crumb} onClick={() => navigate(route.view)}>{section}</button>
               <Icon name="chevron_right" className={s.sep} />

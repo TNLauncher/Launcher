@@ -26,14 +26,24 @@ function useNav(): typeof NAV {
   return [...NAV.slice(0, -1), ...pages, NAV[NAV.length - 1]];
 }
 
-/** Names a screen: its section, and its detail page if one is open. */
-export function useRouteLabel(): (r: Route) => { section: string; detail?: string } {
+/** Names a screen: its section, and its detail page (or nested sub-detail) if one is open. */
+export function useRouteLabel(): (r: Route) => { section: string; detail?: string; subdetail?: string } {
   const nav = useNav();
   const instances = useLauncher((st) => st.snapshot?.instances);
-  return (r) => ({
-    section: nav.find((n) => n.view === r.view)?.label ?? "Page",
-    detail: r.pack?.hit.title ?? (r.instance ? (instances?.find((i) => i.id === r.instance)?.name ?? "Instance") : undefined),
-  });
+  return (r) => {
+    const instName = r.instance ? (instances?.find((i) => i.id === r.instance)?.name ?? "Instance") : undefined;
+    if (r.content && instName) {
+      return {
+        section: nav.find((n) => n.view === r.view)?.label ?? "Page",
+        detail: instName,
+        subdetail: r.content.project.title,
+      };
+    }
+    return {
+      section: nav.find((n) => n.view === r.view)?.label ?? "Page",
+      detail: r.content?.project.title ?? r.pack?.hit.title ?? instName,
+    };
+  };
 }
 
 /** What a detail page's back button returns to. */
@@ -41,7 +51,7 @@ export function useBackLabel(): string {
   const route = useUi((st) => st.route);
   const previous = useUi((st) => st.previous);
   const label = useRouteLabel()(previous ?? route);
-  return previous ? (label.detail ?? label.section) : label.section;
+  return previous ? (label.subdetail ?? label.detail ?? label.section) : (label.detail ?? label.section);
 }
 
 export function Sidebar() {

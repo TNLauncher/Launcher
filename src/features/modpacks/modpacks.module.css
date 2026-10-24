@@ -54,6 +54,7 @@
 /* Pack page */
 .pack-page { --pack: var(--accent); background: var(--view); min-height: 100%; padding-bottom: 40px; }
 .pack-hero { position: relative; overflow: hidden; background: color-mix(in srgb, var(--pack) 18%, var(--lowest)); }
+.pack-hero[hidden] { display: none; }
 .pack-hero-bg {
   position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.42;
   mask-image: linear-gradient(to bottom, #000 30%, transparent);

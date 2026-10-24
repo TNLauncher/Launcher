@@ -1,3 +1,4 @@
 .mods { padding: 16px max(24px, (100% - var(--page-max)) / 2) 24px; background: var(--view); }
-.head { display: flex; margin-bottom: 4px; }
+.head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
+.head[hidden] { display: none; }
 .picker { width: 280px; }

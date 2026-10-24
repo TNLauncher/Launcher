@@ -4,9 +4,11 @@ import { sources } from "@/api/sources";
 import { Button, Chip, Icon, IconButton } from "@/components/ui";
 import { cx } from "@/lib/cx";
 import { InstanceContent } from "@/features/content/InstanceContent";
+import { useInstanceBulkUpdate } from "@/features/content/useContent";
 import { lastPlayed, LOADER_ICON, loaderLabel, playTime } from "@/lib/format";
 import { useSourceEnabled } from "@/hooks/useSource";
 import { useLauncher } from "@/store/LauncherContext";
+import { useUi } from "@/store/UiContext";
 import { useBackLabel } from "@/components/layout/Sidebar";
 import type { Instance } from "@/types";
 // The page reuses the modpack hero.
@@ -18,6 +20,8 @@ export function InstancePage({ instance: i, onBack }: { instance: Instance; onBa
   const running = useLauncher((st) => st.snapshot?.running.includes(i.id) ?? false);
   const starting = useLauncher((st) => st.busyId === i.id);
   const busy = useLauncher((st) => st.busyId !== null);
+  const contentDetailOpen = useUi((st) => st.route.content?.instanceId === i.id);
+  const bulkUpdate = useInstanceBulkUpdate(i);
   const ref = i.pack;
   const sourceOn = useSourceEnabled(ref?.source);
   const pack = useQuery({ queryKey: ["project", ref?.source, ref?.project], queryFn: () => sources.project(ref!.source, ref!.project), enabled: !!ref && sourceOn });
@@ -28,7 +32,7 @@ export function InstancePage({ instance: i, onBack }: { instance: Instance; onBa
 
   return (
     <div className={cx(s.packPage, s.instancePage)} style={color != null ? ({ "--pack": `#${color.toString(16).padStart(6, "0")}` } as React.CSSProperties) : undefined}>
-      <div className={s.packHero}>
+      <div className={s.packHero} hidden={contentDetailOpen}>
         {banner && <img className={s.packHeroBg} src={banner} alt="" />}
         <div className={s.packHeroInner}>
           <Button variant="overlay" size="sm" icon="arrow_back" className={s.packBack} onClick={onBack}>
@@ -51,6 +55,18 @@ export function InstancePage({ instance: i, onBack }: { instance: Instance; onBa
               </div>
             </div>
             <div className={s.instanceActions}>
+              {bulkUpdate.canUpdate && (
+                <Button
+                  variant="overlay"
+                  icon="upgrade"
+                  loading={bulkUpdate.busy}
+                  disabled={running}
+                  title="Update all mods, resource packs and shaders"
+                  onClick={bulkUpdate.runUpdateAll}
+                >
+                  Update all
+                </Button>
+              )}
               <IconButton icon="folder_open" label="Open instance folder" variant="overlay" onClick={() => launcher.openInstanceDir(i.id)} />
               <Button variant="primary" size="lg" icon="play_arrow" loading={starting} disabled={running || busy} onClick={() => launch(i.id)}>
                 {running ? "Running" : starting ? "Starting" : "Play"}
@@ -59,7 +75,7 @@ export function InstancePage({ instance: i, onBack }: { instance: Instance; onBa
           </div>
         </div>
       </div>
-      <div className={s.instanceBody}>
+      <div className={cx(!contentDetailOpen && s.instanceBody)}>
         <InstanceContent key={i.id} instance={i} />
       </div>
     </div>

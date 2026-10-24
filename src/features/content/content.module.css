@@ -12,6 +12,7 @@
 .cpane-title h3 { margin: 0; font-size: 13px; font-weight: 600; }
 .cpane-title :global(.mono) { font-size: 11px; color: var(--subtle); }
 .push-end { margin-left: auto; }
+.head-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
 .identifying { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--subtle); }
 .identifying :global(.icon) { font-size: 14px; }
 .cpane-list { flex: 1; overflow-y: auto; padding: 0 8px 10px; display: flex; flex-direction: column; gap: 2px; transition: opacity var(--quick) var(--butter); }
@@ -21,10 +22,15 @@ fieldset.cpane-list:disabled .citem-actions { opacity: 0.5; }
 .list-skeleton { margin: 0 6px 6px; }
 .cpane-list > [role="alert"] { margin: 0 6px; }
 
-.citem { display: flex; align-items: center; gap: 12px; padding: 8px 8px; border-radius: 12px; transition: background var(--quick) var(--butter), opacity var(--quick) var(--butter); }
+.citem { display: flex; align-items: center; gap: 10px; padding: 8px 8px; border-radius: 12px; transition: background var(--quick) var(--butter), opacity var(--quick) var(--butter); }
 .citem:hover { background: var(--card); }
 .citem.off { opacity: 0.55; }
 .citem.off:hover { opacity: 0.85; }
+.citem-main-btn, .citem-main-static {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; text-align: left; padding: 0;
+}
+.citem-main-btn { border-radius: 8px; }
+.citem-main-btn:hover .citem-name b { color: var(--link); }
 .citem-icon {
   position: relative; width: 36px; height: 36px; border-radius: 9px; flex-shrink: 0; overflow: hidden;
   display: grid; place-items: center; background: rgb(255 255 255 / 0.07); color: var(--subtle);
@@ -35,17 +41,34 @@ fieldset.cpane-list:disabled .citem-actions { opacity: 0.5; }
 .citem-icon.big :global(.icon) { font-size: 22px; }
 .citem-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .citem-name { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 12px; }
-.citem-name b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.citem-name b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transition: color var(--quick) var(--butter); }
 .citem-name .by { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .small-chip { padding: 1px 6px; font-size: 10px; }
 .citem-sub { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--subtle); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .citem-sub :global(.icon) { font-size: 13px; }
-.citem-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.citem-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .reveal { opacity: 0; }
 .citem:hover .reveal, .cresult:hover .reveal, .reveal:focus-visible { opacity: 1; }
 
-.cresult { display: flex; align-items: flex-start; gap: 12px; padding: 10px 8px; border-radius: 12px; transition: background var(--quick) var(--butter); }
+.version-select {
+  height: 26px; padding: 0 6px 0 9px; border-radius: 8px; font-size: 11px; max-width: 128px;
+  background: rgb(255 255 255 / 0.05); border-color: rgb(255 255 255 / 0.08); color: var(--muted);
+}
+.version-select:hover:not(:disabled) { color: var(--fg); background: var(--card-hover); }
+.update-chip-btn {
+  height: 26px; padding: 0 10px; font-size: 11px; font-family: var(--mono);
+  background: rgb(10 132 255 / 0.14); border-color: rgb(10 132 255 / 0.32); color: var(--link);
+}
+.update-chip-btn:hover:not(:disabled) {
+  background: rgb(10 132 255 / 0.24); border-color: rgb(10 132 255 / 0.48); color: #fff;
+}
+
+.cresult { display: flex; align-items: flex-start; gap: 10px; padding: 10px 8px; border-radius: 12px; transition: background var(--quick) var(--butter); }
 .cresult:hover { background: var(--card); }
+.cresult-main-btn {
+  flex: 1; min-width: 0; display: flex; align-items: flex-start; gap: 12px; text-align: left; padding: 0; border-radius: 8px;
+}
+.cresult-main-btn:hover .citem-name b { color: var(--link); }
 .cresult-desc { margin: 0; font-size: 12px; line-height: 1.45; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .cresult-btn { flex-shrink: 0; }
 .installed { color: var(--muted); }
@@ -58,9 +81,40 @@ fieldset.cpane-list:disabled .citem-actions { opacity: 0.5; }
 .content-notice > :global(.icon) { color: var(--accent); font-size: 18px; }
 .content-notice span { flex: 1; }
 
+/* ContentDetail sidebar cards */
+.detail-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.update-callout {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 10px 12px; border-radius: 12px;
+  background: rgb(10 132 255 / 0.11); border: 1px solid rgb(10 132 255 / 0.28);
+}
+.update-callout-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.update-callout-text b { font-size: 12px; font-weight: 600; color: var(--fg); }
+.update-callout-text span { font-size: 11px; color: var(--link); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.installed-controls {
+  display: flex; flex-direction: column; gap: 10px; padding-top: 10px; border-top: 1px solid var(--card-border);
+}
+.installed-toggle {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--muted); cursor: pointer;
+}
+
+.dep-list { display: flex; flex-direction: column; gap: 6px; }
+.dep-item {
+  display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 10px;
+  background: var(--card); border: 1px solid var(--card-border); text-align: left; min-width: 0;
+  transition: background var(--quick) var(--butter);
+}
+.dep-item:hover { background: var(--card-hover); }
+.dep-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; font-size: 12px; }
+.dep-text b { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dep-text span { font-size: 11px; color: var(--subtle); }
+.dep-check { font-size: 16px; color: var(--green); flex-shrink: 0; }
+
 @media (max-width: 1100px) {
   .content-split { gap: 12px; }
   .cats { gap: 4px; }
+  .version-select { max-width: 104px; }
 }
 
 /* A plugin's instance tab: its page in a sandboxed frame. */

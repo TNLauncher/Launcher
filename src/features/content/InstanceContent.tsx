@@ -1,22 +1,25 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { memo, useCallback, useRef, useState } from "react";
-import { useRouteState } from "@/store/UiContext";
+import { lazy, memo, Suspense, useCallback, useRef, useState } from "react";
 import { launcher } from "@/api/launcher";
 import { sources, type Hit, type SourceInfo } from "@/api/sources";
-import { Banner, Button, Chip, ConfirmDialog, EmptyState, Icon, IconButton, Pill, PillGroup, SearchInput, Skeleton, Switch, Tab, Tabs } from "@/components/ui";
-import { cx } from "@/lib/cx";
-import { Screenshots } from "@/features/screenshots/Screenshots";
+import { Banner, Button, Chip, ConfirmDialog, EmptyState, Icon, IconButton, Pill, PillGroup, SearchInput, Select, Skeleton, Switch, Tab, Tabs, toast } from "@/components/ui";
 import { InstanceSettingsPane } from "@/features/instances/InstanceSettings";
+import { Screenshots } from "@/features/screenshots/Screenshots";
 import { useDebounced } from "@/hooks/useDebounced";
 import { useFavorites, usePlugins, useSource } from "@/hooks/useSource";
+import { cx } from "@/lib/cx";
+import { compact, errorMessage, megabytes, plural } from "@/lib/format";
 import { pluginBase } from "@/plugins/bridge";
 import { PluginFrame } from "@/plugins/PluginHost";
 import { SourcePicker } from "@/plugins/SourcePicker";
-import { compact, errorMessage, megabytes } from "@/lib/format";
 import { useLauncher } from "@/store/LauncherContext";
+import { useRouteState, useUi, type ContentTarget } from "@/store/UiContext";
 import type { ContentKind, Instance } from "@/types";
-import { label, useContent, type ContentItem } from "./useContent";
 import s from "./content.module.css";
+import { label, useContent, type ContentItem } from "./useContent";
+
+const loadContentDetail = () => import("./ContentDetail");
+const ContentDetail = lazy(() => loadContentDetail().then((m) => ({ default: m.ContentDetail })));
 
 interface KindInfo {
   label: string;
@@ -59,69 +62,110 @@ export function InstanceContent({ instance }: { instance: Instance }) {
   const pluginTabs = (usePlugins().data ?? []).filter((p) => p.enabled).flatMap((p) => p.instanceTabs.map((t) => ({ plugin: p, tab: t, key: `plugin:${p.id}:${t.id}` as const })));
   const openPluginTab = pluginTabs.find((t) => t.key === tab);
   const content = {
-    mod: useContent(instance.id, "mod", tab === "mod" || tab === "shader"),
-    resourcepack: useContent(instance.id, "resourcepack", tab === "resourcepack"),
-    shader: useContent(instance.id, "shader", tab === "shader"),
+    mod: useContent(instance, "mod", tab === "mod" || tab === "shader"),
+    resourcepack: useContent(instance, "resourcepack", tab === "resourcepack"),
+    shader: useContent(instance, "shader", tab === "shader"),
   };
   const current = content[kind];
   const source = useSource();
+  const route = useUi((st) => st.route);
+  const navigate = useUi((st) => st.navigate);
+  const back = useUi((st) => st.back);
   const needsLoader = kind !== "resourcepack" && !modded;
   const irisMissing =
     kind === "shader" && (instance.loader === "fabric" || instance.loader === "quilt") && source?.id === IRIS.source && !!content.mod.items && !content.mod.identifying && !content.mod.installedProjects.has(IRIS.project);
 
+  const openContent = route.content?.instanceId === instance.id && source && route.content.source === source.id ? route.content : null;
+
+  const openProject = useCallback(
+    (target: ContentTarget) => {
+      navigate(route.view, { instance: route.instance, content: target });
+    },
+    [navigate, route.view, route.instance]
+  );
+
   return (
     <div>
-      <Tabs label="Instance content">
-        {ORDER.map((k) => (
-          <Tab key={k} selected={tab === k} onSelect={() => setTab(k)} icon={KINDS[k].icon} count={content[k].items?.length ?? ""}>
-            {KINDS[k].label}
-          </Tab>
-        ))}
-        <Tab selected={tab === "screenshots"} onSelect={() => setTab("screenshots")} icon="photo_camera">
-          Screenshots
-        </Tab>
-        <Tab selected={tab === "settings"} onSelect={() => setTab("settings")} icon="tune">
-          Settings
-        </Tab>
-        {pluginTabs.map((t) => (
-          <Tab key={t.key} selected={tab === t.key} onSelect={() => setTab(t.key)} icon={t.tab.icon}>
-            {t.tab.title}
-          </Tab>
-        ))}
-      </Tabs>
-
-      {openPluginTab ? (
-        <PluginFrame
-          key={`${openPluginTab.key}/${instance.id}`}
-          plugin={openPluginTab.plugin.id}
-          instances={openPluginTab.plugin.permissions.instances}
-          src={`${pluginBase}${openPluginTab.plugin.id}/${openPluginTab.tab.entry}?instance=${encodeURIComponent(instance.id)}`}
-          title={openPluginTab.tab.title}
-          className={s.pluginTab}
-        />
-      ) : tab.startsWith("plugin:") ? (
-        <EmptyState icon="extension_off">This plugin tab is not available.</EmptyState>
-      ) : tab === "settings" ? (
-        <InstanceSettingsPane instance={instance} />
-      ) : tab === "screenshots" ? (
-        <Screenshots instanceId={instance.id} />
-      ) : needsLoader ? (
-        <EmptyState icon={KINDS[kind].icon}>
-          Vanilla can't load {KINDS[kind].noun}. Create a modded instance to use them.
-        </EmptyState>
-      ) : (
-        <>
-          {irisMissing && <IrisNotice instance={instance} onInstalled={content.mod.reload} />}
-          <div className={s.contentSplit}>
-            <InstalledPane key={kind} instance={instance} kind={kind} content={current} sourceName={source?.name} />
-            {source ? (
-              <BrowsePane key={`${source.id}-${kind}`} source={source} instance={instance} kind={kind} installed={current.installedProjects} onInstalled={current.reload} />
-            ) : (
-              <EmptyState icon="extension_off">Turn on a content source in Settings → Plugins to add {KINDS[kind].noun}.</EmptyState>
-            )}
-          </div>
-        </>
+      {openContent && source && (
+        <Suspense>
+          <ContentDetail
+            source={source}
+            target={openContent}
+            instance={instance}
+            content={content[openContent.kind]}
+            onBack={back}
+            onOpenProject={openProject}
+          />
+        </Suspense>
       )}
+      <div hidden={!!openContent} onPointerOver={loadContentDetail} onFocus={loadContentDetail}>
+        <Tabs label="Instance content">
+          {ORDER.map((k) => (
+            <Tab key={k} selected={tab === k} onSelect={() => setTab(k)} icon={KINDS[k].icon} count={content[k].items?.length ?? ""}>
+              {KINDS[k].label}
+            </Tab>
+          ))}
+          <Tab selected={tab === "screenshots"} onSelect={() => setTab("screenshots")} icon="photo_camera">
+            Screenshots
+          </Tab>
+          <Tab selected={tab === "settings"} onSelect={() => setTab("settings")} icon="tune">
+            Settings
+          </Tab>
+          {pluginTabs.map((t) => (
+            <Tab key={t.key} selected={tab === t.key} onSelect={() => setTab(t.key)} icon={t.tab.icon}>
+              {t.tab.title}
+            </Tab>
+          ))}
+        </Tabs>
+
+        {openPluginTab ? (
+          <PluginFrame
+            key={`${openPluginTab.key}/${instance.id}`}
+            plugin={openPluginTab.plugin.id}
+            instances={openPluginTab.plugin.permissions.instances}
+            src={`${pluginBase}${openPluginTab.plugin.id}/${openPluginTab.tab.entry}?instance=${encodeURIComponent(instance.id)}`}
+            title={openPluginTab.tab.title}
+            className={s.pluginTab}
+          />
+        ) : tab.startsWith("plugin:") ? (
+          <EmptyState icon="extension_off">This plugin tab is not available.</EmptyState>
+        ) : tab === "settings" ? (
+          <InstanceSettingsPane instance={instance} />
+        ) : tab === "screenshots" ? (
+          <Screenshots instanceId={instance.id} />
+        ) : needsLoader ? (
+          <EmptyState icon={KINDS[kind].icon}>
+            Vanilla can't load {KINDS[kind].noun}. Create a modded instance to use them.
+          </EmptyState>
+        ) : (
+          <>
+            {irisMissing && <IrisNotice instance={instance} onInstalled={content.mod.reload} />}
+            <div className={s.contentSplit}>
+              <InstalledPane
+                key={kind}
+                instance={instance}
+                kind={kind}
+                content={current}
+                source={source ?? undefined}
+                onOpenProject={openProject}
+              />
+              {source ? (
+                <BrowsePane
+                  key={`${source.id}-${kind}`}
+                  source={source}
+                  instance={instance}
+                  kind={kind}
+                  installed={current.installedProjects}
+                  onInstalled={current.reload}
+                  onOpenProject={openProject}
+                />
+              ) : (
+                <EmptyState icon="extension_off">Turn on a content source in Settings → Plugins to add {KINDS[kind].noun}.</EmptyState>
+              )}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }
@@ -148,17 +192,30 @@ function IrisNotice({ instance, onInstalled }: { instance: Instance; onInstalled
   );
 }
 
-function InstalledPane({ instance, kind, content, sourceName }: { instance: Instance; kind: ContentKind; content: ReturnType<typeof useContent>; sourceName?: string }) {
+function InstalledPane({
+  instance,
+  kind,
+  content,
+  source,
+  onOpenProject,
+}: {
+  instance: Instance;
+  kind: ContentKind;
+  content: ReturnType<typeof useContent>;
+  source?: SourceInfo;
+  onOpenProject(target: ContentTarget): void;
+}) {
   const refresh = useLauncher((st) => st.refresh);
   // The game rewrites options.txt and Iris' config on exit, and Windows locks loaded jars.
   const running = useLauncher((st) => st.snapshot?.running.includes(instance.id) ?? false);
   const info = KINDS[kind];
+  const sourceName = source?.name;
   const [filter, setFilter] = useState("");
   const [error, setError] = useState("");
   const [removing, setRemoving] = useState<ContentItem | null>(null);
-  const { items } = content;
+  const { items, updatableCount, updatingAll, busyFiles } = content;
 
-  const act = (action: Promise<void>) =>
+  const act = (action: Promise<unknown>) =>
     action
       .then(() => setError(""))
       .catch((e) => setError(errorMessage(e)))
@@ -166,6 +223,16 @@ function InstalledPane({ instance, kind, content, sourceName }: { instance: Inst
         content.reload();
         refresh();
       });
+
+  const handleUpdateAll = async () => {
+    setError("");
+    try {
+      const count = await content.updateAll();
+      if (count > 0) toast(`Updated ${plural(count, info.noun.replace(/s$/, ""))}`);
+    } catch (e) {
+      setError(errorMessage(e));
+    }
+  };
 
   const q = filter.trim().toLowerCase();
   const shown = (items ?? []).filter((i) => !q || `${label(i)} ${i.file}`.toLowerCase().includes(q));
@@ -188,7 +255,21 @@ function InstalledPane({ instance, kind, content, sourceName }: { instance: Inst
               Matching with {sourceName}
             </span>
           )}
-          <IconButton icon="folder_open" label={`Open ${info.folder} folder`} className={s.pushEnd} onClick={() => act(launcher.openInstanceDir(instance.id, info.folder))} />
+          <div className={s.headActions}>
+            {updatableCount > 0 && (
+              <Button
+                variant="primary"
+                size="sm"
+                icon="upgrade"
+                loading={updatingAll}
+                disabled={running}
+                onClick={handleUpdateAll}
+              >
+                Update all ({updatableCount})
+              </Button>
+            )}
+            <IconButton icon="folder_open" label={`Open ${info.folder} folder`} onClick={() => act(launcher.openInstanceDir(instance.id, info.folder))} />
+          </div>
         </div>
         {!!items?.length && (
           <SearchInput label={`Filter installed ${info.noun}`} placeholder={`Filter ${info.noun}`} value={filter} onChange={setFilter} />
@@ -205,26 +286,106 @@ function InstalledPane({ instance, kind, content, sourceName }: { instance: Inst
         ) : !shown.length ? (
           <EmptyState icon="search_off">Nothing matches “{filter}”.</EmptyState>
         ) : (
-          shown.map((i) => (
-            <div key={i.file} className={cx(s.citem, !i.enabled && s.off)}>
-              <ItemIcon item={i} instanceId={instance.id} kind={kind} />
-              <div className={s.citemText}>
-                <div className={s.citemName}>
-                  <b title={i.project?.description}>{label(i)}</b>
-                  {!i.enabled && <Chip className={s.smallChip}>Disabled</Chip>}
+          shown.map((i) => {
+            const isBusy = busyFiles.has(i.file);
+            const canOpen = !!i.project && !!source;
+            const openDetail = () => {
+              if (!i.project || !source) return;
+              onOpenProject({
+                source: source.id,
+                kind,
+                instanceId: instance.id,
+                project: {
+                  id: i.project.id,
+                  title: i.project.title,
+                  description: i.project.description,
+                  iconUrl: i.project.iconUrl,
+                },
+              });
+            };
+            return (
+              <div key={i.file} className={cx(s.citem, !i.enabled && s.off)}>
+                {canOpen ? (
+                  <button type="button" className={s.citemMainBtn} onClick={openDetail} title={`Open ${label(i)} page`}>
+                    <ItemIcon item={i} instanceId={instance.id} kind={kind} />
+                    <div className={s.citemText}>
+                      <div className={s.citemName}>
+                        <b>{label(i)}</b>
+                        {!i.enabled && <Chip className={s.smallChip}>Disabled</Chip>}
+                      </div>
+                      <span className={cx(s.citemSub, "mono")} title={i.file}>
+                        {i.versionNumber && <>{i.versionNumber} · </>}
+                        {megabytes(i.size)}
+                      </span>
+                    </div>
+                  </button>
+                ) : (
+                  <div className={s.citemMainStatic}>
+                    <ItemIcon item={i} instanceId={instance.id} kind={kind} />
+                    <div className={s.citemText}>
+                      <div className={s.citemName}>
+                        <b title={i.project?.description}>{label(i)}</b>
+                        {!i.enabled && <Chip className={s.smallChip}>Disabled</Chip>}
+                      </div>
+                      <span className={cx(s.citemSub, "mono")} title={i.file}>
+                        {i.versionNumber && <>{i.versionNumber} · </>}
+                        {megabytes(i.size)}
+                        {!i.project && !content.identifying && sourceName && ` · not on ${sourceName}`}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                <div className={s.citemActions}>
+                  {i.hasUpdate && i.latestVersion && (
+                    <Button
+                      size="sm"
+                      icon="upgrade"
+                      className={s.updateChipBtn}
+                      loading={isBusy}
+                      title={`Update to ${i.latestVersion.number}`}
+                      aria-label={`Update ${label(i)} to ${i.latestVersion.number}`}
+                      onClick={() =>
+                        content
+                          .updateItem(i)
+                          .then(() => toast(`Updated ${label(i)} to ${i.latestVersion!.number}`))
+                          .catch((e) => setError(errorMessage(e)))
+                      }
+                    >
+                      {i.latestVersion.number}
+                    </Button>
+                  )}
+
+                  {i.versions && i.versions.length > 0 && (
+                    <Select
+                      label={`Version of ${label(i)}`}
+                      className={cx(s.versionSelect, "mono")}
+                      value={i.currentVersion?.id ?? ""}
+                      disabled={isBusy}
+                      placeholder={i.versionNumber ?? "Version"}
+                      onChange={(vid) =>
+                        content
+                          .switchVersion(i, vid)
+                          .then(() => {
+                            const picked = i.versions?.find((v) => v.id === vid);
+                            toast(`Switched ${label(i)} to ${picked?.number ?? "selected version"}`);
+                          })
+                          .catch((e) => setError(errorMessage(e)))
+                      }
+                      options={i.versions.map((v) => ({
+                        value: v.id,
+                        label: v.number,
+                        hint: v.id === i.currentVersion?.id ? "current" : v.channel !== "release" ? v.channel : undefined,
+                      }))}
+                    />
+                  )}
+
+                  <IconButton icon="delete" label={`Remove ${label(i)}`} title="Remove" variant="danger" className={s.reveal} onClick={() => setRemoving(i)} />
+                  <Switch label={`${i.enabled ? "Disable" : "Enable"} ${label(i)}`} checked={i.enabled} onChange={() => act(launcher.toggleContent(instance.id, kind, i.file))} />
                 </div>
-                <span className={cx(s.citemSub, "mono")} title={i.file}>
-                  {i.versionNumber && <>{i.versionNumber} · </>}
-                  {megabytes(i.size)}
-                  {!i.project && !content.identifying && sourceName && ` · not on ${sourceName}`}
-                </span>
               </div>
-              <div className={s.citemActions}>
-                <IconButton icon="delete" label={`Remove ${label(i)}`} title="Remove" variant="danger" className={s.reveal} onClick={() => setRemoving(i)} />
-                <Switch label={`${i.enabled ? "Disable" : "Enable"} ${label(i)}`} checked={i.enabled} onChange={() => act(launcher.toggleContent(instance.id, kind, i.file))} />
-              </div>
-            </div>
-          ))
+            );
+          })
         )}
       </fieldset>
 
@@ -259,8 +420,15 @@ function ItemIcon({ item, instanceId, kind }: { item: ContentItem; instanceId: s
 
 type InstallState = "installing" | "installed" | { error: string };
 
-function BrowsePane(p: { source: SourceInfo; instance: Instance; kind: ContentKind; installed: Set<string>; onInstalled(): void }) {
-  const { source, instance, kind, installed, onInstalled } = p;
+function BrowsePane(p: {
+  source: SourceInfo;
+  instance: Instance;
+  kind: ContentKind;
+  installed: Set<string>;
+  onInstalled(): void;
+  onOpenProject(target: ContentTarget): void;
+}) {
+  const { source, instance, kind, installed, onInstalled, onOpenProject } = p;
   const info = KINDS[kind];
   const categories = [{ id: "", label: "All" }, ...(source.categories[kind] ?? [])];
   const [query, setQuery] = useState("");
@@ -299,6 +467,29 @@ function BrowsePane(p: { source: SourceInfo; instance: Instance; kind: ContentKi
     [source.id, instance.id, kind, onInstalled]
   );
 
+  const openHit = useCallback(
+    (hit: Hit) => {
+      onOpenProject({
+        source: source.id,
+        kind,
+        instanceId: instance.id,
+        project: {
+          id: hit.id,
+          title: hit.title,
+          description: hit.description,
+          iconUrl: hit.iconUrl,
+          author: hit.author,
+          downloads: hit.downloads,
+          follows: hit.follows,
+          updated: hit.updated,
+          bannerUrl: hit.bannerUrl,
+          color: hit.color,
+        },
+      });
+    },
+    [onOpenProject, source.id, kind, instance.id]
+  );
+
   const q = debounced.toLowerCase();
   const shownFavorites = favorites.hits.filter((h) => !q || h.title.toLowerCase().includes(q));
   const card = (h: Hit) => (
@@ -308,6 +499,7 @@ function BrowsePane(p: { source: SourceInfo; instance: Instance; kind: ContentKi
       icon={info.icon}
       state={installed.has(h.id) ? "installed" : installs[h.id]}
       favorite={favorites.ids.has(h.id)}
+      onOpen={openHit}
       onInstall={install}
       onFavorite={favorites.toggle}
     />
@@ -355,20 +547,30 @@ function BrowsePane(p: { source: SourceInfo; instance: Instance; kind: ContentKi
   );
 }
 
-const ResultCard = memo(function ResultCard(p: { hit: Hit; icon: string; state?: InstallState; favorite: boolean; onInstall(id: string): void; onFavorite(hit: Hit): void }) {
-  const { hit, icon, state, favorite, onInstall, onFavorite } = p;
+const ResultCard = memo(function ResultCard(p: {
+  hit: Hit;
+  icon: string;
+  state?: InstallState;
+  favorite: boolean;
+  onOpen(hit: Hit): void;
+  onInstall(id: string): void;
+  onFavorite(hit: Hit): void;
+}) {
+  const { hit, icon, state, favorite, onOpen, onInstall, onFavorite } = p;
   const failed = typeof state === "object";
   return (
     <div className={s.cresult}>
-      <span className={cx(s.citemIcon, s.big)}>{hit.iconUrl ? <img src={hit.iconUrl} alt="" loading="lazy" /> : <Icon name={icon} />}</span>
-      <div className={s.citemText}>
-        <div className={s.citemName}>
-          <b>{hit.title}</b>
-          <span className={s.by}>by {hit.author}</span>
+      <button type="button" className={s.cresultMainBtn} onClick={() => onOpen(hit)}>
+        <span className={cx(s.citemIcon, s.big)}>{hit.iconUrl ? <img src={hit.iconUrl} alt="" loading="lazy" /> : <Icon name={icon} />}</span>
+        <div className={s.citemText}>
+          <div className={s.citemName}>
+            <b>{hit.title}</b>
+            <span className={s.by}>by {hit.author}</span>
+          </div>
+          <p className={s.cresultDesc}>{hit.description}</p>
+          <span className={cx(s.citemSub, "mono")}><Icon name="download" />{compact(hit.downloads)}</span>
         </div>
-        <p className={s.cresultDesc}>{hit.description}</p>
-        <span className={cx(s.citemSub, "mono")}><Icon name="download" />{compact(hit.downloads)}</span>
-      </div>
+      </button>
       <IconButton
         icon="star"
         fill={favorite}

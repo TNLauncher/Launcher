@@ -176,9 +176,15 @@ export const sources = {
 
   /** Installed files of one kind the source recognises, by file name. */
   identifyContent: (source: string, id: string, kind: ContentKind) => call<Record<string, IdentifiedFile>>("identify_content", { source, id, kind }),
-  /** Newest fitting build, plus required dependencies for mods; `skip` = projects already installed. */
-  installContent: (source: string, id: string, kind: ContentKind, project: string, skip: string[] = []) =>
-    call<void>("install_content", { source, id, kind, project, skip }),
+  /** Installs a build (`version` id, omitted = newest), plus required dependencies for mods; `replace` swaps an existing file in place; `skip` = projects already installed. */
+  installContent: (
+    source: string,
+    id: string,
+    kind: ContentKind,
+    project: string,
+    skip: string[] = [],
+    options?: { version?: string; replace?: string }
+  ) => call<void>("install_content", { source, id, kind, project, skip, version: options?.version ?? null, replace: options?.replace ?? null }),
   /** New instance from a modpack; `version` is a version id, omitted = newest. */
   importModpack: (source: string, project: string, version: string | undefined, onProgress: (p: ImportProgress) => void) => {
     const channel = new Channel<ImportProgress>();
