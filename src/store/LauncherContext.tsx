@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { launcher } from "@/api/launcher";
+import { BackendError } from "@/api/ipc";
 import { toast } from "@/components/ui/Toast";
 import { broadcast } from "@/plugins/bridge";
 import { gameLogs } from "./gameLogs";
@@ -122,7 +123,8 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
         imports.dismiss(id);
         toast(`${pack.title} is ready to play`);
       } catch (e) {
-        imports.fail(id, errorMessage(e));
+        if (e instanceof BackendError && e.kind === "cancelled") imports.dismiss(id);
+        else imports.fail(id, errorMessage(e));
       }
     },
     [refresh, select]

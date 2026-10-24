@@ -1,5 +1,6 @@
 import { lazy, Suspense, useMemo, useState } from "react";
 import { View } from "@/components/layout/View";
+import { sources } from "@/api/sources";
 import { Banner, Button, Chip, EmptyState, Icon, IconButton, Meta, Pill, PillGroup, ProgressBar, SearchInput, Select } from "@/components/ui";
 import { cx } from "@/lib/cx";
 import { LOADERS, recency } from "@/lib/format";
@@ -136,6 +137,11 @@ function ImportRow({ pending: p }: { pending: PendingImport }) {
           )}
         </div>
       </div>
+      {!p.error && (
+        <div className={s.rowActions}>
+          <IconButton icon="close" label="Cancel" onClick={() => sources.cancelImport(p.projectId)} />
+        </div>
+      )}
       {p.error && (
         <div className={s.rowActions}>
           <Button icon="refresh" onClick={() => startImport(p.source, { id: p.projectId, title: p.title, iconUrl: p.iconUrl }, p.version)}>

@@ -181,4 +181,6 @@ export const sources = {
     channel.onmessage = onProgress;
     return call<Instance>("import_modpack", { source, project, version, onProgress: channel });
   },
+  /** Stops `importModpack` for this project; it then rejects with kind `cancelled`. */
+  cancelImport: (project: string) => call<void>("cancel_modpack_import", { project }),
 };
