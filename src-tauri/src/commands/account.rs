@@ -23,6 +23,12 @@ pub fn remove_account(state: State<'_, AppState>, id: String) -> Result<()> {
     account::remove(&state, &id)
 }
 
+/// Adds (or selects) an offline profile by player name.
+#[tauri::command]
+pub fn add_offline_account(state: State<'_, AppState>, name: String) -> Result<String> {
+    account::add_offline(&state, &name)
+}
+
 /// Opens the Microsoft code page, sends the code to the UI, resolves with the player name once approved.
 #[tauri::command]
 pub async fn microsoft_login(app: AppHandle, state: State<'_, AppState>, on_code: Channel<DeviceCode>) -> Result<String> {

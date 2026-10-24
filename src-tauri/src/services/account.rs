@@ -1,8 +1,8 @@
-//! Player accounts: any number of Microsoft or plugin-provided accounts, one of them selected;
-//! none selected = offline with the name from settings. Persisted in accounts.json.
+//! Player accounts: any number of Microsoft, plugin-provided or offline accounts, one of them selected;
+//! none selected = offline with the default name from settings. Persisted in accounts.json.
 use crate::error::{AppError, Result};
 use crate::minecraft::{
-    auth::{self, DeviceCode, Session},
+    auth::{self, offline_uuid, DeviceCode, Session},
     http,
 };
 use crate::plugins::{self, js::PluginSession};
@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 pub const MICROSOFT: &str = "microsoft";
+pub const OFFLINE: &str = "offline";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -80,6 +81,7 @@ fn new_id() -> String {
 fn provider_name(state: &AppState, provider: &str) -> String {
     match provider {
         MICROSOFT => "Microsoft".into(),
+        OFFLINE => "Offline".into(),
         id => state.plugins.get(id).map(|p| p.manifest.name.clone()).unwrap_or_else(|_| id.into()),
     }
 }
@@ -125,7 +127,7 @@ pub fn remove(state: &AppState, id: &str) -> Result<()> {
     update(state, |all| {
         all.accounts.retain(|a| a.id != id);
         if all.selected.as_deref() == Some(id) {
-            all.selected = None;
+            all.selected = all.accounts.first().map(|a| a.id.clone());
         }
         Ok(())
     })
@@ -142,6 +144,16 @@ fn add(state: &AppState, acc: Account) -> Result<String> {
         all.accounts.push(acc);
         Ok(name)
     })
+}
+
+/// Adds (or, for the same offline player name, selects) an offline account.
+pub fn add_offline(state: &AppState, name: &str) -> Result<String> {
+    let name = name.trim();
+    if !(3..=16).contains(&name.len()) || !name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+        return Err(AppError::Invalid("Player name must be 3–16 letters, digits or underscores".into()));
+    }
+    let uuid = offline_uuid(name);
+    add(state, Account { id: new_id(), provider: OFFLINE.into(), name: name.into(), uuid, microsoft: None, data: Value::Null })
 }
 
 /// Runs the Microsoft device-code flow.
@@ -182,6 +194,9 @@ pub async fn session(state: &AppState, offline_name: &str) -> Result<Session> {
     let Some(acc) = all.selected.as_ref().and_then(|id| all.accounts.iter().find(|a| &a.id == id)).cloned() else {
         return Ok(Session::offline(offline_name));
     };
+    if acc.provider == OFFLINE {
+        return Ok(Session::offline(&acc.name));
+    }
     if acc.provider == MICROSOFT {
         let ms = acc.microsoft.clone().ok_or_else(|| AppError::Invalid("Microsoft account has no tokens; sign in again".into()))?;
         if ms.fresh() {
@@ -253,6 +268,14 @@ mod tests {
         remove(&state, &view.id).unwrap();
         assert!(list(&state).is_empty() && selected(&state).is_none());
         assert!(select(&state, Some("nope")).is_err());
+
+        add_offline(&state, "Alex_1").unwrap();
+        let off = selected(&state).unwrap();
+        assert_eq!((off.name.as_str(), off.provider.as_str(), off.provider_name.as_str()), ("Alex_1", "offline", "Offline"));
+        // Adding the same offline name again replaces it instead of duplicating.
+        add_offline(&state, "Alex_1").unwrap();
+        assert_eq!(list(&state).len(), 1);
+        assert!(add_offline(&state, "ab").is_err());
         std::fs::remove_dir_all(root).unwrap();
     }
 

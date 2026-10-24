@@ -86,6 +86,7 @@ pub fn run() {
             commands::account::list_accounts,
             commands::account::select_account,
             commands::account::remove_account,
+            commands::account::add_offline_account,
             commands::account::microsoft_login,
             commands::account::plugin_login,
             commands::account::account_skin,
