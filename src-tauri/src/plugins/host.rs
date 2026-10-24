@@ -108,13 +108,14 @@ pub fn host_allowed(hosts: &[String], url: &str) -> bool {
         })
 }
 
-/// Instances as plugins see them: plus `mods`, the number of enabled mod jars.
+/// Instances as plugins see them: plus `mods`, the number of enabled mod jars; minus launch settings (env may hold secrets).
 fn with_mods(state: &AppState, list: Vec<crate::models::Instance>) -> Result<Value> {
     let counts = crate::services::instances::mod_counts(state, &list);
     let mut v = serde_json::to_value(&list)?;
     for i in v.as_array_mut().into_iter().flatten() {
         let n = i["id"].as_str().and_then(|id| counts.get(id)).copied().unwrap_or(0);
         i["mods"] = n.into();
+        i.as_object_mut().map(|o| o.remove("settings"));
     }
     Ok(v)
 }

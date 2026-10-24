@@ -29,7 +29,7 @@ async fn fabric_reaches_main_menu_init() {
 
     let mut cmd = command::build(&v, &command::LaunchOptions {
         java: &java, root: &root, game_dir: &game_dir, natives: &natives, classpath: &cp,
-        session: &auth::Session::offline("Tester"), ram_mb: 2048, jvm_args: "", width: 854, height: 480, fullscreen: false,
+        session: &auth::Session::offline("Tester"), ram_mb: 2048, jvm_args: "", width: 854, height: 480, fullscreen: false, wrapper: "",
     });
     let child = cmd.stdout(Stdio::piped()).stderr(Stdio::piped()).spawn().unwrap();
     let pid = child.id();

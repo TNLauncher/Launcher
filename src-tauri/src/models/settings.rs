@@ -1,3 +1,4 @@
+use super::InstanceSettings;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -42,6 +43,19 @@ impl Default for Settings {
 }
 
 impl Settings {
+    /// These settings with an instance's overrides applied.
+    pub fn for_instance(&self, o: &InstanceSettings) -> Self {
+        Self {
+            java_path: o.java_path.clone().unwrap_or_else(|| self.java_path.clone()),
+            ram_mb: o.ram_mb.unwrap_or(self.ram_mb),
+            jvm_args: o.jvm_args.clone().unwrap_or_else(|| self.jvm_args.clone()),
+            width: o.width.unwrap_or(self.width),
+            height: o.height.unwrap_or(self.height),
+            fullscreen: o.fullscreen.unwrap_or(self.fullscreen),
+            ..self.clone()
+        }
+    }
+
     /// Offline-mode name, falling back to "Player" when unset or invalid.
     pub fn player_name(&self) -> &str {
         let n = self.username.trim();

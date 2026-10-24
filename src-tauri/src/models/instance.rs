@@ -27,6 +27,8 @@ pub struct Instance {
     pub icon: String,
     /// Modpack the instance was created from; `None` = made by hand.
     pub pack: Option<PackRef>,
+    /// Per-instance launch options; unset fields fall back to the global settings.
+    pub settings: InstanceSettings,
     /// Pre-plugin builds stored a Modrinth project here; read once and moved into `pack`.
     #[serde(skip_serializing)]
     pub(crate) modpack_id: String,
@@ -41,6 +43,28 @@ impl Instance {
             let project = std::mem::take(&mut self.modpack_id);
             self.pack = Some(PackRef { source: "modrinth".into(), project, version: std::mem::take(&mut self.modpack_version) });
         }
+    }
+}
+
+/// Overrides of the global `Settings` for one instance; `None` = use the global value.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+#[serde(default, rename_all = "camelCase")]
+pub struct InstanceSettings {
+    pub java_path: Option<String>,
+    pub ram_mb: Option<u32>,
+    pub jvm_args: Option<String>,
+    pub width: Option<u32>,
+    pub height: Option<u32>,
+    pub fullscreen: Option<bool>,
+    /// Command the game runs through, e.g. `gamemoderun` or `mangohud`; empty = none.
+    pub wrapper: String,
+    /// `KEY=VALUE` per line, added to the game's environment.
+    pub env: String,
+}
+
+impl InstanceSettings {
+    pub fn env_vars(&self) -> impl Iterator<Item = (&str, &str)> {
+        self.env.lines().filter_map(|l| l.trim().split_once('=')).map(|(k, v)| (k.trim(), v.trim())).filter(|(k, _)| !k.is_empty())
     }
 }
 
@@ -109,5 +133,11 @@ mod tests {
         let mut plain: super::Instance = serde_json::from_str(r#"{"id":"b","modpackId":""}"#).unwrap();
         plain.migrate();
         assert_eq!(plain.pack, None);
+    }
+
+    #[test]
+    fn parses_env_lines() {
+        let s = super::InstanceSettings { env: "A=1\n  \n=x\nnoeq\n B = two=2 ".into(), ..Default::default() };
+        assert_eq!(s.env_vars().collect::<Vec<_>>(), [("A", "1"), ("B", "two=2")]);
     }
 }

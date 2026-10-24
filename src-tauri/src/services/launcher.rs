@@ -68,8 +68,8 @@ impl Drop for RunningGuard {
 pub async fn launch(app: &AppHandle, id: &str, on_event: Channel<LaunchEvent>) -> Result<()> {
     let guard = RunningGuard::acquire(app, id)?;
     let state = app.state::<AppState>();
-    let settings = storage::load_settings(&state);
     let mut inst = instances::get(&state, id)?;
+    let settings = storage::load_settings(&state).for_instance(&inst.settings);
     // Instances saved without a loader version would hit `/loader/{game}//profile/json`.
     if inst.loader != Loader::Vanilla && inst.loader_version.is_empty() {
         let v = loader::latest(&state.http, &inst.version, inst.loader).await?;
@@ -109,12 +109,13 @@ pub async fn launch(app: &AppHandle, id: &str, on_event: Channel<LaunchEvent>) -
             width: settings.width,
             height: settings.height,
             fullscreen: settings.fullscreen,
+            wrapper: &inst.settings.wrapper,
         },
     );
-    cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
+    cmd.envs(inst.settings.env_vars()).stdout(Stdio::piped()).stderr(Stdio::piped());
     let mut child = cmd
         .spawn()
-        .map_err(|e| AppError::Unsupported(format!("Could not start Java ({}): {e}", java.display())))?;
+        .map_err(|e| AppError::Unsupported(format!("Could not start {:?}: {e}", cmd.get_program())))?;
 
     let readers = [
         pipe(app, id, child.stdout.take().expect("piped"), log.clone(), false),

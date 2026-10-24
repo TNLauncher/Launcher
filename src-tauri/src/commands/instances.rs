@@ -1,5 +1,5 @@
 use crate::error::Result;
-use crate::models::{Instance, Loader, Screenshot};
+use crate::models::{Instance, InstanceSettings, Loader, Screenshot};
 use crate::services::modpacks::{self, ImportProgress};
 use crate::services::{instances, mods, screenshots};
 use crate::state::AppState;
@@ -35,6 +35,11 @@ pub fn rename_instance(state: State<'_, AppState>, id: String, name: String) -> 
 #[tauri::command]
 pub fn set_instance_icon(state: State<'_, AppState>, id: String, icon: String) -> Result<()> {
     instances::set_icon(&state, &id, &icon)
+}
+
+#[tauri::command]
+pub fn set_instance_settings(state: State<'_, AppState>, id: String, settings: InstanceSettings) -> Result<()> {
+    instances::set_settings(&state, &id, settings)
 }
 
 #[tauri::command]

@@ -1,6 +1,6 @@
 use crate::error::{AppError, Result};
 use crate::minecraft::loader;
-use crate::models::{Instance, Loader};
+use crate::models::{Instance, InstanceSettings, Loader};
 use crate::state::AppState;
 use crate::storage;
 use std::collections::HashMap;
@@ -61,6 +61,10 @@ pub fn set_icon(state: &AppState, id: &str, icon: &str) -> Result<()> {
         return Err(AppError::Invalid("Icon must be a small image".into()));
     }
     update(state, id, |i| i.icon = icon.into())
+}
+
+pub fn set_settings(state: &AppState, id: &str, settings: InstanceSettings) -> Result<()> {
+    update(state, id, |i| i.settings = settings)
 }
 
 pub fn delete(state: &AppState, id: &str) -> Result<()> {

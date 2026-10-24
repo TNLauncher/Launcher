@@ -93,6 +93,7 @@ pub fn run() {
             commands::instances::import_modpack,
             commands::instances::rename_instance,
             commands::instances::set_instance_icon,
+            commands::instances::set_instance_settings,
             commands::instances::delete_instance,
             commands::instances::open_instance_dir,
             commands::instances::list_screenshots,

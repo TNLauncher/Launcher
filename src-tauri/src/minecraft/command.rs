@@ -17,6 +17,8 @@ pub struct LaunchOptions<'a> {
     pub width: u32,
     pub height: u32,
     pub fullscreen: bool,
+    /// Command line the game runs through (`gamemoderun`...); empty = run Java directly.
+    pub wrapper: &'a str,
 }
 
 pub fn build(version: &Value, o: &LaunchOptions) -> Command {
@@ -80,7 +82,15 @@ pub fn build(version: &Value, o: &LaunchOptions) -> Command {
         None => (collect(&version["arguments"]["jvm"]), collect(&version["arguments"]["game"])),
     };
 
-    let mut cmd = Command::new(o.java);
+    let mut wrapper = o.wrapper.split_whitespace();
+    let mut cmd = match wrapper.next() {
+        Some(program) => {
+            let mut c = Command::new(program);
+            c.args(wrapper).arg(o.java);
+            c
+        }
+        None => Command::new(o.java),
+    };
     cmd.current_dir(o.game_dir)
         .arg(format!("-Xmx{}M", o.ram_mb))
         .args(o.jvm_args.split_whitespace())
