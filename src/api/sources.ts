@@ -140,6 +140,13 @@ export interface IdentifiedFile {
   versionNumber: string;
 }
 
+/** A starred catalog project; `hit` is a snapshot from when it was starred. */
+export interface Favorite {
+  source: string;
+  kind: ProjectKind;
+  hit: Hit;
+}
+
 export const primaryFile = (v: Pick<Version, "files">) => v.files.find((f) => f.primary) ?? v.files[0];
 
 export const sources = {
@@ -150,6 +157,11 @@ export const sources = {
   setSetting: (id: string, key: string, value: string | boolean) => call<void>("set_plugin_setting", { id, key, value }),
   /** User plugins live there and load on the next start. */
   openPluginsDir: () => call<void>("open_plugins_dir"),
+
+  /** Newest first. */
+  listFavorites: () => call<Favorite[]>("list_favorites"),
+  /** Stars or unstars; resolves with the new list. */
+  setFavorite: (favorite: Favorite, on: boolean) => call<Favorite[]>("set_favorite", { favorite, on }),
 
   search: (source: string, query: SearchQuery) => call<Page>("source_search", { source, query }),
   project: (source: string, id: string) => call<Project>("source_project", { source, id }),

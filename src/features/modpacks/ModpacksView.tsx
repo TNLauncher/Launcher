@@ -6,7 +6,7 @@ import { View } from "@/components/layout/View";
 import { Banner, Button, Chip, EmptyState, Icon, Pill, PillGroup, SearchInput, Select, Skeleton } from "@/components/ui";
 import { cx } from "@/lib/cx";
 import { useDebounced } from "@/hooks/useDebounced";
-import { useSource } from "@/hooks/useSource";
+import { useFavorites, useSource } from "@/hooks/useSource";
 import { SourcePicker } from "@/plugins/SourcePicker";
 import { ago, compact, errorMessage } from "@/lib/format";
 import { useLauncher } from "@/store/LauncherContext";
@@ -49,6 +49,8 @@ function Catalog({ source }: { source: SourceInfo }) {
   const [categories, setCategories] = useState<string[]>([]);
   const [sort, setSort] = useState(source.sorts[0]?.id ?? "");
   const [open, setOpen] = useState<Hit | null>(null);
+  const [favOnly, setFavOnly] = useState(false);
+  const favorites = useFavorites(source.id, "modpack");
   const debounced = useDebounced(query.trim(), 300);
   const filters = { query: debounced, gameVersion: gameVersion || undefined, loader: loader || undefined, categories, sort };
   const filtered = !!(debounced || gameVersion || loader || categories.length);
@@ -64,7 +66,7 @@ function Catalog({ source }: { source: SourceInfo }) {
   const hits = packs.data?.pages.flatMap((p) => p.hits) ?? [];
   const total = packs.data?.pages[0]?.total ?? 0;
 
-  // Load the next page when the end of the list scrolls into view.
+  // Load the next page when the end of the list scrolls into view; the sentinel is unmounted while favorites show.
   const sentinel = useRef<HTMLDivElement>(null);
   const { hasNextPage, isFetchingNextPage, fetchNextPage } = packs;
   useEffect(() => {
@@ -73,9 +75,12 @@ function Catalog({ source }: { source: SourceInfo }) {
     const io = new IntersectionObserver((e) => e[0].isIntersecting && !isFetchingNextPage && fetchNextPage(), { rootMargin: "400px" });
     io.observe(el);
     return () => io.disconnect();
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage, favOnly]);
 
-  const toggleCategory = (c: string) => setCategories((cs) => (cs.includes(c) ? cs.filter((x) => x !== c) : [...cs, c]));
+  const toggleCategory = (c: string) => {
+    setFavOnly(false);
+    setCategories((cs) => (cs.includes(c) ? cs.filter((x) => x !== c) : [...cs, c]));
+  };
   const reset = () => {
     setQuery("");
     setGameVersion("");
@@ -110,6 +115,9 @@ function Catalog({ source }: { source: SourceInfo }) {
           </div>
           <div className={s.packsFilterRow}>
             <PillGroup label="Categories" wrap>
+              <Pill pressed={favOnly} icon="star" count={favorites.hits.length} onClick={() => setFavOnly((f) => !f)}>
+                Favorites
+              </Pill>
               {packCategories.map((c) => (
                 <Pill key={c.id} pressed={categories.includes(c.id)} onClick={() => toggleCategory(c.id)}>
                   {c.label}
@@ -119,34 +127,46 @@ function Catalog({ source }: { source: SourceInfo }) {
           </div>
         </div>
 
-        <div className={s.packsSummary} aria-live="polite">
-          <span className="mono">{packs.data ? `${total.toLocaleString("en")} modpacks` : "Searching…"}</span>
-          {filtered && (
-            <Button variant="link" onClick={reset}>
-              Clear filters
-            </Button>
-          )}
-        </div>
+        {favOnly ? (
+          <div className={s.packsList}>
+            {favorites.hits.length ? (
+              favorites.hits.map((h) => <PackRow key={h.id} hit={h} categoryLabel={categoryLabel} onOpen={setOpen} />)
+            ) : (
+              <EmptyState icon="star">No favorite modpacks yet. Open one and star it.</EmptyState>
+            )}
+          </div>
+        ) : (
+          <>
+            <div className={s.packsSummary} aria-live="polite">
+              <span className="mono">{packs.data ? `${total.toLocaleString("en")} modpacks` : "Searching…"}</span>
+              {filtered && (
+                <Button variant="link" onClick={reset}>
+                  Clear filters
+                </Button>
+              )}
+            </div>
 
-        <div className={cx(s.packsList, packs.isPlaceholderData && s.stale)}>
-          {packs.isError && !packs.data ? (
-            <Banner message={`${source.name} search failed: ${errorMessage(packs.error)}`} onRetry={() => packs.refetch()} />
-          ) : !packs.data ? (
-            Array.from({ length: 5 }, (_, i) => <Skeleton key={i} height={124} />)
-          ) : !hits.length ? (
-            <EmptyState
-              icon="search_off"
-              action={filtered && <Button onClick={reset}>Clear filters</Button>}
-            >
-              No Fabric or Quilt modpacks match these filters.
-            </EmptyState>
-          ) : (
-            hits.map((h) => <PackRow key={h.id} hit={h} categoryLabel={categoryLabel} onOpen={setOpen} />)
-          )}
-          <div ref={sentinel} />
-          {isFetchingNextPage && <Skeleton height={124} />}
-          {packs.isFetchNextPageError && <Banner message="Could not load more modpacks." onRetry={() => fetchNextPage()} />}
-        </div>
+            <div className={cx(s.packsList, packs.isPlaceholderData && s.stale)}>
+              {packs.isError && !packs.data ? (
+                <Banner message={`${source.name} search failed: ${errorMessage(packs.error)}`} onRetry={() => packs.refetch()} />
+              ) : !packs.data ? (
+                Array.from({ length: 5 }, (_, i) => <Skeleton key={i} height={124} />)
+              ) : !hits.length ? (
+                <EmptyState
+                  icon="search_off"
+                  action={filtered && <Button onClick={reset}>Clear filters</Button>}
+                >
+                  No Fabric or Quilt modpacks match these filters.
+                </EmptyState>
+              ) : (
+                hits.map((h) => <PackRow key={h.id} hit={h} categoryLabel={categoryLabel} onOpen={setOpen} />)
+              )}
+              <div ref={sentinel} />
+              {isFetchingNextPage && <Skeleton height={124} />}
+              {packs.isFetchNextPageError && <Banner message="Could not load more modpacks." onRetry={() => fetchNextPage()} />}
+            </div>
+          </>
+        )}
       </div>
     </>
   );

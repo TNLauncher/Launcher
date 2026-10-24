@@ -6,7 +6,7 @@ import { Banner, Button, Chip, ConfirmDialog, EmptyState, Icon, IconButton, Pill
 import { cx } from "@/lib/cx";
 import { Screenshots } from "@/features/screenshots/Screenshots";
 import { useDebounced } from "@/hooks/useDebounced";
-import { usePlugins, useSource } from "@/hooks/useSource";
+import { useFavorites, usePlugins, useSource } from "@/hooks/useSource";
 import { pluginBase } from "@/plugins/bridge";
 import { PluginFrame } from "@/plugins/PluginHost";
 import { SourcePicker } from "@/plugins/SourcePicker";
@@ -254,6 +254,8 @@ function BrowsePane(p: { source: SourceInfo; instance: Instance; kind: ContentKi
   const categories = [{ id: "", label: "All" }, ...(source.categories[kind] ?? [])];
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("");
+  const [favOnly, setFavOnly] = useState(false);
+  const favorites = useFavorites(source.id, kind);
   const [installs, setInstalls] = useState<Record<string, InstallState>>({});
   const debounced = useDebounced(query.trim(), 300);
   const { version, loader } = instance;
@@ -286,6 +288,20 @@ function BrowsePane(p: { source: SourceInfo; instance: Instance; kind: ContentKi
     [source.id, instance.id, kind, onInstalled]
   );
 
+  const q = debounced.toLowerCase();
+  const shownFavorites = favorites.hits.filter((h) => !q || h.title.toLowerCase().includes(q));
+  const card = (h: Hit) => (
+    <ResultCard
+      key={h.id}
+      hit={h}
+      icon={info.icon}
+      state={installed.has(h.id) ? "installed" : installs[h.id]}
+      favorite={favorites.ids.has(h.id)}
+      onInstall={install}
+      onFavorite={favorites.toggle}
+    />
+  );
+
   return (
     <section className={s.cpane} aria-label={`Add ${info.noun} from ${source.name}`}>
       <div className={s.cpaneHead}>
@@ -296,32 +312,40 @@ function BrowsePane(p: { source: SourceInfo; instance: Instance; kind: ContentKi
         <SourcePicker />
         <SearchInput icon="travel_explore" label={`Search ${info.noun} on ${source.name}`} placeholder={`Search ${info.noun}`} value={query} onChange={setQuery} />
         <PillGroup label="Category" wrap className={s.cats}>
+          <Pill pressed={favOnly} icon="star" count={favorites.hits.length} onClick={() => setFavOnly(true)}>
+            Favorites
+          </Pill>
           {categories.map((c) => (
-            <Pill key={c.id} pressed={category === c.id} onClick={() => setCategory(c.id)}>
+            <Pill key={c.id} pressed={!favOnly && category === c.id} onClick={() => (setFavOnly(false), setCategory(c.id))}>
               {c.label}
             </Pill>
           ))}
         </PillGroup>
       </div>
 
-      <div className={cx(s.cpaneList, hits.isPlaceholderData && s.stale)}>
-        {hits.isError ? (
+      <div className={cx(s.cpaneList, !favOnly && hits.isPlaceholderData && s.stale)}>
+        {favOnly ? (
+          !shownFavorites.length ? (
+            <EmptyState icon="star">{debounced ? `No favorite ${info.noun} match “${debounced}”.` : `No favorite ${info.noun} yet. Star some from the search.`}</EmptyState>
+          ) : (
+            shownFavorites.map((h) => card(h))
+          )
+        ) : hits.isError ? (
           <Banner message={`${source.name} search failed: ${errorMessage(hits.error)}`} onRetry={() => hits.refetch()} />
         ) : !hits.data ? (
           Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className={s.listSkeleton} height={84} />)
         ) : !hits.data.length ? (
           <EmptyState icon="search_off">No {info.noun} for Minecraft {version}{debounced && ` match “${debounced}”`}.</EmptyState>
         ) : (
-          hits.data.map((h) => (
-            <ResultCard key={h.id} hit={h} icon={info.icon} state={installed.has(h.id) ? "installed" : installs[h.id]} onInstall={install} />
-          ))
+          hits.data.map((h) => card(h))
         )}
       </div>
     </section>
   );
 }
 
-const ResultCard = memo(function ResultCard({ hit, icon, state, onInstall }: { hit: Hit; icon: string; state?: InstallState; onInstall(id: string): void }) {
+const ResultCard = memo(function ResultCard(p: { hit: Hit; icon: string; state?: InstallState; favorite: boolean; onInstall(id: string): void; onFavorite(hit: Hit): void }) {
+  const { hit, icon, state, favorite, onInstall, onFavorite } = p;
   const failed = typeof state === "object";
   return (
     <div className={s.cresult}>
@@ -334,6 +358,15 @@ const ResultCard = memo(function ResultCard({ hit, icon, state, onInstall }: { h
         <p className={s.cresultDesc}>{hit.description}</p>
         <span className={cx(s.citemSub, "mono")}><Icon name="download" />{compact(hit.downloads)}</span>
       </div>
+      <IconButton
+        icon="star"
+        fill={favorite}
+        aria-pressed={favorite}
+        label={favorite ? `Remove ${hit.title} from favorites` : `Add ${hit.title} to favorites`}
+        title={favorite ? "Remove from favorites" : "Add to favorites"}
+        className={cx(s.cresultBtn, !favorite && s.reveal)}
+        onClick={() => onFavorite(hit)}
+      />
       {state === "installed" ? (
         <Button size="sm" icon="check" className={cx(s.cresultBtn, s.installed)} disabled>
           Installed

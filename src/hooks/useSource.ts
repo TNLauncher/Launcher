@@ -1,6 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
-import { useSyncExternalStore } from "react";
-import { sources, type SourceInfo } from "@/api/sources";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useMemo, useRef, useSyncExternalStore } from "react";
+import { sources, type Hit, type ProjectKind, type SourceInfo } from "@/api/sources";
 
 export const usePlugins = () => useQuery({ queryKey: ["plugins"], queryFn: sources.listPlugins, staleTime: Infinity });
 
@@ -42,4 +42,19 @@ export function useSource(): SourceInfo | null {
 /** Whether source `id` is installed and turned on. */
 export function useSourceEnabled(id: string | undefined): boolean {
   return !!id && !!usePlugins().data?.some((p) => p.id === id && p.enabled);
+}
+
+/** Starred projects of one source and kind, newest first; `toggle` is stable. */
+export function useFavorites(source: string, kind: ProjectKind) {
+  const qc = useQueryClient();
+  const all = useQuery({ queryKey: ["favorites"], queryFn: sources.listFavorites, staleTime: Infinity }).data;
+  const hits = useMemo(() => (all ?? []).filter((f) => f.source === source && f.kind === kind).map((f) => f.hit), [all, source, kind]);
+  const ids = useMemo(() => new Set(hits.map((h) => h.id)), [hits]);
+  const idsRef = useRef(ids);
+  idsRef.current = ids;
+  const toggle = useCallback(
+    (hit: Hit) => sources.setFavorite({ source, kind, hit }, !idsRef.current.has(hit.id)).then((list) => qc.setQueryData(["favorites"], list)),
+    [qc, source, kind]
+  );
+  return { hits, ids, toggle };
 }

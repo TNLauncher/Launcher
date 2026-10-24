@@ -5,6 +5,7 @@ import { primaryFile, sources, type GalleryImage, type Hit, type Project, type S
 import { Banner, Button, Chip, Dialog, EmptyState, Field, Icon, IconButton, Select, Skeleton, Tab, Tabs } from "@/components/ui";
 import { Markdown } from "@/components/ui/Markdown";
 import { cx } from "@/lib/cx";
+import { useFavorites } from "@/hooks/useSource";
 import { ago, compact, errorMessage, megabytes } from "@/lib/format";
 import { useLauncher } from "@/store/LauncherContext";
 import { useUi } from "@/store/UiContext";
@@ -25,6 +26,8 @@ export function PackDetail({ source, hit, preferredVersion, onBack }: { source: 
   const [mc, setMc] = useState("");
   const [versionId, setVersionId] = useState("");
   const top = useRef<HTMLDivElement>(null);
+  const favorites = useFavorites(source.id, "modpack");
+  const favorite = favorites.ids.has(id);
 
   useEffect(() => {
     top.current?.scrollIntoView({ block: "start" });
@@ -50,9 +53,19 @@ export function PackDetail({ source, hit, preferredVersion, onBack }: { source: 
       <div className={s.packHero}>
         {banner && <img className={s.packHeroBg} src={banner} alt="" />}
         <div className={s.packHeroInner}>
-          <Button variant="overlay" size="sm" icon="arrow_back" className={s.packBack} onClick={onBack}>
-            Modpacks
-          </Button>
+          <div className={s.packBar}>
+            <Button variant="overlay" size="sm" icon="arrow_back" onClick={onBack}>
+              Modpacks
+            </Button>
+            <IconButton
+              icon="star"
+              variant="overlay"
+              fill={favorite}
+              aria-pressed={favorite}
+              label={favorite ? "Remove from favorites" : "Add to favorites"}
+              onClick={() => favorites.toggle(hit)}
+            />
+          </div>
           <div className={s.packHeroMain}>
             <span className={cx(s.packIcon, s.big)}>{hit.iconUrl ? <img src={hit.iconUrl} alt="" /> : <Icon name="inventory_2" />}</span>
             <div className={s.packHeroText}>

@@ -42,7 +42,7 @@ fieldset.cpane-list:disabled .citem-actions { opacity: 0.5; }
 .citem-sub :global(.icon) { font-size: 13px; }
 .citem-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
 .reveal { opacity: 0; }
-.citem:hover .reveal, .reveal:focus-visible { opacity: 1; }
+.citem:hover .reveal, .cresult:hover .reveal, .reveal:focus-visible { opacity: 1; }
 
 .cresult { display: flex; align-items: flex-start; gap: 12px; padding: 10px 8px; border-radius: 10px; transition: background 160ms var(--ease); }
 .cresult:hover { background: var(--card); }

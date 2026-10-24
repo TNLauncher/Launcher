@@ -8,12 +8,14 @@ interface Props extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children"
   /** Accessible name and tooltip. */
   label: string;
   variant?: "default" | "danger" | "overlay";
+  /** Filled glyph, e.g. a set star. */
+  fill?: boolean;
 }
 
-export function IconButton({ icon, label, variant = "default", className, type = "button", title, ...rest }: Props) {
+export function IconButton({ icon, label, variant = "default", fill, className, type = "button", title, ...rest }: Props) {
   return (
     <button type={type} className={cx(s.btn, s[variant], className)} aria-label={label} title={title ?? label} {...rest}>
-      <Icon name={icon} />
+      <Icon name={icon} fill={fill} />
     </button>
   );
 }

@@ -58,6 +58,7 @@
 .pack-hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to bottom, rgb(22 22 24 / 0.15), var(--view)); }
 .pack-hero-inner { position: relative; z-index: 1; padding: 16px 24px 24px; display: flex; flex-direction: column; gap: 28px; }
 .pack-back { align-self: flex-start; }
+.pack-bar { display: flex; align-items: center; justify-content: space-between; }
 .pack-hero-main { display: flex; align-items: flex-end; gap: 18px; }
 .pack-icon.big { width: 88px; height: 88px; border-radius: 20px; box-shadow: 0 10px 30px rgb(0 0 0 / 0.45); border: 1px solid rgb(255 255 255 / 0.12); }
 .pack-icon.big :global(.icon) { font-size: 40px; }
