@@ -1,4 +1,4 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { cx } from "@/lib/cx";
 import { Icon } from "./Icon";
@@ -21,10 +21,12 @@ interface Props<T extends string> {
   variant?: "default" | "pill";
   className?: string;
   style?: CSSProperties;
+  /** Custom trigger content in place of the current label. */
+  children?: ReactNode;
 }
 
 /** Select-only combobox: focus stays on the trigger, the list follows via aria-activedescendant. */
-export function Select<T extends string>({ value, options, onChange, label, placeholder, disabled, variant = "default", className, style }: Props<T>) {
+export function Select<T extends string>({ value, options, onChange, label, placeholder, disabled, variant = "default", className, style, children }: Props<T>) {
   const id = useId();
   const btn = useRef<HTMLButtonElement>(null);
   const list = useRef<HTMLUListElement>(null);
@@ -123,11 +125,12 @@ export function Select<T extends string>({ value, options, onChange, label, plac
         aria-activedescendant={open ? `${id}-${active}` : undefined}
         className={cx(s.select, variant === "pill" && s.pill, className)}
         style={style}
+        title={children ? current?.label : undefined}
         disabled={off}
         onClick={() => (open ? setOpen(false) : show())}
         onKeyDown={onKeyDown}
       >
-        <span className={cx(s.value, !current && s.placeholder)}>{current?.label ?? placeholder}</span>
+        {children ?? <span className={cx(s.value, !current && s.placeholder)}>{current?.label ?? placeholder}</span>}
         <Icon name="unfold_more" />
       </button>
       {open && place && createPortal(

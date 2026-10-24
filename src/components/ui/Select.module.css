@@ -4,7 +4,7 @@
   display: inline-flex; align-items: center; justify-content: space-between; gap: 8px;
   padding: 0 8px 0 12px; text-align: left; font-size: 12px; font-weight: 500;
   background: var(--card); border: 1px solid var(--border); box-shadow: var(--highlight);
-  outline: none; transition: border-color 160ms var(--ease), background 160ms var(--ease);
+  transition: border-color 160ms var(--ease), background 160ms var(--ease);
 }
 .select:hover:not(:disabled) { background-color: var(--card-hover); }
 .select:focus-visible, .select[aria-expanded="true"] { border-color: var(--accent); }
