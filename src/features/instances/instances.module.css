@@ -1,20 +1,20 @@
 /* Instances */
 .page { padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; background: var(--view); min-height: 100%; }
-.toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; border-radius: 8px; background: var(--window); border: 1px solid var(--card-border); }
+.toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; border-radius: 10px; background: var(--window); border: 1px solid var(--card-border); }
 .toolbar-left { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1; }
 .search { width: 256px; flex-shrink: 0; }
 .vsep { width: 1px; height: 16px; background: var(--border); flex-shrink: 0; }
 .toolbar-right { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
 .rows { display: flex; flex-direction: column; gap: 8px; }
 .row {
-  display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px; border-radius: 16px;
   background: var(--card); border: 1px solid var(--card-border); box-shadow: var(--highlight);
-  transition: background 160ms var(--ease), border-color 160ms var(--ease);
+  transition: background var(--soft) var(--butter), border-color var(--soft) var(--butter), box-shadow var(--soft) var(--butter);
 }
-.row:hover { background: var(--card-hover); border-color: var(--border); }
+.row:hover { background: var(--card-hover); border-color: var(--border); box-shadow: var(--highlight), var(--shadow-soft); }
 .row.openable { cursor: pointer; }
 .row-main { display: flex; align-items: center; gap: 14px; min-width: 0; }
-.row-icon { position: relative; width: 48px; height: 48px; border-radius: 8px; background: rgb(255 255 255 / 0.04); border: 1px solid var(--card-border); display: grid; place-items: center; color: var(--muted); flex-shrink: 0; cursor: pointer; }
+.row-icon { position: relative; width: 48px; height: 48px; border-radius: 10px; background: rgb(255 255 255 / 0.04); border: 1px solid var(--card-border); display: grid; place-items: center; color: var(--muted); flex-shrink: 0; cursor: pointer; }
 .row-icon:hover { border-color: var(--border); }
 .row-icon img { width: 100%; height: 100%; object-fit: cover; border-radius: 7px; }
 .row-icon :global(.icon) { font-size: 24px; }

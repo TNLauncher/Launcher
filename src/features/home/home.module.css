@@ -3,8 +3,8 @@
 .hero { position: relative; height: 320px; display: flex; flex-direction: column; justify-content: flex-end; padding: 0 28px 24px; overflow: hidden; }
 .hero-bg { position: absolute; inset: 0; background: url("@/assets/hero.jpg") center / cover; filter: saturate(0.7); }
 /* Only when the selected instance changes, never on opening Home. */
-.restage .hero-bg { animation: hero-bg 900ms var(--ease) backwards; }
-.restage .hero-body > * { animation: hero-rise 480ms var(--ease) backwards; }
+.restage .hero-bg { animation: hero-bg 900ms var(--butter) backwards; }
+.restage .hero-body > * { animation: hero-rise var(--slow) var(--butter) backwards; }
 .restage .hero-body > :nth-child(2) { animation-delay: 60ms; }
 .restage .hero-body > :nth-child(3) { animation-delay: 120ms; }
 /* The scene settles out of a slight push-in and a brighter exposure. */
@@ -20,28 +20,29 @@
 .section { padding: 16px 28px 8px; }
 .tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
 .tile {
-  display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 12px; text-align: left;
+  display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 16px; text-align: left;
   background: rgb(99 99 102 / 0.1); border: 1px solid var(--card-border); box-shadow: var(--highlight);
-  transition: background 160ms var(--ease), border-color 160ms var(--ease), transform 140ms var(--ease); min-width: 0;
+  transition: background var(--soft) var(--butter), border-color var(--soft) var(--butter), box-shadow var(--soft) var(--butter), transform var(--soft) var(--spring); min-width: 0;
 }
-.tile:active { transform: scale(0.97); transition-duration: 60ms; }
+.tile:hover { transform: translateY(-2px); box-shadow: var(--highlight), var(--shadow-soft); }
+.tile:active { transform: scale(0.97); transition: transform var(--press) var(--butter); }
 .tile:hover { background: var(--panel); border-color: rgb(255 255 255 / 0.15); }
 .tile[aria-pressed="true"] { background: var(--panel); border-color: var(--accent-fill); }
-.tile-icon { width: 36px; height: 36px; border-radius: 8px; background: rgb(255 255 255 / 0.06); display: grid; place-items: center; color: var(--muted); flex-shrink: 0; overflow: hidden; }
+.tile-icon { width: 36px; height: 36px; border-radius: 10px; background: rgb(255 255 255 / 0.06); display: grid; place-items: center; color: var(--muted); flex-shrink: 0; overflow: hidden; }
 .tile-icon img { width: 100%; height: 100%; object-fit: cover; }
-.tile-icon { transition: background 160ms var(--ease), color 160ms var(--ease); }
+.tile-icon { transition: background var(--soft) var(--butter), color var(--soft) var(--butter); }
 .tile[aria-pressed="true"] .tile-icon { background: rgb(0 113 227 / 0.15); color: var(--link); }
 .picked .tile[aria-pressed="true"] .tile-icon { animation: tile-pick 360ms var(--ease); }
 @keyframes tile-pick { 40% { transform: scale(1.12); } }
 .add:hover .tile-icon { color: var(--fg); }
-.add .tile-icon :global(.icon) { transition: transform 260ms var(--ease); }
+.add .tile-icon :global(.icon) { transition: transform var(--slow) var(--spring); }
 .add:hover .tile-icon :global(.icon) { transform: rotate(90deg); }
 .tile-text { min-width: 0; flex: 1; }
 .tile-name { display: block; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tile-sub { display: block; font-size: 11px; color: var(--muted); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .add { border-style: dashed; background: rgb(255 255 255 / 0.02); }
 
-.news { border-radius: 12px; background: rgb(99 99 102 / 0.08); border: 1px solid var(--card-border); box-shadow: var(--highlight); overflow: hidden; }
+.news { border-radius: 16px; background: rgb(99 99 102 / 0.08); border: 1px solid var(--card-border); box-shadow: var(--highlight); overflow: hidden; }
 .news-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 16px; color: var(--muted); }
 .news-row + .news-row { border-top: 1px solid rgb(255 255 255 / 0.06); }
 .news-row:first-child { color: var(--fg); }
@@ -57,7 +58,7 @@
 .dock-right { flex: 0 1 auto; display: flex; align-items: center; justify-content: flex-end; gap: 16px; min-width: 0; }
 
 .card { height: 48px; max-width: 320px; padding: 0 12px 0 6px; gap: 10px; background-color: transparent; border-color: transparent; box-shadow: none; }
-.card-icon { width: 36px; height: 36px; border-radius: 8px; background: rgb(255 255 255 / 0.06); display: grid; place-items: center; flex-shrink: 0; overflow: hidden; }
+.card-icon { width: 36px; height: 36px; border-radius: 10px; background: rgb(255 255 255 / 0.06); display: grid; place-items: center; flex-shrink: 0; overflow: hidden; }
 .card-icon img { width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated; }
 .card-icon :global(.icon) { font-size: 20px; color: var(--muted); }
 .card-text { display: flex; flex-direction: column; min-width: 0; flex: 1; }
@@ -81,12 +82,12 @@
 }
 
 .play { flex-shrink: 0; width: 200px; height: 48px; font-size: 14px; position: relative; overflow: hidden; isolation: isolate; }
-.swap { animation: play-swap 340ms var(--ease) backwards; }
+.swap { animation: play-swap var(--slow) var(--spring) backwards; }
 /* Each state (play → preparing → stop) arrives as a new button, so the change is felt, not just read. */
 @keyframes play-swap { from { opacity: 0; transform: scale(0.92); } }
-.play-ready { transition: background 160ms var(--ease), box-shadow 240ms var(--ease), transform 120ms var(--ease); }
+.play-ready { transition: background var(--quick) var(--butter), box-shadow var(--soft) var(--butter), transform var(--soft) var(--spring); }
 .play-ready:hover { box-shadow: 0 8px 24px rgb(0 113 227 / 0.35), var(--highlight); }
-.play-ready :global(.icon) { transition: transform 240ms var(--ease); }
+.play-ready :global(.icon) { transition: transform var(--soft) var(--spring); }
 .play-ready:hover :global(.icon) { transform: translateX(2px) scale(1.1); }
 
 /* In game: a steady heartbeat next to the status. */
@@ -100,7 +101,7 @@
 .play-busy:disabled { opacity: 1; background: rgb(0 113 227 / 0.28); }
 .play-busy::before {
   content: ""; position: absolute; inset: 0; z-index: -1; background: var(--accent-fill);
-  transform-origin: left; transform: scaleX(var(--p, 0)); transition: transform 300ms var(--ease);
+  transform-origin: left; transform: scaleX(var(--p, 0)); transition: transform var(--slow) var(--butter);
 }
 .play-sweep::before { transform: none; width: 35%; animation: play-sweep 1.4s var(--ease) infinite; }
 .play-pct { color: rgb(255 255 255 / 0.72); font-size: 12px; min-width: 4ch; text-align: right; }

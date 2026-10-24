@@ -1,15 +1,15 @@
 @layer kit {
 .select {
-  height: 32px; border-radius: 8px; min-width: 0;
+  height: 32px; border-radius: var(--r-sm); min-width: 0;
   display: inline-flex; align-items: center; justify-content: space-between; gap: 8px;
   padding: 0 8px 0 12px; text-align: left; font-size: 12px; font-weight: 500;
   background: var(--card); border: 1px solid var(--border); box-shadow: var(--highlight);
-  transition: border-color 160ms var(--ease), background 160ms var(--ease);
+  transition: border-color var(--quick) var(--butter), background var(--quick) var(--butter);
 }
 .select:hover:not(:disabled) { background-color: var(--card-hover); }
 .select:focus-visible, .select[aria-expanded="true"] { border-color: var(--accent); }
 .select:disabled { opacity: 0.55; cursor: default; }
-.select :global(.icon) { font-size: 16px; color: var(--muted); flex-shrink: 0; transition: color 160ms var(--ease); }
+.select :global(.icon) { font-size: 16px; color: var(--muted); flex-shrink: 0; transition: color var(--quick) var(--butter); }
 .select:hover :global(.icon), .select[aria-expanded="true"] :global(.icon) { color: var(--fg); }
 .pill { border-radius: 999px; max-width: 240px; background-color: var(--btn); }
 .value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -18,14 +18,14 @@
 .list {
   position: fixed; z-index: 100; margin: 0; padding: 4px; list-style: none;
   max-width: 360px; overflow-y: auto; overscroll-behavior: contain;
-  border-radius: 10px; background: var(--popover); border: 1px solid var(--border);
-  box-shadow: var(--lift), var(--highlight); font-size: 12px;
-  transform-origin: top center; animation: select-in 140ms var(--ease);
+  border-radius: 14px; background: var(--popover); border: 1px solid var(--border);
+  box-shadow: var(--shadow-raised), var(--highlight); font-size: 12px;
+  transform-origin: top center; animation: select-in var(--soft) var(--spring);
 }
 .up { transform-origin: bottom center; animation-name: select-in-up; }
 .list li {
   display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 12px 0 6px;
-  border-radius: 6px; white-space: nowrap; cursor: pointer;
+  border-radius: 9px; white-space: nowrap; cursor: pointer; transition: background var(--press) var(--butter);
 }
 .list li[data-active] { background: var(--accent-fill); color: #fff; }
 .check { font-size: 15px; visibility: hidden; }
@@ -33,7 +33,7 @@
 .list li[aria-selected="true"]:not([data-active]) .check { color: var(--accent); }
 .hint { margin-left: auto; padding-left: 16px; color: var(--subtle); font-size: 11px; }
 .list li[data-active] .hint { color: rgb(255 255 255 / 0.72); }
-@keyframes select-in { from { opacity: 0; transform: scale(0.96) translateY(-2px); } }
-@keyframes select-in-up { from { opacity: 0; transform: scale(0.96) translateY(2px); } }
+@keyframes select-in { from { opacity: 0; transform: scale(0.94) translateY(-4px); } }
+@keyframes select-in-up { from { opacity: 0; transform: scale(0.94) translateY(4px); } }
 @media (prefers-reduced-motion: reduce) { .list { animation: none; } }
 }

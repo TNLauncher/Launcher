@@ -7,8 +7,8 @@
 .sidebar nav { position: relative; display: flex; flex-direction: column; gap: 4px; margin-top: 12px; }
 /* 44px step = 40px button + 4px gap */
 .indicator {
-  position: absolute; top: 0; left: 0; width: 44px; height: 40px; border-radius: 8px; pointer-events: none;
-  background: rgb(0 113 227 / 0.15); transition: transform 380ms var(--ease);
+  position: absolute; top: 0; left: 0; width: 44px; height: 40px; border-radius: var(--r-sm); pointer-events: none;
+  background: rgb(0 113 227 / 0.15); transition: transform var(--slow) var(--spring);
 }
 .indicator::before {
   content: ""; position: absolute; left: -10px; top: 10px; width: 3px; height: 20px; border-radius: 0 3px 3px 0;
@@ -17,24 +17,25 @@
 /* block + auto margins: the wrapper is as wide as the 44px nav, an inline img sat at its left edge */
 .logo { display: block; margin: 0 auto; width: 32px; height: 32px; border-radius: 7px; box-shadow: 0 0 0 1px var(--border); }
 .nav-btn {
-  position: relative; width: 44px; height: 40px; border-radius: 8px;
+  position: relative; width: 44px; height: 40px; border-radius: var(--r-sm);
   display: grid; place-items: center; color: var(--muted);
-  transition: background 160ms var(--ease), color 160ms var(--ease);
+  transition: background var(--quick) var(--butter), color var(--quick) var(--butter);
 }
 .nav-btn:hover { background: var(--card); color: var(--fg); }
 .nav-btn[aria-current="page"] { color: var(--link); }
 .nav-btn[aria-current="page"]:hover { background: none; }
-.nav-btn :global(.icon) { transition: transform 160ms var(--ease); }
-.nav-btn:active :global(.icon) { transform: scale(0.86); }
-.nav-btn[aria-current="page"] :global(.icon) { animation: nav-pop 360ms var(--ease); }
-@keyframes nav-pop { 40% { transform: scale(1.18); } }
+.nav-btn :global(.icon) { transition: transform var(--soft) var(--spring); }
+.nav-btn:hover :global(.icon) { transform: scale(1.08); }
+.nav-btn:active :global(.icon) { transform: scale(0.84); transition: transform var(--press) var(--butter); }
+.nav-btn[aria-current="page"] :global(.icon) { animation: nav-pop var(--slow) var(--spring); }
+@keyframes nav-pop { from { transform: scale(0.84); } }
 .tip {
   position: absolute; left: 56px; padding: 4px 10px; border-radius: 6px;
   background: var(--popover); border: 1px solid var(--border); box-shadow: var(--lift);
   font-size: 11px; font-weight: 500; color: var(--fg); white-space: nowrap;
-  opacity: 0; transform: translateX(-4px); pointer-events: none; transition: opacity 120ms var(--ease), transform 120ms var(--ease);
+  opacity: 0; transform: translateX(-6px) scale(0.96); transform-origin: left center; pointer-events: none; transition: opacity var(--quick) var(--butter), transform var(--soft) var(--spring);
 }
 .nav-btn:hover .tip, .avatar:hover .tip { opacity: 1; transform: none; transition-delay: 150ms; }
 .avatar { position: relative; width: 32px; height: 32px; padding: 0; border-radius: 8px; display: grid; place-items: center; }
-.head { border-radius: 8px; transition: box-shadow 160ms var(--ease); }
+.head { border-radius: 8px; transition: box-shadow var(--quick) var(--butter); }
 .avatar:hover .head { box-shadow: 0 0 0 1px rgb(255 255 255 / 0.3); }

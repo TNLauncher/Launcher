@@ -1,7 +1,7 @@
 @layer kit {
 .banner {
   display: flex; align-items: center; justify-content: space-between; gap: 16px;
-  padding: 10px 12px; border-radius: 8px;
+  padding: 10px 14px; border-radius: var(--r-sm);
   background: rgb(217 58 48 / 0.15); border: 1px solid rgb(255 69 58 / 0.3); color: var(--critical);
   animation: banner-in 420ms var(--ease);
 }

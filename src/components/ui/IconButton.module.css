@@ -2,9 +2,9 @@
 .btn {
   width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0;
   background: rgb(255 255 255 / 0.08); border: 1px solid rgb(255 255 255 / 0.06); color: var(--icon);
-  transition: background 160ms var(--ease), color 160ms var(--ease), opacity 160ms var(--ease), transform 120ms var(--ease);
+  transition: background var(--quick) var(--butter), color var(--quick) var(--butter), opacity var(--quick) var(--butter), transform var(--soft) var(--spring);
 }
-.btn:active { transform: scale(0.9); transition-duration: 60ms; }
+.btn:active { transform: scale(0.88); transition: transform var(--press) var(--butter); }
 .btn:hover { background: var(--btn-hover); color: var(--fg); }
 .btn:disabled { opacity: 0.45; pointer-events: none; }
 .btn :global(.icon) { font-size: 16px; }

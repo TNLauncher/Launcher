@@ -8,7 +8,7 @@ interface Item { id: number; message: string; tone: Tone; icon: string; leaving?
 
 const ICON: Record<Tone, string> = { success: "check_circle", info: "info", critical: "error" };
 const SHOWN_MS = 3200;
-const EXIT_MS = 180;
+const EXIT_MS = 320;
 
 // Module store: toasts can fire from contexts and async callbacks that outlive their component.
 let items: Item[] = [];
@@ -33,9 +33,12 @@ export function Toaster() {
   return (
     <div className={s.stack} role="status" aria-live="polite">
       {list.map((t) => (
-        <div key={t.id} className={cx(s.toast, s[t.tone], t.leaving && s.leaving)} onClick={() => dismiss(t.id)}>
-          <Icon name={t.icon} fill className={s.icon} />
-          <span>{t.message}</span>
+        // The slot collapses its height on exit, so the toasts above glide down instead of jumping.
+        <div key={t.id} className={cx(s.slot, t.leaving && s.leaving)}>
+          <div className={cx(s.toast, s[t.tone])} onClick={() => dismiss(t.id)}>
+            <Icon name={t.icon} fill className={s.icon} />
+            <span>{t.message}</span>
+          </div>
         </div>
       ))}
     </div>

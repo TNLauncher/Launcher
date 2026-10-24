@@ -76,7 +76,7 @@
 .log-fold {
   display: flex; align-items: center; gap: 6px; height: 22px; margin: 1px 0 3px 300px; padding: 0 10px 0 6px;
   border-radius: 6px; font: 500 11px/1 "Inter Variable", Inter, sans-serif; color: var(--link);
-  transition: background 160ms var(--ease);
+  transition: background var(--quick) var(--butter);
 }
 .log-fold:hover { background: rgb(64 156 255 / 0.12); }
 .log-fold :global(.icon) { font-size: 15px; }

@@ -186,7 +186,7 @@ const PackRow = memo(function PackRow({ hit: h, categoryLabel, onOpen }: { hit: 
   const cats = h.categories.filter((c) => c in categoryLabel);
   const mc = h.gameVersions.length > 1 ? `${h.gameVersions[0]} – ${h.gameVersions.at(-1)}` : h.gameVersions[0];
   return (
-    <button className={s.packRow} onClick={() => onOpen(h)} style={{ "--pack": packColor(h.color) } as React.CSSProperties}>
+    <button className={cx(s.packRow, "sheen")} onClick={() => onOpen(h)} style={{ "--pack": packColor(h.color) } as React.CSSProperties}>
       <div className={s.packThumb}>
         {h.bannerUrl ? <img src={h.bannerUrl} alt="" loading="lazy" /> : h.iconUrl && <img className={s.blur} src={h.iconUrl} alt="" loading="lazy" />}
       </div>

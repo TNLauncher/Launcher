@@ -24,7 +24,7 @@ export function InstanceTiles() {
       />
       <div className={cx(s.tiles, picked && s.picked)}>
         {recent.slice(0, 3).map((i) => (
-          <button key={i.id} className={s.tile} aria-pressed={i.id === selected?.id} onClick={() => select(i.id)}>
+          <button key={i.id} className={cx(s.tile, "sheen")} aria-pressed={i.id === selected?.id} onClick={() => select(i.id)}>
             <span className={s.tileIcon}>{i.icon ? <img src={i.icon} alt="" /> : <Icon name={LOADER_ICON[i.loader]} />}</span>
             <span className={s.tileText}>
               <span className={s.tileName}>{i.name}</span>
@@ -32,7 +32,7 @@ export function InstanceTiles() {
             </span>
           </button>
         ))}
-        <button className={cx(s.tile, s.add)} onClick={openNewInstance}>
+        <button className={cx(s.tile, s.add, "sheen")} onClick={openNewInstance}>
           <span className={s.tileIcon}><Icon name="add" /></span>
           <span className={s.tileText}>
             <span className={s.tileName}>Add instance</span>

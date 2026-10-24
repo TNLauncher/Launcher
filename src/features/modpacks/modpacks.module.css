@@ -3,7 +3,7 @@
 .packs[hidden] { display: none; }
 
 .packs-filters {
-  display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 12px;
+  display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 16px;
   background: var(--window); border: 1px solid var(--card-border);
 }
 .packs-filter-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
@@ -12,17 +12,20 @@
 .packs-sort { width: 168px; margin-left: auto; }
 
 .packs-summary { display: flex; align-items: center; justify-content: space-between; padding: 0 4px; font-size: 11px; color: var(--subtle); min-height: 18px; }
-.packs-list { display: flex; flex-direction: column; gap: 8px; transition: opacity 160ms var(--ease); }
+.packs-list { display: flex; flex-direction: column; gap: 8px; transition: opacity var(--quick) var(--butter); }
 .packs-list.stale { opacity: 0.55; }
 
 /* A row leads with the pack's own screenshot: packs are chosen by how they look as much as by what they list. */
 .pack-row {
   --pack: var(--accent);
   display: flex; align-items: stretch; gap: 16px; padding: 10px; width: 100%; text-align: left;
-  border-radius: 14px; background: var(--card); border: 1px solid var(--card-border); box-shadow: var(--highlight);
-  transition: background 160ms var(--ease), border-color 160ms var(--ease);
+  border-radius: 18px; background: var(--card); border: 1px solid var(--card-border); box-shadow: var(--highlight);
+  transition: background var(--soft) var(--butter), border-color var(--soft) var(--butter), box-shadow var(--soft) var(--butter), transform var(--soft) var(--spring);
 }
-.pack-row:hover { background: var(--card-hover); border-color: var(--border); }
+.pack-row:hover { background: var(--card-hover); border-color: var(--border); transform: translateY(-2px); box-shadow: var(--highlight), var(--shadow-soft); }
+.pack-row:active { transform: scale(0.99); transition: transform var(--press) var(--butter); }
+.pack-thumb img { transition: transform var(--slow) var(--butter); }
+.pack-row:hover .pack-thumb img { transform: scale(1.04); }
 .pack-row:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .pack-thumb {
   position: relative; width: 184px; aspect-ratio: 16 / 9; flex-shrink: 0; border-radius: 9px; overflow: hidden;
@@ -45,7 +48,7 @@
 .pack-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; margin-top: auto; font-size: 11px; color: var(--muted); }
 .stat { display: inline-flex; align-items: center; gap: 4px; }
 .pack-meta :global(.icon) { font-size: 14px; color: var(--subtle); }
-.pack-chevron { align-self: center; color: var(--subtle); font-size: 20px; transition: transform 160ms var(--ease), color 160ms var(--ease); }
+.pack-chevron { align-self: center; color: var(--subtle); font-size: 20px; transition: transform var(--quick) var(--butter), color var(--quick) var(--butter); }
 .pack-row:hover .pack-chevron { color: var(--fg); transform: translateX(2px); }
 
 /* Pack page */
@@ -72,13 +75,13 @@
 .pack-content { min-width: 0; }
 .pack-side { display: flex; flex-direction: column; gap: 12px; position: sticky; top: 16px; }
 
-.side-card { padding: 16px; border-radius: 14px; background: var(--window); border: 1px solid var(--card-border); box-shadow: var(--highlight); display: flex; flex-direction: column; gap: 12px; }
+.side-card { padding: 16px; border-radius: 18px; background: var(--window); border: 1px solid var(--card-border); box-shadow: var(--highlight); display: flex; flex-direction: column; gap: 12px; }
 .side-card h2 { margin: 0; font-size: 13px; font-weight: 600; }
 .side-card-select { width: 100%; }
 .install-facts { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; margin: 0; font-size: 12px; }
 .install-facts dt { color: var(--subtle); }
 .install-facts dd { margin: 0; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.install-note { display: flex; gap: 8px; margin: 0; padding: 8px 10px; border-radius: 8px; font-size: 12px; line-height: 1.4; color: var(--warning); background: rgb(255 159 10 / 0.1); }
+.install-note { display: flex; gap: 8px; margin: 0; padding: 8px 10px; border-radius: 10px; font-size: 12px; line-height: 1.4; color: var(--warning); background: rgb(255 159 10 / 0.1); }
 .install-note :global(.icon) { font-size: 16px; }
 .install-btn { width: 100%; }
 .note { font-size: 11px; line-height: 1.5; margin: 0; color: var(--muted); }
@@ -89,7 +92,7 @@
 
 /* Gallery */
 .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
-.gallery-item { position: relative; aspect-ratio: 16 / 9; border-radius: 10px; overflow: hidden; background: var(--card); border: 1px solid var(--card-border); }
+.gallery-item { position: relative; aspect-ratio: 16 / 9; border-radius: 12px; overflow: hidden; background: var(--card); border: 1px solid var(--card-border); }
 .gallery-item img { width: 100%; height: 100%; object-fit: cover; transition: transform 400ms var(--ease); }
 .gallery-item:hover img { transform: scale(1.04); }
 .gallery-item span {
@@ -107,19 +110,19 @@
 
 /* Mods inside a pack */
 .mod-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px; margin-top: 10px; }
-.mod-cell { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; background: var(--card); border: 1px solid var(--card-border); text-align: left; min-width: 0; }
+.mod-cell { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 12px; background: var(--card); border: 1px solid var(--card-border); text-align: left; min-width: 0; }
 button.mod-cell:hover { background: var(--card-hover); }
-.mod-cell .pack-icon { width: 32px; height: 32px; border-radius: 8px; }
+.mod-cell .pack-icon { width: 32px; height: 32px; border-radius: 10px; }
 .mod-cell-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; font-size: 12px; }
 .mod-cell-text b { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mod-cell-text span { font-size: 11px; color: var(--subtle); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Versions */
 .versions { display: flex; flex-direction: column; gap: 6px; }
-.version { border-radius: 10px; background: var(--card); border: 1px solid var(--card-border); }
+.version { border-radius: 12px; background: var(--card); border: 1px solid var(--card-border); }
 .version.on { border-color: rgb(10 132 255 / 0.45); background: rgb(10 132 255 / 0.06); }
 .version-head { display: flex; align-items: center; gap: 12px; width: 100%; padding: 8px 12px; text-align: left; font-size: 12px; }
-.version-head:hover { background: rgb(255 255 255 / 0.03); border-radius: 10px; }
+.version-head:hover { background: rgb(255 255 255 / 0.03); border-radius: 12px; }
 .vtype { width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; font-family: var(--mono); font-size: 11px; font-weight: 600; flex-shrink: 0; }
 .vtype.release { background: rgb(48 209 88 / 0.15); color: var(--green); }
 .vtype.beta { background: rgb(255 159 10 / 0.15); color: var(--warning); }

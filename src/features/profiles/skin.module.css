@@ -1,7 +1,7 @@
 /* CSS 3D player model: zero-size anchors in preserve-3d, faces cut from the skin sheet. */
 .scene {
   position: relative; display: grid; place-items: center;
-  perspective: 1400px; cursor: grab; touch-action: none; border-radius: 12px;
+  perspective: 1400px; cursor: grab; touch-action: none; border-radius: 16px;
 }
 .scene:active { cursor: grabbing; }
 .enter, .model, .joint, .limb, .box { position: absolute; width: 0; height: 0; transform-style: preserve-3d; }

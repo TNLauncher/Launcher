@@ -4,10 +4,11 @@
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   background: var(--btn); border: 1px solid rgb(255 255 255 / 0.06); box-shadow: var(--highlight);
   font-size: 12px; font-weight: 500; white-space: nowrap;
-  transition: background 160ms var(--ease), border-color 160ms var(--ease), transform 120ms var(--ease), opacity 160ms var(--ease);
+  transition: background var(--quick) var(--butter), border-color var(--quick) var(--butter), box-shadow var(--soft) var(--butter), opacity var(--quick) var(--butter), transform var(--soft) var(--spring);
 }
 .btn:hover { background: var(--btn-hover); }
-.btn:active { transform: scale(0.96); transition-duration: 60ms; }
+/* Sinks quickly under the pointer, springs back on release (the base transition). */
+.btn:active { transform: scale(0.95); transition: transform var(--press) var(--butter), background var(--press); }
 .btn:disabled { opacity: 0.6; pointer-events: none; }
 .btn :global(.icon) { font-size: 16px; }
 
@@ -15,8 +16,8 @@
 .lg { height: 40px; padding: 0 20px; font-size: 13px; }
 .lg :global(.icon) { font-size: 20px; }
 
-.primary { background: var(--accent-fill); border-color: transparent; color: #fff; }
-.primary:hover { background: var(--accent); }
+.primary { background: var(--accent-fill); border-color: transparent; color: #fff; box-shadow: var(--highlight), 0 4px 14px -6px rgb(0 113 227 / 0.6); }
+.primary:hover { background: var(--accent); box-shadow: var(--highlight), 0 8px 22px -8px rgb(10 132 255 / 0.7); }
 .primary:active { background: var(--accent-press); }
 .destructive { background: var(--critical-fill); border-color: transparent; color: #fff; }
 .destructive:hover { background: var(--critical); }
@@ -25,7 +26,7 @@
 
 .link { height: auto; padding: 0; gap: 4px; border: 0; border-radius: 0; background: none; box-shadow: none; color: var(--link); }
 .link:hover { background: none; text-decoration: underline; text-underline-offset: 2px; }
-.link:active { transform: none; }
+.link:active { transform: none; transition: none; }
 
 .overlay { background: rgb(0 0 0 / 0.35); backdrop-filter: blur(12px); }
 .overlay:hover { background: rgb(0 0 0 / 0.5); }

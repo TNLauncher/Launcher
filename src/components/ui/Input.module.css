@@ -1,10 +1,10 @@
 @layer kit {
 .input {
-  height: 32px; padding: 0 12px; border-radius: 8px; min-width: 0;
+  height: 32px; padding: 0 12px; border-radius: var(--r-sm); min-width: 0;
   background: var(--card); border: 1px solid var(--border); box-shadow: var(--highlight);
-  font-size: 12px; outline: none; transition: border-color 160ms var(--ease), background 160ms var(--ease);
+  font-size: 12px; outline: none; transition: border-color var(--quick) var(--butter), background var(--quick) var(--butter), box-shadow var(--soft) var(--butter);
 }
-.input:focus { border-color: var(--accent); background: rgb(255 255 255 / 0.08); }
+.input:focus { border-color: var(--accent); background: rgb(255 255 255 / 0.08); box-shadow: var(--highlight), 0 0 0 4px rgb(10 132 255 / 0.16); }
 .input::placeholder { color: var(--subtle); }
 .input[aria-invalid="true"] { border-color: var(--critical); }
 .mono { font-family: var(--mono); font-size: 11px; }

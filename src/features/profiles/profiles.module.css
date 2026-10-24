@@ -42,9 +42,9 @@
 .list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .row { position: relative; }
 .pick {
-  width: 100%; display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 12px; text-align: left;
+  width: 100%; display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 16px; text-align: left;
   background: rgb(99 99 102 / 0.1); border: 1px solid var(--card-border); box-shadow: var(--highlight);
-  transition: background 160ms var(--ease), border-color 160ms var(--ease), padding 160ms var(--ease);
+  transition: background var(--quick) var(--butter), border-color var(--quick) var(--butter), padding var(--quick) var(--butter);
 }
 /* Room for the delete button only while it shows. */
 .row:has(.remove):is(:hover, :focus-within) .pick { padding-right: 48px; }
@@ -55,7 +55,7 @@
 .row-sub { display: block; font-size: 11px; color: var(--muted); margin-top: 2px; }
 .current { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 500; color: var(--link); }
 .current :global(.icon) { font-size: 16px; }
-.use { font-size: 12px; color: var(--muted); padding: 3px 10px; border-radius: 999px; background: var(--btn); transition: background 160ms var(--ease), color 160ms var(--ease); }
+.use { font-size: 12px; color: var(--muted); padding: 3px 10px; border-radius: 999px; background: var(--btn); transition: background var(--quick) var(--butter), color var(--quick) var(--butter); }
 .pick:hover .use { background: var(--accent-fill); color: #fff; }
 /* Out of the way until the row is pointed at or tabbed to. */
 .remove { position: absolute; right: 8px; top: 50%; translate: 0 -50%; opacity: 0; transition: opacity 120ms var(--ease); }
@@ -69,7 +69,7 @@
 .field { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--muted); }
 .field-hint { font-size: 11px; color: var(--subtle); }
 
-.code { display: flex; flex-direction: column; gap: 8px; padding: 16px; border-radius: 12px; background: var(--panel); border: 1px solid var(--card-border); box-shadow: var(--highlight); font-size: 12px; }
+.code { display: flex; flex-direction: column; gap: 8px; padding: 16px; border-radius: 16px; background: var(--panel); border: 1px solid var(--card-border); box-shadow: var(--highlight); font-size: 12px; }
 .code-row { display: flex; align-items: center; justify-content: space-between; }
 .code-link { align-self: flex-start; padding: 0; font-family: var(--mono); font-size: 11px; }
 .code-row strong { font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: 0.14em; color: var(--fg); }

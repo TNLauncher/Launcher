@@ -46,7 +46,7 @@ export function InstanceRow({ instance: i, onOpen }: { instance: Instance; onOpe
   return (
     // The name button stays the keyboard entry; this makes the rest of the card a click target too.
     <div
-      className={cx(s.row, s.openable)}
+      className={cx(s.row, s.openable, "sheen")}
       onClick={(e) => !(e.target as Element).closest("button, input, label, dialog") && onOpen()}
     >
       <div className={s.rowMain}>
