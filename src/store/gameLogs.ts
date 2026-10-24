@@ -120,3 +120,8 @@ export function useGameLog(id: string | undefined): Session | undefined {
   useSyncExternalStore(subscribe, () => (id ? sessions.get(id)?.rev ?? -1 : -1));
   return id ? sessions.get(id) : undefined;
 }
+
+/** Just the Stop-pending flag: unlike `useGameLog`, new output lines don't re-render the caller. */
+export function useGameStopping(id: string | undefined): boolean {
+  return useSyncExternalStore(subscribe, () => (id ? sessions.get(id)?.stopping ?? false : false));
+}

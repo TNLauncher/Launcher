@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { launcher } from "@/api/launcher";
 import { View } from "@/components/layout/View";
 import { Button, Dot, EmptyState, Icon, IconButton, Pill, PillGroup, SearchInput, Select, type Tone } from "@/components/ui";
@@ -50,8 +50,12 @@ function Console({ instance }: { instance: Instance }) {
 
   const lines = log?.lines;
   const counts = useMemo(() => {
-    const c = { warn: 0, error: 0 };
-    for (const l of lines ?? []) if (!l.cont && (l.level === "warn" || l.level === "error")) c[l.level]++;
+    const c = { warn: 0, error: 0, total: 0 };
+    for (const l of lines ?? []) {
+      if (l.cont) continue;
+      c.total++;
+      if (l.level === "warn" || l.level === "error") c[l.level]++;
+    }
     return c;
     // `lines` mutates in place; `rev` is what changes.
   }, [lines, rev]);
@@ -96,7 +100,7 @@ function Console({ instance }: { instance: Instance }) {
   return (
     <View className={s.console}>
       <Toolbar instance={instance} log={log} filter={filter} setFilter={setFilter} query={query} setQuery={setQuery}
-        counts={counts} total={lines?.filter((l) => !l.cont).length ?? 0} items={items} />
+        counts={counts} total={counts.total} items={items} />
       {loadError && <p className={s.consoleLoadError}>Could not read the last log: {loadError}</p>}
       <LogBody instance={instance} items={items} rev={rev} query={query.trim()} filtered={filtered} log={log}
         onToggle={toggleFold}
@@ -340,7 +344,8 @@ function LogBody({ instance, log, items, rev, query, filtered, onToggle, onClear
   );
 }
 
-function Line({ line: l, query, flash }: { line: LogLine; query: string; flash: boolean }) {
+// Memoized: a log line never changes, so each new batch of output renders only the new lines.
+const Line = memo(function Line({ line: l, query, flash }: { line: LogLine; query: string; flash: boolean }) {
   return (
     <div className={cx(s.ln, s[l.level], l.cont && s.cont, flash && s.flash)} data-n={l.n}>
       <span className={s.lnN}>{l.n}</span>
@@ -349,7 +354,7 @@ function Line({ line: l, query, flash }: { line: LogLine; query: string; flash: 
       <span className={s.lnText}>{query ? <Marked text={l.text} query={query} /> : l.text || " "}</span>
     </div>
   );
-}
+});
 
 function Marked({ text, query }: { text: string; query: string }) {
   const lower = text.toLowerCase();

@@ -7,6 +7,7 @@ import { Markdown } from "@/components/ui/Markdown";
 import { cx } from "@/lib/cx";
 import { useFavorites } from "@/hooks/useSource";
 import { ago, compact, errorMessage, megabytes } from "@/lib/format";
+import { useInstalling } from "@/store/imports";
 import { useLauncher } from "@/store/LauncherContext";
 import { useUi } from "@/store/UiContext";
 import { packColor } from "./ModpacksView";
@@ -139,9 +140,9 @@ function InstallCard(p: {
   version: Version | undefined;
   onVersion(id: string): void;
 }) {
-  const { imports, startImport } = useLauncher();
+  const { startImport } = useLauncher();
   const { navigate } = useUi();
-  const installing = imports.some((i) => i.projectId === p.hit.id && !i.error);
+  const installing = useInstalling(p.hit.id);
   const file = p.version && primaryFile(p.version);
 
   return (

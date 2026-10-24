@@ -1,5 +1,5 @@
 import { keepPreviousData, useInfiniteQuery, useQuery } from "@tanstack/react-query";
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, memo, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { getVersions } from "@/api/mojang";
 import { sources, type Hit, type SourceInfo } from "@/api/sources";
 import { View } from "@/components/layout/View";
@@ -9,8 +9,7 @@ import { useDebounced } from "@/hooks/useDebounced";
 import { useFavorites, useSource } from "@/hooks/useSource";
 import { SourcePicker } from "@/plugins/SourcePicker";
 import { ago, compact, errorMessage } from "@/lib/format";
-import { useLauncher } from "@/store/LauncherContext";
-import { PackDetail } from "./PackDetail";
+import { useInstalling } from "@/store/imports";
 import s from "./modpacks.module.css";
 
 /** Loaders the launcher can run modpacks on. */
@@ -19,6 +18,10 @@ const LOADER_PILLS: [PackLoader, string][] = [["", "Any"], ["fabric", "Fabric"],
 const PACK_PAGE = 20;
 
 const releases = () => getVersions().then((vs) => vs.filter((v) => v.type === "release").map((v) => v.id));
+
+// The detail page drags in marked + DOMPurify (most of this view's weight): load it when a pack is about to open.
+const loadDetail = () => import("./PackDetail");
+const PackDetail = lazy(() => loadDetail().then((m) => ({ default: m.PackDetail })));
 
 export const packColor = (c: number | null) => (c == null ? undefined : `#${c.toString(16).padStart(6, "0")}`);
 
@@ -90,8 +93,13 @@ function Catalog({ source }: { source: SourceInfo }) {
 
   return (
     <>
-      {open && <PackDetail source={source} hit={open} preferredVersion={gameVersion} onBack={() => setOpen(null)} />}
-      <div className={s.packs} hidden={!!open}>
+      {open && (
+        <Suspense>
+          <PackDetail source={source} hit={open} preferredVersion={gameVersion} onBack={() => setOpen(null)} />
+        </Suspense>
+      )}
+      {/* Hovering any pack warms the detail chunk, so opening one doesn't wait on it. */}
+      <div className={s.packs} hidden={!!open} onPointerOver={loadDetail} onFocus={loadDetail}>
         <div className={s.packsFilters}>
           <SourcePicker />
           <div className={s.packsFilterRow}>
@@ -173,7 +181,7 @@ function Catalog({ source }: { source: SourceInfo }) {
 }
 
 const PackRow = memo(function PackRow({ hit: h, categoryLabel, onOpen }: { hit: Hit; categoryLabel: Record<string, string>; onOpen(h: Hit): void }) {
-  const installing = useLauncher().imports.some((p) => p.projectId === h.id && !p.error);
+  const installing = useInstalling(h.id);
   const loaders = h.categories.filter((c) => c === "fabric" || c === "quilt");
   const cats = h.categories.filter((c) => c in categoryLabel);
   const mc = h.gameVersions.length > 1 ? `${h.gameVersions[0]} – ${h.gameVersions.at(-1)}` : h.gameVersions[0];

@@ -4,6 +4,7 @@ import { SkinHead, useSkin } from "@/features/profiles/Skin";
 import { usePlugins } from "@/hooks/useSource";
 import { useLauncher } from "@/store/LauncherContext";
 import { useUi, type View } from "@/store/UiContext";
+import { preloadView } from "@/views";
 import s from "./Sidebar.module.css";
 
 const NAV: { view: View; icon: string; label: string }[] = [
@@ -36,14 +37,15 @@ export function Sidebar() {
           {/* One shared highlight that travels between items, so the eye follows the move. */}
           <span className={s.indicator} hidden={active < 0} style={{ transform: `translateY(${active * 44}px)` }} />
           {nav.map((n) => (
-            <button key={n.view} className={s.navBtn} aria-current={view === n.view ? "page" : undefined} onClick={() => navigate(n.view)}>
+            <button key={n.view} className={s.navBtn} aria-current={view === n.view ? "page" : undefined} onClick={() => navigate(n.view)}
+              onPointerEnter={() => preloadView(n.view)} onFocus={() => preloadView(n.view)}>
               <Icon name={n.icon} fill={view === n.view} />
               <span className={s.tip}>{n.label}</span>
             </button>
           ))}
         </nav>
       </div>
-      <button className={s.avatar} onClick={() => navigate("profiles")} aria-label="Profiles">
+      <button className={s.avatar} onClick={() => navigate("profiles")} onPointerEnter={() => preloadView("profiles")} aria-label="Profiles">
         <SkinHead skin={skin} name={name} size={32} className={s.head} />
         <span className={`${s.tip} mono`}>{name} · {snapshot?.account?.providerName ?? "Offline"}</span>
       </button>

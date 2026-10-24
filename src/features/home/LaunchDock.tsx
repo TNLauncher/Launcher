@@ -2,22 +2,52 @@ import { useId, useState, type CSSProperties } from "react";
 import { Button, Icon, IconButton, Select } from "@/components/ui";
 import { cx } from "@/lib/cx";
 import { errorMessage, LOADER_ICON, LOADERS, lastPlayed, STAGE_LABEL } from "@/lib/format";
-import { gameLogs, useGameLog } from "@/store/gameLogs";
+import { gameLogs, useGameStopping } from "@/store/gameLogs";
 import { useLauncher, useProgress, useRecentInstances } from "@/store/LauncherContext";
 import { useUi } from "@/store/UiContext";
 import s from "./home.module.css";
 
 export function LaunchDock() {
-  const { selected: inst, select, launch, busyId, error, clearError, isRunning, snapshot } = useLauncher();
+  return (
+    <footer className={s.dock}>
+      <DockInstance />
+      <DockAction />
+    </footer>
+  );
+}
+
+/** Kept apart from the action so per-frame launch progress doesn't re-render the picker. */
+function DockInstance() {
+  const { selected: inst, select, snapshot } = useLauncher();
+  const { navigate } = useUi();
+  const instances = useRecentInstances();
+  const ramGb = +((snapshot?.settings.ramMb ?? 0) / 1024).toFixed(1);
+  if (!inst) return <div className={s.dockLeft} />;
+  return (
+    <div className={s.dockLeft}>
+      <Select label="Instance" variant="pill" className={s.card} value={inst.id} onChange={select}
+        options={instances.map((i) => ({ value: i.id, label: i.name, hint: i.version }))}>
+        <span className={s.cardIcon}>{inst.icon ? <img src={inst.icon} alt="" /> : <Icon name={LOADER_ICON[inst.loader]} />}</span>
+        <span className={s.cardText}>
+          <span className={s.cardName}>{inst.name}</span>
+          <span className={s.cardSub}>{inst.version} · {LOADERS[inst.loader]}{ramGb > 0 && ` · ${ramGb} GB`}</span>
+        </span>
+      </Select>
+      <IconButton icon="terminal" label="Open console" onClick={() => navigate("console")} />
+    </div>
+  );
+}
+
+function DockAction() {
+  const { selected: inst, launch, busyId, error, clearError, isRunning, snapshot } = useLauncher();
   const progress = useProgress();
   const { navigate, openNewInstance } = useUi();
-  const instances = useRecentInstances();
-  const log = useGameLog(inst?.id);
+  const hasInstances = !!snapshot?.instances.length;
+  const stopping = useGameStopping(inst?.id);
   const [stopError, setStopError] = useState<string | null>(null);
   const statusId = useId();
   const running = !!inst && isRunning(inst.id);
   const preparing = !!inst && busyId === inst.id;
-  const ramGb = +((snapshot?.settings.ramMb ?? 0) / 1024).toFixed(1);
   const known = !!progress && progress.total > 0;
   const pct = known ? progress.done / progress.total : 0;
 
@@ -41,12 +71,12 @@ export function LaunchDock() {
   }
 
   let action;
-  if (snapshot && !instances.length) {
+  if (snapshot && !hasInstances) {
     action = <Button key="create" variant="primary" size="lg" icon="add" className={s.play} onClick={openNewInstance}>Create instance</Button>;
   } else if (running) {
     action = (
-      <Button key="stop" variant="danger" size="lg" icon="stop" className={s.play} disabled={log?.stopping} onClick={stop}>
-        {log?.stopping ? "Stopping" : "Stop"}
+      <Button key="stop" variant="danger" size="lg" icon="stop" className={s.play} disabled={stopping} onClick={stop}>
+        {stopping ? "Stopping" : "Stop"}
       </Button>
     );
   } else if (preparing) {
@@ -67,34 +97,18 @@ export function LaunchDock() {
   }
 
   return (
-    <footer className={s.dock}>
-      <div className={s.dockLeft}>
-        {inst && (
-          <Select label="Instance" variant="pill" className={s.card} value={inst.id} onChange={select}
-            options={instances.map((i) => ({ value: i.id, label: i.name, hint: i.version }))}>
-            <span className={s.cardIcon}>{inst.icon ? <img src={inst.icon} alt="" /> : <Icon name={LOADER_ICON[inst.loader]} />}</span>
-            <span className={s.cardText}>
-              <span className={s.cardName}>{inst.name}</span>
-              <span className={s.cardSub}>{inst.version} · {LOADERS[inst.loader]}{ramGb > 0 && ` · ${ramGb} GB`}</span>
-            </span>
-          </Select>
-        )}
-        {inst && <IconButton icon="terminal" label="Open console" onClick={() => navigate("console")} />}
-      </div>
-
-      <div className={s.dockRight}>
-        {failure ? (
-          <div className={s.failure} role="alert">
-            <Icon name="error" className={s.failureIcon} />
-            <span id={statusId} className={s.failureText} title={failure}>{failure}</span>
-            <IconButton icon="article" label="Open log" onClick={() => navigate("console")} />
-            <IconButton icon="close" label="Dismiss" onClick={dismiss} />
-          </div>
-        ) : (
-          <span id={statusId} className={cx(s.status, preparing && s.statusSr, running && s.live)} role="status" title={status}>{status}</span>
-        )}
-        {action}
-      </div>
-    </footer>
+    <div className={s.dockRight}>
+      {failure ? (
+        <div className={s.failure} role="alert">
+          <Icon name="error" className={s.failureIcon} />
+          <span id={statusId} className={s.failureText} title={failure}>{failure}</span>
+          <IconButton icon="article" label="Open log" onClick={() => navigate("console")} />
+          <IconButton icon="close" label="Dismiss" onClick={dismiss} />
+        </div>
+      ) : (
+        <span id={statusId} className={cx(s.status, preparing && s.statusSr, running && s.live)} role="status" title={status}>{status}</span>
+      )}
+      {action}
+    </div>
   );
 }

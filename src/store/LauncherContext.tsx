@@ -3,7 +3,8 @@ import { launcher } from "@/api/launcher";
 import { toast } from "@/components/ui/Toast";
 import { broadcast } from "@/plugins/bridge";
 import { gameLogs } from "./gameLogs";
-import { sources, type Hit, type Version } from "@/api/sources";
+import { imports, type PackHit } from "./imports";
+import { sources, type Version } from "@/api/sources";
 import { errorMessage, recency } from "@/lib/format";
 import type { Instance, Settings, Snapshot, Stage } from "@/types";
 
@@ -16,21 +17,6 @@ export interface Progress {
 export interface LaunchError {
   id: string;
   message: string;
-}
-
-type PackHit = Pick<Hit, "id" | "title" | "iconUrl">;
-
-/** A modpack download that has not become an instance yet. */
-export interface PendingImport {
-  source: string;
-  projectId: string;
-  title: string;
-  iconUrl: string | null;
-  /** Chosen pack version; undefined = newest. */
-  version?: Version;
-  done: number;
-  total: number;
-  error: string;
 }
 
 interface LauncherValue {
@@ -46,11 +32,8 @@ interface LauncherValue {
   clearError(): void;
   saveSettings(settings: Settings): Promise<void>;
   isRunning(id: string): boolean;
-  /** Modpack installs in flight (or failed, until dismissed). */
-  imports: PendingImport[];
-  /** Starts a background install; a pack already installing is ignored. */
+  /** Starts a background install (state in `@/store/imports`); a pack already installing is ignored. */
   startImport(source: string, pack: PackHit, version?: Version): void;
-  dismissImport(projectId: string): void;
 }
 
 const LauncherContext = createContext<LauncherValue | null>(null);
@@ -74,8 +57,6 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
   const [progress, setProgress] = useState<Progress | null>(null);
   const frame = useRef(0);
   const [error, setError] = useState<LaunchError | null>(null);
-  const [imports, setImports] = useState<PendingImport[]>([]);
-  const inFlight = useRef(new Set<string>());
 
   const refresh = useCallback(async () => setSnapshot(await launcher.getState()), []);
 
@@ -129,32 +110,23 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
 
   const clearError = useCallback(() => setError(null), []);
 
-  const patchImport = (projectId: string, patch: Partial<PendingImport>) =>
-    setImports((list) => list.map((p) => (p.projectId === projectId ? { ...p, ...patch } : p)));
-
   const startImport = useCallback(
     async (source: string, pack: PackHit, version?: Version) => {
       const id = pack.id;
-      if (inFlight.current.has(id)) return;
-      inFlight.current.add(id);
-      const pending: PendingImport = { source, projectId: id, title: pack.title, iconUrl: pack.iconUrl, version, done: 0, total: 0, error: "" };
-      setImports((list) => [pending, ...list.filter((p) => p.projectId !== id)]);
+      if (imports.has(id)) return;
+      imports.start({ source, projectId: id, title: pack.title, iconUrl: pack.iconUrl, version, error: "" });
       try {
-        const inst = await sources.importModpack(source, id, version?.id, ({ done, total }) => patchImport(id, { done, total }));
+        const inst = await sources.importModpack(source, id, version?.id, (p) => imports.progress(id, p));
         select(inst.id);
         await refresh();
-        setImports((list) => list.filter((p) => p.projectId !== id));
+        imports.dismiss(id);
         toast(`${pack.title} is ready to play`);
       } catch (e) {
-        patchImport(id, { error: errorMessage(e) });
-      } finally {
-        inFlight.current.delete(id);
+        imports.fail(id, errorMessage(e));
       }
     },
     [refresh, select]
   );
-
-  const dismissImport = useCallback((projectId: string) => setImports((list) => list.filter((p) => p.projectId !== projectId)), []);
 
   useEffect(() => {
     refresh();
@@ -184,11 +156,9 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
       clearError,
       saveSettings,
       isRunning: (id) => snapshot?.running.includes(id) ?? false,
-      imports,
       startImport,
-      dismissImport,
     };
-  }, [snapshot, selectedId, select, refresh, launch, busyId, error, clearError, saveSettings, imports, startImport, dismissImport]);
+  }, [snapshot, selectedId, select, refresh, launch, busyId, error, clearError, saveSettings, startImport]);
 
   return (
     <LauncherContext.Provider value={value}>

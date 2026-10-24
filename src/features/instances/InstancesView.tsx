@@ -1,14 +1,18 @@
-import { useMemo, useState } from "react";
+import { lazy, Suspense, useMemo, useState } from "react";
 import { View } from "@/components/layout/View";
 import { Banner, Button, Chip, EmptyState, Icon, IconButton, Meta, Pill, PillGroup, ProgressBar, SearchInput, Select } from "@/components/ui";
 import { cx } from "@/lib/cx";
 import { LOADERS, recency } from "@/lib/format";
-import { useLauncher, type PendingImport } from "@/store/LauncherContext";
+import { imports as importStore, useImportProgress, useImports, type PendingImport } from "@/store/imports";
+import { useLauncher } from "@/store/LauncherContext";
 import { useUi } from "@/store/UiContext";
 import type { Instance, Loader } from "@/types";
-import { InstancePage } from "./InstancePage";
 import { InstanceRow } from "./InstanceRow";
 import s from "./instances.module.css";
+
+// The page pulls in content browsing, screenshots and per-instance settings; warmed when a row is hovered.
+const loadPage = () => import("./InstancePage");
+const InstancePage = lazy(() => loadPage().then((m) => ({ default: m.InstancePage })));
 
 type Sort = "played" | "name" | "time";
 const SORTERS: Record<Sort, (a: Instance, b: Instance) => number> = {
@@ -19,7 +23,8 @@ const SORTERS: Record<Sort, (a: Instance, b: Instance) => number> = {
 const FILTERS: ("all" | Loader)[] = ["all", "vanilla", "fabric", "quilt"];
 
 export function InstancesView() {
-  const { snapshot, error, clearError, launch, imports } = useLauncher();
+  const { snapshot, error, clearError, launch } = useLauncher();
+  const imports = useImports();
   const { openNewInstance, navigate } = useUi();
   const [query, setQuery] = useState("");
   const [loader, setLoader] = useState<"all" | Loader>("all");
@@ -42,8 +47,12 @@ export function InstancesView() {
 
   return (
     <View>
-      {opened && <InstancePage instance={opened} onBack={() => setOpenId(null)} />}
-      <div className={s.page} hidden={!!opened}>
+      {opened && (
+        <Suspense>
+          <InstancePage instance={opened} onBack={() => setOpenId(null)} />
+        </Suspense>
+      )}
+      <div className={s.page} hidden={!!opened} onPointerOver={loadPage} onFocus={loadPage}>
         {error && <Banner message={error.message} onRetry={() => launch(error.id)} onDismiss={clearError} />}
         <div className={s.toolbar}>
           <div className={s.toolbarLeft}>
@@ -104,8 +113,9 @@ export function InstancesView() {
 
 /** A modpack still downloading; replaced by the real instance row once it lands. */
 function ImportRow({ pending: p }: { pending: PendingImport }) {
-  const { startImport, dismissImport } = useLauncher();
-  const pct = p.total ? (p.done / p.total) * 100 : 0;
+  const { startImport } = useLauncher();
+  const { done, total } = useImportProgress(p.projectId);
+  const pct = total ? (done / total) * 100 : 0;
   return (
     <div className={cx(s.row, s.importRow)} role="status" aria-busy={!p.error}>
       <div className={s.rowMain}>
@@ -120,8 +130,8 @@ function ImportRow({ pending: p }: { pending: PendingImport }) {
             <Meta small className={s.error} items={[p.error]} />
           ) : (
             <div className={s.importProgress}>
-              <ProgressBar value={p.total ? pct / 100 : undefined} />
-              <Meta small className="mono" items={[p.total ? `${p.done} / ${p.total} files` : "Preparing…"]} />
+              <ProgressBar value={total ? pct / 100 : undefined} />
+              <Meta small className="mono" items={[total ? `${done} / ${total} files` : "Preparing…"]} />
             </div>
           )}
         </div>
@@ -131,7 +141,7 @@ function ImportRow({ pending: p }: { pending: PendingImport }) {
           <Button icon="refresh" onClick={() => startImport(p.source, { id: p.projectId, title: p.title, iconUrl: p.iconUrl }, p.version)}>
             Retry
           </Button>
-          <IconButton icon="close" label="Dismiss" onClick={() => dismissImport(p.projectId)} />
+          <IconButton icon="close" label="Dismiss" onClick={() => importStore.dismiss(p.projectId)} />
         </div>
       )}
     </div>

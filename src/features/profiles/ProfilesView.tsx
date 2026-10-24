@@ -10,7 +10,8 @@ import { cx } from "@/lib/cx";
 import { errorMessage } from "@/lib/format";
 import { useLauncher } from "@/store/LauncherContext";
 import type { Account, DeviceCode } from "@/types";
-import { SkinHead, SkinModel, useSkin } from "./Skin";
+import { SkinHead, useSkin } from "./Skin";
+import { SkinModel } from "./SkinModel";
 import s from "./profiles.module.css";
 
 const USERNAME = /^[A-Za-z0-9_]{3,16}$/;
