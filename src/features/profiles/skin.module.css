@@ -10,8 +10,11 @@
   from { transform: rotateY(-110deg) translateY(10px); opacity: 0.4; }
 }
 
+/* The 1px transparent border puts each face's visible edge inside its layer, where WebKit's texture
+   filtering antialiases it; a bare layer edge is drawn aliased (jagged) once rotated. */
 .face {
-  position: absolute; backface-visibility: hidden;
+  position: absolute; backface-visibility: hidden; box-sizing: content-box;
+  border: 1px solid transparent; background-clip: padding-box; background-origin: padding-box;
   background-image: var(--skin); background-size: var(--sheet) auto; background-repeat: no-repeat;
   image-rendering: pixelated; image-rendering: crisp-edges;
 }

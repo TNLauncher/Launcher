@@ -21,6 +21,6 @@
   opacity: 0; pointer-events: none; transition: opacity 120ms var(--ease);
 }
 .nav-btn:hover .tip, .avatar:hover .tip { opacity: 1; }
-.avatar { position: relative; width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center; }
+.avatar { position: relative; width: 32px; height: 32px; padding: 0; border-radius: 8px; display: grid; place-items: center; }
 .head { border-radius: 8px; transition: box-shadow 160ms var(--ease); }
 .avatar:hover .head { box-shadow: 0 0 0 1px rgb(255 255 255 / 0.3); }

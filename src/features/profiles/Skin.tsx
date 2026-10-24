@@ -86,8 +86,9 @@ function Box({ box, uv, px, y, inflate = 0, textured, seam = 0 }: { box: V3; uv:
             style={{
               width: fw,
               height: fh,
-              left: -fw / 2,
-              top: -fh / 2,
+              // -1: the antialiasing border (skin.module.css) sits outside the face.
+              left: -fw / 2 - 1,
+              top: -fh / 2 - 1,
               transform: `${f.turn} translateZ(${f.depth * px}px)${seam ? ` scale(${(fw + seam) / fw}, ${(fh + seam) / fh})` : ""}`,
               backgroundPosition: textured ? `${-f.uv[0] * px}px ${-f.uv[1] * px}px` : undefined,
             }}

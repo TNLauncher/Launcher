@@ -56,8 +56,25 @@ async function normalize(src: string): Promise<string | null> {
   for (let i = 3; i < alpha.length; i += 4) if (alpha[i] !== 255) { opaque = false; break; }
   if (opaque) for (const [x, y, rw, rh] of legacy ? HAT : [...HAT, ...OUTER]) ctx.clearRect(x * k, y * k, rw * k, rh * k);
 
-  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+  const out = supersample(canvas);
+  const blob = await new Promise<Blob | null>((resolve) => out.toBlob(resolve, "image/png"));
   return blob && URL.createObjectURL(blob);
+}
+
+/**
+ * WebKitGTK ignores `image-rendering: pixelated` on 3D-transformed layers and filters them bilinearly, which
+ * smears 64px texels into blur. Scaled up nearest-neighbor first, the filtering only softens texel edges by a
+ * screen pixel. 1024 covers the largest model scale (13px per texel) with room to spare.
+ */
+const SHEET = 1024;
+function supersample(canvas: HTMLCanvasElement): HTMLCanvasElement {
+  if (canvas.width >= SHEET) return canvas;
+  const out = document.createElement("canvas");
+  out.width = out.height = SHEET;
+  const ctx = out.getContext("2d")!;
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(canvas, 0, 0, SHEET, SHEET);
+  return out;
 }
 
 // ponytail: object URLs live for the session, one per skin seen; revoke on eviction if this ever holds hundreds.
