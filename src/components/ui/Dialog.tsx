@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, type DialogHTMLAttributes, type FormEvent, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { cx } from "@/lib/cx";
 import s from "./Dialog.module.css";
 
@@ -36,12 +37,12 @@ export function Dialog({ open, onClose, title, aside, actions, onSubmit, classNa
     }
   }, [open]);
 
-  return (
+  return createPortal(
     <dialog ref={ref} className={cx(s.dialog, className)} aria-labelledby={title ? titleId : undefined} onClose={onClose}
       // Esc asks the owner to close, so it gets the same exit animation as Cancel.
       onCancel={(e) => (e.preventDefault(), onClose())} {...rest}>
       {title ? (
-        <form method="dialog" className={s.form} onSubmit={(e) => (e.preventDefault(), onSubmit?.(e))}>
+        <form method="dialog" className={s.form} onSubmit={(e) => (e.preventDefault(), e.stopPropagation(), onSubmit?.(e))}>
           <div className={s.head}>
             <h2 id={titleId}>{title}</h2>
             {aside}
@@ -52,7 +53,8 @@ export function Dialog({ open, onClose, title, aside, actions, onSubmit, classNa
       ) : (
         children
       )}
-    </dialog>
+    </dialog>,
+    document.body
   );
 }
 
