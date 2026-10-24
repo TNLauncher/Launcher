@@ -16,22 +16,23 @@
 .placeholder { color: var(--subtle); }
 
 .list {
-  position: fixed; z-index: 100; margin: 0; padding: 4px; list-style: none;
+  position: fixed; z-index: 100; margin: 0; padding: 6px; list-style: none;
+  display: flex; flex-direction: column; gap: 2px;
   max-width: 360px; overflow-y: auto; overscroll-behavior: contain;
-  border-radius: 14px; background: var(--popover); border: 1px solid var(--border);
+  border-radius: 16px; background: var(--popover); border: 1px solid var(--border);
   box-shadow: var(--shadow-raised), var(--highlight); font-size: 12px;
   transform-origin: top center; animation: select-in var(--soft) var(--spring);
 }
 .up { transform-origin: bottom center; animation-name: select-in-up; }
 .list li {
-  display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 12px 0 6px;
-  border-radius: 9px; white-space: nowrap; cursor: pointer; transition: background var(--press) var(--butter);
+  display: flex; align-items: center; gap: 8px; min-height: 32px; flex-shrink: 0; padding: 0 12px 0 8px;
+  border-radius: 10px; white-space: nowrap; cursor: pointer; transition: background var(--press) var(--butter);
 }
 .list li[data-active] { background: var(--accent-fill); color: #fff; }
 .check { font-size: 15px; visibility: hidden; }
 .list li[aria-selected="true"] .check { visibility: visible; }
 .list li[aria-selected="true"]:not([data-active]) .check { color: var(--accent); }
-.hint { margin-left: auto; padding-left: 16px; color: var(--subtle); font-size: 11px; }
+.hint { margin-left: auto; padding-left: 24px; color: var(--subtle); font-size: 11px; }
 .list li[data-active] .hint { color: rgb(255 255 255 / 0.72); }
 @keyframes select-in { from { opacity: 0; transform: scale(0.94) translateY(-4px); } }
 @keyframes select-in-up { from { opacity: 0; transform: scale(0.94) translateY(4px); } }
