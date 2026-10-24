@@ -1,7 +1,8 @@
 /* Settings */
 /* View only has min-height, so stretch via flex to pin the footer to the window bottom */
 .view { display: flex; flex-direction: column; }
-.settings { flex: 1; padding: 28px 32px 0; display: flex; flex-direction: column; gap: 32px; background: var(--view); }
+/* A form column, narrower than list pages. vw, not %: the sticky footer reuses --pad to bleed back out. */
+.settings { --pad: max(32px, (100vw - var(--sidebar-w) - 960px) / 2); flex: 1; padding: 28px var(--pad) 0; display: flex; flex-direction: column; gap: 32px; background: var(--view); }
 .settings h1 { margin: 0; font-size: 26px; line-height: 32px; font-weight: 300; letter-spacing: -0.02em; }
 .group-head { display: flex; align-items: center; justify-content: space-between; padding-bottom: 8px; border-bottom: 1px solid var(--card-border); }
 .group-head > div { display: flex; align-items: center; gap: 8px; }
@@ -29,7 +30,7 @@
 .res { display: flex; align-items: center; gap: 8px; }
 .res-input { width: 96px; text-align: right; }
 .settings-foot {
-  position: sticky; bottom: 0; margin: auto -32px 0; padding: 14px 32px;
+  position: sticky; bottom: 0; margin: auto calc(-1 * var(--pad)) 0; padding: 14px var(--pad);
   background: rgb(28 28 30 / 0.95); backdrop-filter: blur(12px);
   border-top: 1px solid var(--card-border); box-shadow: var(--highlight);
   display: flex; align-items: center; justify-content: space-between;

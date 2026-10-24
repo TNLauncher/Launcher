@@ -1,5 +1,5 @@
 /* Modpacks: catalog + pack page */
-.packs { padding: 20px 24px 32px; display: flex; flex-direction: column; gap: 12px; background: var(--view); min-height: 100%; }
+.packs { padding: 20px max(24px, (100% - var(--page-max)) / 2) 32px; display: flex; flex-direction: column; gap: 12px; background: var(--view); min-height: 100%; }
 .packs[hidden] { display: none; }
 
 .packs-filters {
@@ -59,7 +59,7 @@
   mask-image: linear-gradient(to bottom, #000 30%, transparent);
 }
 .pack-hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to bottom, rgb(22 22 24 / 0.15), var(--view)); }
-.pack-hero-inner { position: relative; z-index: 1; padding: 16px 24px 24px; display: flex; flex-direction: column; gap: 28px; }
+.pack-hero-inner { position: relative; z-index: 1; padding: 16px max(24px, (100% - var(--page-max)) / 2) 24px; display: flex; flex-direction: column; gap: 28px; }
 .pack-back { align-self: flex-start; }
 .pack-bar { display: flex; align-items: center; justify-content: space-between; }
 .pack-hero-main { display: flex; align-items: flex-end; gap: 18px; }
@@ -71,7 +71,7 @@
 .pack-hero-text .pack-meta { margin-top: 2px; font-size: 12px; color: rgb(245 245 247 / 0.72); }
 .pack-hero-text .pack-meta b { color: var(--fg); font-weight: 500; }
 
-.pack-columns { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 24px; padding: 0 24px; align-items: start; }
+.pack-columns { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 24px; padding: 0 max(24px, (100% - var(--page-max)) / 2); align-items: start; }
 .pack-content { min-width: 0; }
 .pack-side { display: flex; flex-direction: column; gap: 12px; position: sticky; top: 16px; }
 
@@ -152,7 +152,7 @@ button.mod-cell:hover { background: var(--card-hover); }
 
 /* Instance page reuses the pack hero */
 .instance-actions { margin-left: auto; display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
-.instance-body { padding: 0 24px; }
+.instance-body { padding: 0 max(24px, (100% - var(--page-max)) / 2); }
 .instance-page .pack-hero-inner { gap: 24px; }
 
-.source-picker { margin: 20px 24px 0; }
+.source-picker { margin: 20px max(24px, (100% - var(--page-max)) / 2) 0; }

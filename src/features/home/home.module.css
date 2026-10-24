@@ -1,6 +1,6 @@
 .home { background: var(--window); }
 
-.hero { position: relative; height: 320px; display: flex; flex-direction: column; justify-content: flex-end; padding: 0 28px 24px; overflow: hidden; }
+.hero { position: relative; height: clamp(220px, 36vh, 440px); display: flex; flex-direction: column; justify-content: flex-end; padding: 0 max(28px, (100% - var(--page-max)) / 2) 24px; overflow: hidden; }
 .hero-bg { position: absolute; inset: 0; background: url("@/assets/hero.jpg") center / cover; filter: saturate(0.7); }
 /* Only when the selected instance changes, never on opening Home. */
 .restage .hero-bg { animation: hero-bg 900ms var(--butter) backwards; }
@@ -17,7 +17,7 @@
 .hero-cta { margin-top: 8px; }
 .hero h1 { margin: 0; font-size: 26px; line-height: 32px; font-weight: 300; letter-spacing: -0.02em; }
 
-.section { padding: 16px 28px 8px; }
+.section { padding: 16px max(28px, (100% - var(--page-max)) / 2) 8px; }
 .tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
 .tile {
   display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 16px; text-align: left;
@@ -52,7 +52,9 @@
 .dock {
   position: fixed; left: var(--sidebar-w); right: 0; bottom: 0; height: 72px; z-index: 40;
   background: var(--lowest); border-top: 1px solid var(--card-border); box-shadow: var(--highlight);
-  display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 28px 0 20px;
+  display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 max(28px, var(--edge)) 0 max(20px, var(--edge) - 8px);
+  /* Fixed, so % would be the viewport: line the dock up with the page column by hand. */
+  --edge: (100vw - var(--sidebar-w) - var(--page-max)) / 2;
 }
 .dock-left { flex: 1 1 auto; display: flex; align-items: center; gap: 8px; min-width: 0; }
 .dock-right { flex: 0 1 auto; display: flex; align-items: center; justify-content: flex-end; gap: 16px; min-width: 0; }
