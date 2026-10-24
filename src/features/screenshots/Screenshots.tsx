@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { launcher } from "@/api/launcher";
+import { useBlobUrl } from "@/hooks/useBlobUrl";
 import { Banner, ConfirmDialog, Dialog, EmptyState, IconButton, Skeleton } from "@/components/ui";
 import { errorMessage, megabytes } from "@/lib/format";
 import type { Screenshot } from "@/types";
@@ -50,7 +51,7 @@ export function Screenshots({ instanceId }: { instanceId: string }) {
           {list.map((sh) => (
             <button key={sh.file} type="button" className={s.thumb} title={`${sh.file} · ${taken(sh)}`} onClick={() => setOpen(sh.file)}>
               {/* ponytail: full-size PNGs as thumbnails; generate small ones in Rust if big folders feel slow */}
-              <img src={launcher.screenshotUrl(instanceId, sh.file)} alt={sh.file} loading="lazy" decoding="async" />
+              <Shot instanceId={instanceId} file={sh.file} />
             </button>
           ))}
         </div>
@@ -68,7 +69,7 @@ export function Screenshots({ instanceId }: { instanceId: string }) {
       >
         {current && (
           <>
-            <img src={launcher.screenshotUrl(instanceId, current.file)} alt={current.file} />
+            <Shot instanceId={instanceId} file={current.file} />
             <div className={s.bar}>
               <IconButton icon="chevron_left" label="Previous" variant="overlay" disabled={list.length < 2} onClick={() => step(-1)} />
               <span className={s.caption}>
@@ -100,4 +101,9 @@ export function Screenshots({ instanceId }: { instanceId: string }) {
       </ConfirmDialog>
     </section>
   );
+}
+
+function Shot({ instanceId, file }: { instanceId: string; file: string }) {
+  const src = useBlobUrl(`${instanceId}/${file}`, () => launcher.screenshot(instanceId, file));
+  return src && <img src={src} alt={file} decoding="async" />;
 }

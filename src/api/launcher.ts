@@ -1,5 +1,5 @@
 // Typed wrappers for the core commands in src-tauri/src/lib.rs; plugin commands live in ./sources.
-import { Channel, convertFileSrc } from "@tauri-apps/api/core";
+import { Channel } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { call } from "./ipc";
 import type { Account, ContentKind, DeviceCode, GameExit, GameLog, Instance, InstanceSettings, LaunchEvent, Loader, LoaderBuild, ModFile, Screenshot, Settings, Skin, Snapshot } from "@/types";
@@ -39,7 +39,7 @@ export const launcher = {
   /** Newest first. */
   listScreenshots: (id: string) => call<Screenshot[]>("list_screenshots", { id }),
   deleteScreenshot: (id: string, file: string) => call<void>("delete_screenshot", { id, file }),
-  screenshotUrl: (id: string, file: string) => convertFileSrc(`screenshot/${id}/${file}`, "instance"),
+  screenshot: (id: string, file: string) => call<ArrayBuffer>("screenshot_bytes", { id, file }),
 
   /** Resolves once the game process has started; progress arrives through `onEvent`. */
   launch: (id: string, onEvent: (e: LaunchEvent) => void) => {
@@ -58,8 +58,8 @@ export const launcher = {
   /** Mods are renamed to `.disabled`; packs are switched in `options.txt`, shaders in Iris' config. */
   toggleContent: (id: string, kind: ContentKind, file: string) => call<void>("toggle_content", { id, kind, file }),
   deleteContent: (id: string, kind: ContentKind, file: string) => call<void>("delete_content", { id, kind, file }),
-  /** URL of the icon packed inside a mod jar; 404s when the mod has none. */
-  modIconUrl: (id: string, file: string) => convertFileSrc(`modicon/${id}/${file}`, "instance"),
+  /** The icon packed inside a mod jar; rejects when the mod has none. */
+  modIcon: (id: string, file: string) => call<ArrayBuffer>("mod_icon", { id, file }),
 
   /** GET a Mojang document through Rust: no CORS in the webview. Content sources go through `sources`. */
   fetchJson: <T>(url: string) => call<T>("fetch_json", { url }),

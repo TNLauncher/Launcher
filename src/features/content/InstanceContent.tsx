@@ -10,6 +10,7 @@ import { useFavorites, usePlugins, useSource } from "@/hooks/useSource";
 import { cx } from "@/lib/cx";
 import { compact, errorMessage, megabytes, plural } from "@/lib/format";
 import { pluginBase } from "@/plugins/bridge";
+import { useBlobUrl } from "@/hooks/useBlobUrl";
 import { PluginFrame } from "@/plugins/PluginHost";
 import { SourcePicker } from "@/plugins/SourcePicker";
 import { useLauncher } from "@/store/LauncherContext";
@@ -407,7 +408,8 @@ function InstalledPane({
 }
 
 function ItemIcon({ item, instanceId, kind }: { item: ContentItem; instanceId: string; kind: ContentKind }) {
-  const src = item.project?.iconUrl ?? (kind === "mod" ? launcher.modIconUrl(instanceId, item.file) : null);
+  const jar = useBlobUrl(kind === "mod" && !item.project?.iconUrl ? `${instanceId}/${item.file}` : null, () => launcher.modIcon(instanceId, item.file));
+  const src = item.project?.iconUrl ?? jar;
   // The jar icon is tried before the source answers; remember a failure per URL so the source's one still shows.
   const [failed, setFailed] = useState<string | null>(null);
   return (
