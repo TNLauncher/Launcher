@@ -2,7 +2,7 @@
 import { Channel, convertFileSrc } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { call } from "./ipc";
-import type { Account, ContentKind, DeviceCode, GameExit, GameLog, Instance, LaunchEvent, Loader, ModFile, Screenshot, Settings, Skin, Snapshot } from "@/types";
+import type { Account, ContentKind, DeviceCode, GameExit, GameLog, Instance, InstanceSettings, LaunchEvent, Loader, ModFile, Screenshot, Settings, Skin, Snapshot } from "@/types";
 
 export const launcher = {
   getState: () => call<Snapshot>("get_state"),
@@ -28,6 +28,7 @@ export const launcher = {
   renameInstance: (id: string, name: string) => call<void>("rename_instance", { id, name }),
   /** `icon` is a `data:image/...` URL, or "" to reset. */
   setInstanceIcon: (id: string, icon: string) => call<void>("set_instance_icon", { id, icon }),
+  setInstanceSettings: (id: string, settings: InstanceSettings) => call<void>("set_instance_settings", { id, settings }),
   deleteInstance: (id: string) => call<void>("delete_instance", { id }),
   /** Opens the instance folder, or a folder inside it (`mods`, `screenshots`...). */
   openInstanceDir: (id: string, folder?: string) => call<void>("open_instance_dir", { id, folder }),

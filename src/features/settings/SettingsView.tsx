@@ -12,7 +12,7 @@ import type { Settings } from "@/types";
 import s from "./settings.module.css";
 
 // Keep in sync with Settings::default() in src-tauri/src/models/settings.rs.
-const DEFAULT_JVM_ARGS =
+export const DEFAULT_JVM_ARGS =
   "-XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UnlockExperimentalVMOptions -XX:+DisableExplicitGC";
 const DEFAULTS: Omit<Settings, "username"> = {
   javaPath: "",
@@ -62,22 +62,7 @@ export function SettingsView() {
 
         <Group icon="memory" title="Java & memory">
           <Row label="RAM allocation" hint="Maximum heap for every instance. 4–6 GB suits most modpacks.">
-            <div className={cx(s.settingControl, s.col)}>
-              <div className={s.settingControl}>
-                <input
-                  className={s.range}
-                  type="range" min={1} max={16} step={0.5} aria-label="RAM in gigabytes"
-                  value={form.ramMb / 1024}
-                  onChange={(e) => update({ ramMb: Math.round(parseFloat(e.target.value) * 1024) })}
-                />
-                <span className={cx(s.ramChip, "mono")}>{form.ramMb} MB</span>
-              </div>
-              <div className={cx(s.ticks, "mono")}>
-                {[1, 4, 8, 12, 16].map((gb) => (
-                  <span key={gb} style={{ left: `${((gb - 1) / 15) * 100}%` }}>{gb} GB</span>
-                ))}
-              </div>
-            </div>
+            <RamSlider value={form.ramMb} onChange={(ramMb) => update({ ramMb })} />
           </Row>
           <Row label="Java runtime" hint="Leave empty and the launcher downloads the right Java for each version.">
             <div className={s.settingControl}>
@@ -233,7 +218,28 @@ function PluginSettings({ plugin, onError }: { plugin: PluginEntry; onError(mess
   );
 }
 
-function Group({ icon, title, aside, children }: { icon: string; title: string; aside?: string; children: ReactNode }) {
+export function RamSlider({ value, onChange }: { value: number; onChange(mb: number): void }) {
+  return (
+    <div className={cx(s.settingControl, s.col)}>
+      <div className={s.settingControl}>
+        <input
+          className={s.range}
+          type="range" min={1} max={16} step={0.5} aria-label="RAM in gigabytes"
+          value={value / 1024}
+          onChange={(e) => onChange(Math.round(parseFloat(e.target.value) * 1024))}
+        />
+        <span className={cx(s.ramChip, "mono")}>{value} MB</span>
+      </div>
+      <div className={cx(s.ticks, "mono")}>
+        {[1, 4, 8, 12, 16].map((gb) => (
+          <span key={gb} style={{ left: `${((gb - 1) / 15) * 100}%` }}>{gb} GB</span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function Group({ icon, title, aside, children }: { icon: string; title: string; aside?: ReactNode; children: ReactNode }) {
   return (
     <section>
       <div className={s.groupHead}>
@@ -245,7 +251,7 @@ function Group({ icon, title, aside, children }: { icon: string; title: string; 
   );
 }
 
-function Row({ label, hint, top, children }: { label: string; hint: string; top?: boolean; children: ReactNode }) {
+export function Row({ label, hint, top, children }: { label: string; hint: string; top?: boolean; children: ReactNode }) {
   return (
     <div className={cx(s.setting, top && s.top)}>
       <div className={s.settingLabel}><strong>{label}</strong><span>{hint}</span></div>

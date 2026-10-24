@@ -29,6 +29,21 @@ export interface Instance {
   icon: string;
   /** Modpack it was created from; null = made by hand. */
   pack: PackRef | null;
+  settings: InstanceSettings;
+}
+
+/** Overrides of the global Settings; null = use the global value. */
+export interface InstanceSettings {
+  javaPath: string | null;
+  ramMb: number | null;
+  jvmArgs: string | null;
+  width: number | null;
+  height: number | null;
+  fullscreen: boolean | null;
+  /** Command the game runs through, e.g. `gamemoderun`; "" = none. */
+  wrapper: string;
+  /** `KEY=VALUE` per line. */
+  env: string;
 }
 
 export interface PackRef {

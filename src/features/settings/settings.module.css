@@ -36,3 +36,4 @@
 }
 .settings-foot > div { display: flex; align-items: center; gap: 8px; color: var(--muted); }
 .settings-foot :global(.icon) { font-size: 16px; color: var(--green); }
+.instance-pane { display: flex; flex-direction: column; gap: 32px; padding: 16px 0 32px; }
