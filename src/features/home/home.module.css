@@ -1,12 +1,14 @@
 .home { background: var(--window); }
 
 .hero { position: relative; height: 320px; display: flex; flex-direction: column; justify-content: flex-end; padding: 0 28px 24px; overflow: hidden; }
-.hero-bg { position: absolute; inset: 0; background: url("@/assets/hero.jpg") center / cover; filter: saturate(0.7); animation: hero-bg 1100ms var(--ease) backwards; }
-.hero-body > * { animation: hero-rise 520ms var(--ease) backwards; }
-.hero-body > :nth-child(2) { animation-delay: 70ms; }
-.hero-body > :nth-child(3) { animation-delay: 140ms; }
+.hero-bg { position: absolute; inset: 0; background: url("@/assets/hero.jpg") center / cover; filter: saturate(0.7); }
+/* Only when the selected instance changes, never on opening Home. */
+.restage .hero-bg { animation: hero-bg 900ms var(--ease) backwards; }
+.restage .hero-body > * { animation: hero-rise 480ms var(--ease) backwards; }
+.restage .hero-body > :nth-child(2) { animation-delay: 60ms; }
+.restage .hero-body > :nth-child(3) { animation-delay: 120ms; }
 /* The scene settles out of a slight push-in and a brighter exposure. */
-@keyframes hero-bg { from { transform: scale(1.06); filter: saturate(1) brightness(1.25); } }
+@keyframes hero-bg { from { transform: scale(1.04); filter: saturate(0.85) brightness(1.08); } }
 @keyframes hero-rise { from { opacity: 0; transform: translateY(14px); clip-path: inset(0 0 100% 0); } to { clip-path: inset(0 0 -20% 0); } }
 .hero::before, .hero::after { content: ""; position: absolute; inset: 0; z-index: 1; }
 .hero::before { background: linear-gradient(to top, var(--window), rgb(28 28 30 / 0.8) 45%, transparent); }
@@ -21,16 +23,15 @@
   display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 12px; text-align: left;
   background: rgb(99 99 102 / 0.1); border: 1px solid var(--card-border); box-shadow: var(--highlight);
   transition: background 160ms var(--ease), border-color 160ms var(--ease), transform 140ms var(--ease); min-width: 0;
-  animation: tile-in 420ms var(--ease) backwards; animation-delay: calc(var(--i, 0) * 50ms);
 }
 .tile:active { transform: scale(0.97); transition-duration: 60ms; }
-@keyframes tile-in { from { opacity: 0; transform: translateY(8px); } }
 .tile:hover { background: var(--panel); border-color: rgb(255 255 255 / 0.15); }
 .tile[aria-pressed="true"] { background: var(--panel); border-color: var(--accent-fill); }
 .tile-icon { width: 36px; height: 36px; border-radius: 8px; background: rgb(255 255 255 / 0.06); display: grid; place-items: center; color: var(--muted); flex-shrink: 0; overflow: hidden; }
 .tile-icon img { width: 100%; height: 100%; object-fit: cover; }
 .tile-icon { transition: background 160ms var(--ease), color 160ms var(--ease); }
-.tile[aria-pressed="true"] .tile-icon { background: rgb(0 113 227 / 0.15); color: var(--link); animation: tile-pick 360ms var(--ease); }
+.tile[aria-pressed="true"] .tile-icon { background: rgb(0 113 227 / 0.15); color: var(--link); }
+.picked .tile[aria-pressed="true"] .tile-icon { animation: tile-pick 360ms var(--ease); }
 @keyframes tile-pick { 40% { transform: scale(1.12); } }
 .add:hover .tile-icon { color: var(--fg); }
 .add .tile-icon :global(.icon) { transition: transform 260ms var(--ease); }
@@ -79,7 +80,8 @@
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
 }
 
-.play { flex-shrink: 0; width: 200px; height: 48px; font-size: 14px; position: relative; overflow: hidden; isolation: isolate; animation: play-swap 340ms var(--ease) backwards; }
+.play { flex-shrink: 0; width: 200px; height: 48px; font-size: 14px; position: relative; overflow: hidden; isolation: isolate; }
+.swap { animation: play-swap 340ms var(--ease) backwards; }
 /* Each state (play → preparing → stop) arrives as a new button, so the change is felt, not just read. */
 @keyframes play-swap { from { opacity: 0; transform: scale(0.92); } }
 .play-ready { transition: background 160ms var(--ease), box-shadow 240ms var(--ease), transform 120ms var(--ease); }

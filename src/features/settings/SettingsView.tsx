@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { View } from "@/components/layout/View";
 import { Button, ConfirmDialog, Icon, Input, Select, Switch, Textarea } from "@/components/ui";
+import { useChanged } from "@/hooks/useChanged";
 import { cx } from "@/lib/cx";
 import { errorMessage } from "@/lib/format";
 import { useLauncher } from "@/store/LauncherContext";
@@ -29,6 +30,7 @@ export function SettingsView() {
   const { snapshot, saveSettings } = useLauncher();
   const [form, setForm] = useState<Settings | null>(snapshot?.settings ?? null);
   const [status, setStatus] = useState("Changes save automatically");
+  const statusChanged = useChanged(status);
   const [confirmReset, setConfirmReset] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -115,7 +117,7 @@ export function SettingsView() {
 
         <div className={s.settingsFoot}>
           {/* Keyed so each new save state lands with its own beat. */}
-          <div key={status} className={cx(s.saveState, saving && s.saving, failed && s.saveFailed)} role="status">
+          <div key={status} className={cx(s.saveState, statusChanged && s.saveChanged, saving && s.saving, failed && s.saveFailed)} role="status">
             <Icon name={saving ? "progress_activity" : failed ? "error" : "check_circle"} spin={saving} fill={!saving} />
             <span className="mono">{status}</span>
           </div>

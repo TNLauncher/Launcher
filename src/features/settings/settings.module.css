@@ -36,8 +36,9 @@
 }
 .settings-foot > div { display: flex; align-items: center; gap: 8px; color: var(--muted); }
 .settings-foot :global(.icon) { font-size: 16px; color: var(--green); }
-.save-state :global(.icon) { animation: save-pop 420ms var(--ease); }
-.save-state span { animation: save-text 260ms var(--ease); }
+/* Only once the status has moved off its resting text: opening Settings shows it settled. */
+.save-changed :global(.icon) { animation: save-pop 420ms var(--ease); }
+.save-changed span { animation: save-text 260ms var(--ease); }
 .saving :global(.icon) { color: var(--muted); animation: spin 1s linear infinite; }
 .settings-foot > .save-failed { color: var(--critical); }
 .save-failed :global(.icon) { color: var(--critical); }

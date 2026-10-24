@@ -1,4 +1,6 @@
 import { Button, Meta } from "@/components/ui";
+import { useChanged } from "@/hooks/useChanged";
+import { cx } from "@/lib/cx";
 import { lastPlayed, loaderLabel, plural } from "@/lib/format";
 import { useLauncher } from "@/store/LauncherContext";
 import { useUi } from "@/store/UiContext";
@@ -7,9 +9,10 @@ import s from "./home.module.css";
 export function Hero() {
   const { selected: inst, snapshot } = useLauncher();
   const { openNewInstance } = useUi();
+  const restage = useChanged(inst?.id);
 
   return (
-    <div className={s.hero}>
+    <div className={cx(s.hero, restage && s.restage)}>
       {/* Keyed by instance: switching re-stages the scene instead of swapping text in place. */}
       <div key={inst?.id} className={s.heroBg} />
       <div key={`body-${inst?.id}`} className={s.heroBody}>

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useLayoutEffect, useRef } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Titlebar } from "@/components/layout/Titlebar";
 import { Toaster } from "@/components/ui/Toast";
@@ -20,12 +20,17 @@ function CurrentView({ view }: { view: Parameters<typeof viewComponent>[0] }) {
 function Shell() {
   const { view, newInstanceOpen } = useUi();
   const [, plugin, page] = view.split(":");
+  const main = useRef<HTMLElement>(null);
+  // Each view opens at the top; the scroller itself persists so the old view stays up while the next one loads.
+  // Layout effect: the new view paints already scrolled to the top.
+  useLayoutEffect(() => {
+    main.current?.scrollTo(0, 0);
+  }, [view]);
   return (
     <>
       <Sidebar />
       <Titlebar />
-      {/* Keyed: each view opens scrolled to the top and replays its entrance. */}
-      <main key={view} className={s.main}>
+      <main ref={main} className={s.main}>
         <Suspense>
           {page ? <PluginPage key={view} plugin={plugin} page={page} /> : <CurrentView view={view as Parameters<typeof viewComponent>[0]} />}
         </Suspense>

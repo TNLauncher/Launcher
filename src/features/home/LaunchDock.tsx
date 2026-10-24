@@ -1,5 +1,6 @@
 import { useId, useState, type CSSProperties } from "react";
 import { Button, Icon, IconButton, Select } from "@/components/ui";
+import { useChanged } from "@/hooks/useChanged";
 import { cx } from "@/lib/cx";
 import { errorMessage, LOADER_ICON, LOADERS, lastPlayed, STAGE_LABEL } from "@/lib/format";
 import { gameLogs, useGameStopping } from "@/store/gameLogs";
@@ -70,18 +71,22 @@ function DockAction() {
     clearError();
   }
 
+  const state = snapshot && !hasInstances ? "create" : running ? "stop" : preparing ? "busy" : "play";
+  // Each state arrives as a new button, but only after a real change: opening Home shows it settled.
+  const swap = useChanged(state) && s.swap;
+
   let action;
   if (snapshot && !hasInstances) {
-    action = <Button key="create" variant="primary" size="lg" icon="add" className={s.play} onClick={openNewInstance}>Create instance</Button>;
+    action = <Button key="create" variant="primary" size="lg" icon="add" className={cx(s.play, swap)} onClick={openNewInstance}>Create instance</Button>;
   } else if (running) {
     action = (
-      <Button key="stop" variant="danger" size="lg" icon="stop" className={s.play} disabled={stopping} onClick={stop}>
+      <Button key="stop" variant="danger" size="lg" icon="stop" className={cx(s.play, swap)} disabled={stopping} onClick={stop}>
         {stopping ? "Stopping" : "Stop"}
       </Button>
     );
   } else if (preparing) {
     action = (
-      <Button key="busy" variant="primary" size="lg" className={cx(s.play, s.playBusy, !known && s.playSweep)} disabled aria-busy="true"
+      <Button key="busy" variant="primary" size="lg" className={cx(s.play, swap, s.playBusy, !known && s.playSweep)} disabled aria-busy="true"
         style={{ "--p": pct } as CSSProperties}>
         {progress ? STAGE_LABEL[progress.stage] : "Starting"}
         {known && <span className={cx(s.playPct, "mono")}>{Math.floor(pct * 100)}%</span>}
@@ -89,7 +94,7 @@ function DockAction() {
     );
   } else {
     action = (
-      <Button key="play" variant={busyId ? "default" : "primary"} size="lg" icon="play_arrow" className={cx(s.play, !busyId && s.playReady)}
+      <Button key="play" variant={busyId ? "default" : "primary"} size="lg" icon="play_arrow" className={cx(s.play, swap, !busyId && s.playReady)}
         disabled={!inst || !!busyId} aria-describedby={statusId} onClick={() => inst && launch(inst.id)}>
         Play
       </Button>

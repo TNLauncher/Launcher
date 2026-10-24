@@ -1,7 +1,1 @@
 .main { position: fixed; top: 40px; left: var(--sidebar-w); right: 0; bottom: 0; overflow-y: auto; background: var(--view); }
-/* Short and close: navigation reads as a cut with a soft landing, not a wait.
-   On the view's children, not the view: a transform there would re-anchor the fixed launch dock, which stays put. */
-.main > * > :not(footer) { animation: view-in 300ms var(--ease) backwards; }
-.main > * > :nth-child(2):not(footer) { animation-delay: 30ms; }
-.main > * > :nth-child(n + 3):not(footer) { animation-delay: 60ms; }
-@keyframes view-in { from { opacity: 0; transform: translateY(10px); } }
