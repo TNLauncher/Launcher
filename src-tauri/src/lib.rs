@@ -90,6 +90,7 @@ pub fn run() {
             commands::account::plugin_login,
             commands::account::account_skin,
             commands::instances::create_instance,
+            commands::instances::loader_version,
             commands::instances::import_modpack,
             commands::instances::rename_instance,
             commands::instances::set_instance_icon,

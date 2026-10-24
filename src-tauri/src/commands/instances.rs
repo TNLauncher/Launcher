@@ -1,4 +1,5 @@
 use crate::error::Result;
+use crate::minecraft::loader;
 use crate::models::{Instance, InstanceSettings, Loader, Screenshot};
 use crate::services::modpacks::{self, ImportProgress};
 use crate::services::{instances, mods, screenshots};
@@ -9,6 +10,12 @@ use tauri_plugin_opener::OpenerExt;
 #[tauri::command]
 pub async fn create_instance(state: State<'_, AppState>, name: String, version: String, loader: Loader) -> Result<Instance> {
     instances::create(&state, &name, &version, loader).await
+}
+
+/// The loader version a new instance would get; fails with `unsupported` when the loader skips that game version.
+#[tauri::command]
+pub async fn loader_version(state: State<'_, AppState>, version: String, loader: Loader) -> Result<String> {
+    loader::latest(&state.http, &version, loader).await
 }
 
 /// Creates an instance from a modpack project; `version` is a version id, `None` = newest.

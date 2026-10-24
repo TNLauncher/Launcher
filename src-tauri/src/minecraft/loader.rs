@@ -29,7 +29,11 @@ fn meta_base(loader: Loader) -> Option<&'static str> {
 }
 
 fn unsupported(loader: Loader, game: &str) -> AppError {
-    AppError::Unsupported(format!("{loader:?} does not support Minecraft {game} yet"))
+    AppError::Unsupported(match loader {
+        // Abandoned in 2017: newer versions never come.
+        Loader::LiteLoader => format!("LiteLoader only runs Minecraft 1.5.2 to 1.12.2, not {game}"),
+        _ => format!("{loader:?} does not support Minecraft {game} yet"),
+    })
 }
 
 /// NeoForge drops the leading `1.` and pads to the game's part count: 1.21 → `21.0.`, 26.1 → `26.1.0.`.
