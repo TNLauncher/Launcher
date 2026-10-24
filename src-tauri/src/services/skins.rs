@@ -1,6 +1,6 @@
 //! Account skins for Profiles. Textures are fetched here rather than in the webview: no CORS or mixed
 //! content, a disk cache keeps them showing offline, and links a plugin hands out stay on its hosts.
-use super::account::{self, Account, MICROSOFT, OFFLINE};
+use super::account::{self, Account, MICROSOFT};
 use crate::error::{AppError, Result};
 use crate::minecraft::http;
 use crate::plugins::{self, host::host_allowed, js::Skin};
@@ -43,9 +43,6 @@ pub async fn skin(state: &AppState, id: &str) -> Result<Option<SkinView>> {
 
 /// Where the skin is: Mojang's session server for Microsoft accounts, the plugin's `skin` otherwise.
 async fn resolve(state: &AppState, acc: &Account) -> Result<Option<Skin>> {
-    if acc.provider == OFFLINE {
-        return Ok(None);
-    }
     let (skin, hosts) = if acc.provider == MICROSOFT {
         let url = format!("https://sessionserver.mojang.com/session/minecraft/profile/{}", acc.uuid);
         (textures_of(&http::get_json(&state.http, &url).await?), vec!["textures.minecraft.net".to_string()])

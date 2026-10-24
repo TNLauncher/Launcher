@@ -85,7 +85,7 @@ pub async fn launch(app: &AppHandle, id: &str, on_event: Channel<LaunchEvent>) -
 
     progress(Stage::Resolving, 0, 0);
     // Before the downloads, so an expired sign-in fails fast.
-    let session = super::account::session(&state, settings.player_name()).await?;
+    let session = super::account::session(&state).await?;
     let base = version::base(&state.http, root, &inst.version).await?;
     // Java follows the vanilla version; Forge/NeoForge installers need it before their profile exists.
     let java = match settings.java_path.trim() {

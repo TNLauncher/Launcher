@@ -28,9 +28,10 @@ async fn fabric_reaches_main_menu_init() {
     let natives = game_dir.join(".natives");
     let cp = install::install(&c, &root, &v, &natives, &progress).await.unwrap();
 
+    let session = auth::Session { name: "Tester".into(), uuid: "00000000000000000000000000000000".into(), token: "0".into(), user_type: "legacy", jvm_args: vec![] };
     let mut cmd = command::build(&v, &command::LaunchOptions {
         java: &java, root: &root, game_dir: &game_dir, natives: &natives, classpath: &cp,
-        session: &auth::Session::offline("Tester"), ram_mb: 2048, jvm_args: "", width: 854, height: 480, fullscreen: false, wrapper: "",
+        session: &session, ram_mb: 2048, jvm_args: "", width: 854, height: 480, fullscreen: false, wrapper: "",
     });
     let child = cmd.stdout(Stdio::piped()).stderr(Stdio::piped()).spawn().unwrap();
     let pid = child.id();

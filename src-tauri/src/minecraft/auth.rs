@@ -1,4 +1,4 @@
-//! Player identity: offline names and Microsoft accounts.
+//! Player identity: Microsoft accounts and launch sessions.
 //! Microsoft: device code → MS token → Xbox Live → XSTS → Minecraft token → profile.
 use crate::config::MS_CLIENT_ID;
 use crate::error::{AppError, Result};
@@ -14,16 +14,10 @@ pub struct Session {
     pub name: String,
     pub uuid: String,
     pub token: String,
-    /// `msa`, `mojang` (Yggdrasil servers like Ely.by) or `legacy` (offline).
+    /// `msa`, `mojang` (Yggdrasil servers) or `legacy`.
     pub user_type: &'static str,
     /// Extra JVM flags the account needs, e.g. an authlib-injector `-javaagent`.
     pub jvm_args: Vec<String>,
-}
-
-impl Session {
-    pub fn offline(name: &str) -> Self {
-        Self { name: name.into(), uuid: offline_uuid(name), token: "0".into(), user_type: "legacy", jvm_args: vec![] }
-    }
 }
 
 /// Persisted Microsoft sign-in; `token` is the Minecraft access token.
@@ -54,15 +48,6 @@ impl Account {
 pub struct DeviceCode {
     pub user_code: String,
     pub verification_uri: String,
-}
-
-/// Mojang's offline-mode UUID: md5("OfflinePlayer:" + name) as a v3 UUID, no dashes.
-pub fn offline_uuid(name: &str) -> String {
-    use md5::{Digest, Md5};
-    let mut b: [u8; 16] = Md5::digest(format!("OfflinePlayer:{name}")).into();
-    b[6] = (b[6] & 0x0f) | 0x30;
-    b[8] = (b[8] & 0x3f) | 0x80;
-    b.iter().map(|x| format!("{x:02x}")).collect()
 }
 
 /// Full interactive sign-in. Resolves once the user approves the code (or it expires).
@@ -192,12 +177,4 @@ fn text(v: &Value) -> String {
 
 fn now() -> u64 {
     SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs()
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn matches_offline_servers() {
-        assert_eq!(super::offline_uuid("Notch"), "b50ad385829d3141a2167e7d7539ba7f");
-    }
 }

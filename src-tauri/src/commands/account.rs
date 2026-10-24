@@ -12,21 +12,14 @@ pub fn list_accounts(state: State<'_, AppState>) -> Vec<AccountView> {
     account::list(&state)
 }
 
-/// `id` = None plays offline.
 #[tauri::command]
-pub fn select_account(state: State<'_, AppState>, id: Option<String>) -> Result<()> {
-    account::select(&state, id.as_deref())
+pub fn select_account(state: State<'_, AppState>, id: String) -> Result<()> {
+    account::select(&state, &id)
 }
 
 #[tauri::command]
 pub fn remove_account(state: State<'_, AppState>, id: String) -> Result<()> {
     account::remove(&state, &id)
-}
-
-/// Adds (or selects) an offline profile by player name.
-#[tauri::command]
-pub fn add_offline_account(state: State<'_, AppState>, name: String) -> Result<String> {
-    account::add_offline(&state, &name)
 }
 
 /// Opens the Microsoft code page, sends the code to the UI, resolves with the player name once approved.

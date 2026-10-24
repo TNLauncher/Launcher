@@ -13,7 +13,7 @@ use tauri::State;
 #[serde(rename_all = "camelCase")]
 pub struct Snapshot {
     settings: Settings,
-    /// The account launches use; `None` = offline.
+    /// The active account; `None` when not signed in.
     account: Option<AccountView>,
     instances: Vec<Instance>,
     mod_counts: HashMap<String, usize>,

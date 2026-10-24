@@ -21,7 +21,6 @@ pub struct Settings {
     pub height: u32,
     pub fullscreen: bool,
     pub after_launch: AfterLaunch,
-    pub username: String,
 }
 
 pub const DEFAULT_JVM_ARGS: &str =
@@ -37,7 +36,6 @@ impl Default for Settings {
             height: 720,
             fullscreen: false,
             after_launch: AfterLaunch::Hide,
-            username: "Player".into(),
         }
     }
 }
@@ -53,17 +51,6 @@ impl Settings {
             height: o.height.unwrap_or(self.height),
             fullscreen: o.fullscreen.unwrap_or(self.fullscreen),
             ..self.clone()
-        }
-    }
-
-    /// Offline-mode name, falling back to "Player" when unset or invalid.
-    pub fn player_name(&self) -> &str {
-        let n = self.username.trim();
-        let valid = (3..=16).contains(&n.len()) && n.chars().all(|c| c.is_ascii_alphanumeric() || c == '_');
-        if valid {
-            n
-        } else {
-            "Player"
         }
     }
 }

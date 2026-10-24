@@ -2113,16 +2113,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "md-5"
-version = "0.10.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d89e7ee0cfbedfc4da3340218492196241d89eefb6dab27de5df917a6d2e78cf"
-dependencies = [
- "cfg-if",
- "digest",
-]
-
-[[package]]
 name = "memchr"
 version = "2.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4053,7 +4043,6 @@ dependencies = [
  "discord-rich-presence",
  "dotenvy",
  "futures",
- "md-5",
  "percent-encoding",
  "reqwest 0.12.28",
  "serde",

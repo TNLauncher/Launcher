@@ -38,7 +38,13 @@
       try {
         const impl = registered[m.target];
         const fn = impl && impl[m.method];
-        if (typeof fn !== "function") throw new Error(`${m.target}.${m.method} is not implemented`);
+        if (typeof fn !== "function") {
+          if (m.target === "account" && m.method === "skin") {
+            post({ type: "result", callId: m.callId, ok: true, value: null });
+            return;
+          }
+          throw new Error(`${m.target}.${m.method} is not implemented`);
+        }
         const value = await fn.apply(impl, m.args);
         post({ type: "result", callId: m.callId, ok: true, value: value === undefined ? null : value });
       } catch (err) {
