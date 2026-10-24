@@ -1,10 +1,11 @@
 import type { Instance, Loader, Stage } from "@/types";
 
-export const LOADERS: Record<Loader, string> = { vanilla: "Vanilla", fabric: "Fabric", quilt: "Quilt" };
-export const LOADER_ICON: Record<Loader, string> = { vanilla: "deployed_code", fabric: "texture", quilt: "grid_view" };
+export const LOADERS: Record<Loader, string> = { vanilla: "Vanilla", fabric: "Fabric", quilt: "Quilt", forge: "Forge", neoforge: "NeoForge", liteloader: "LiteLoader" };
+export const LOADER_ICON: Record<Loader, string> = { vanilla: "deployed_code", fabric: "texture", quilt: "grid_view", forge: "construction", neoforge: "hardware", liteloader: "lightbulb" };
 export const STAGE_LABEL: Record<Stage, string> = {
   resolving: "Resolving version",
   java: "Downloading Java",
+  loader: "Installing mod loader",
   libraries: "Libraries",
   assets: "Assets",
   starting: "Starting",

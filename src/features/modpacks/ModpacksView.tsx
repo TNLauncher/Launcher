@@ -8,13 +8,14 @@ import { cx } from "@/lib/cx";
 import { useDebounced } from "@/hooks/useDebounced";
 import { useFavorites, useSource } from "@/hooks/useSource";
 import { SourcePicker } from "@/plugins/SourcePicker";
-import { ago, compact, errorMessage } from "@/lib/format";
+import { ago, compact, errorMessage, LOADERS } from "@/lib/format";
 import { useInstalling } from "@/store/imports";
 import s from "./modpacks.module.css";
 
 /** Loaders the launcher can run modpacks on. */
-type PackLoader = "" | "fabric" | "quilt";
-const LOADER_PILLS: [PackLoader, string][] = [["", "Any"], ["fabric", "Fabric"], ["quilt", "Quilt"]];
+const PACK_LOADERS = ["fabric", "quilt", "forge", "neoforge"] as const;
+type PackLoader = "" | (typeof PACK_LOADERS)[number];
+const LOADER_PILLS: [PackLoader, string][] = [["", "Any"], ...PACK_LOADERS.map((l): [PackLoader, string] => [l, LOADERS[l]])];
 const PACK_PAGE = 20;
 
 const releases = () => getVersions().then((vs) => vs.filter((v) => v.type === "release").map((v) => v.id));
@@ -164,7 +165,7 @@ function Catalog({ source }: { source: SourceInfo }) {
                   icon="search_off"
                   action={filtered && <Button onClick={reset}>Clear filters</Button>}
                 >
-                  No Fabric or Quilt modpacks match these filters.
+                  No modpacks match these filters.
                 </EmptyState>
               ) : (
                 hits.map((h) => <PackRow key={h.id} hit={h} categoryLabel={categoryLabel} onOpen={setOpen} />)
@@ -182,7 +183,7 @@ function Catalog({ source }: { source: SourceInfo }) {
 
 const PackRow = memo(function PackRow({ hit: h, categoryLabel, onOpen }: { hit: Hit; categoryLabel: Record<string, string>; onOpen(h: Hit): void }) {
   const installing = useInstalling(h.id);
-  const loaders = h.categories.filter((c) => c === "fabric" || c === "quilt");
+  const loaders = PACK_LOADERS.filter((l) => h.categories.includes(l));
   const cats = h.categories.filter((c) => c in categoryLabel);
   const mc = h.gameVersions.length > 1 ? `${h.gameVersions[0]} – ${h.gameVersions.at(-1)}` : h.gameVersions[0];
   return (
@@ -203,7 +204,7 @@ const PackRow = memo(function PackRow({ hit: h, categoryLabel, onOpen }: { hit: 
           <span className={cx(s.stat, "mono")}><Icon name="favorite" />{compact(h.follows)}</span>
           <span className={s.stat}><Icon name="update" />{ago(h.updated)}</span>
           {mc && <Chip variant="tag">{mc}</Chip>}
-          {loaders.map((l) => <Chip key={l}>{l === "fabric" ? "Fabric" : "Quilt"}</Chip>)}
+          {loaders.map((l) => <Chip key={l}>{LOADERS[l]}</Chip>)}
           {cats.map((c) => <Chip key={c} variant="ghost">{categoryLabel[c]}</Chip>)}
         </div>
       </div>

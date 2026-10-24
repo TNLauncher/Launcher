@@ -6,7 +6,7 @@ import { Banner, Button, Chip, Dialog, EmptyState, Field, Icon, IconButton, Sele
 import { Markdown } from "@/components/ui/Markdown";
 import { cx } from "@/lib/cx";
 import { useFavorites } from "@/hooks/useSource";
-import { ago, compact, errorMessage, megabytes } from "@/lib/format";
+import { ago, compact, errorMessage, LOADERS, megabytes } from "@/lib/format";
 import { useInstalling } from "@/store/imports";
 import { useLauncher } from "@/store/LauncherContext";
 import { useUi } from "@/store/UiContext";
@@ -14,7 +14,7 @@ import { packColor } from "./ModpacksView";
 import s from "./modpacks.module.css";
 
 type Section = "description" | "gallery" | "mods" | "versions";
-const LOADER_NAME: Record<string, string> = { fabric: "Fabric", quilt: "Quilt" };
+const LOADER_NAME: Record<string, string> = LOADERS;
 
 const dateLabel = (iso: string) => new Date(iso).toLocaleDateString("en", { year: "numeric", month: "short", day: "numeric" });
 
@@ -151,7 +151,7 @@ function InstallCard(p: {
       {p.error ? (
         <Banner message={`Could not load versions: ${p.error}`} onRetry={p.onRetry} />
       ) : !p.loading && !p.mcOptions.length ? (
-        <p className={s.note}>This modpack has no Fabric or Quilt version the launcher can run.</p>
+        <p className={s.note}>This modpack has no version the launcher can run.</p>
       ) : (
         <>
           <Field label="Minecraft version" asLabel={false}>
@@ -324,7 +324,7 @@ function ModList({ source, version }: { source: SourceInfo; version: Version }) 
 
 function VersionList({ versions, loading, selected, onSelect }: { versions: Version[]; loading: boolean; selected?: Version; onSelect(v: Version): void }) {
   if (loading) return <TextSkeleton />;
-  if (!versions.length) return <EmptyState icon="history">No Fabric or Quilt versions.</EmptyState>;
+  if (!versions.length) return <EmptyState icon="history">No versions the launcher can run.</EmptyState>;
   return (
     <div className={s.versions}>
       {versions.map((v) => {

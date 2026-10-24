@@ -62,7 +62,7 @@ export function InstanceContent({ instance }: { instance: Instance }) {
   const source = useSource();
   const needsLoader = kind !== "resourcepack" && !modded;
   const irisMissing =
-    kind === "shader" && modded && source?.id === IRIS.source && !!content.mod.items && !content.mod.identifying && !content.mod.installedProjects.has(IRIS.project);
+    kind === "shader" && (instance.loader === "fabric" || instance.loader === "quilt") && source?.id === IRIS.source && !!content.mod.items && !content.mod.identifying && !content.mod.installedProjects.has(IRIS.project);
 
   return (
     <div>
@@ -102,7 +102,7 @@ export function InstanceContent({ instance }: { instance: Instance }) {
         <Screenshots instanceId={instance.id} />
       ) : needsLoader ? (
         <EmptyState icon={KINDS[kind].icon}>
-          Vanilla can't load {KINDS[kind].noun}. Create a Fabric or Quilt instance to use them.
+          Vanilla can't load {KINDS[kind].noun}. Create a modded instance to use them.
         </EmptyState>
       ) : (
         <>

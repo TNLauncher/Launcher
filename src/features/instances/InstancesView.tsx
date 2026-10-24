@@ -20,7 +20,7 @@ const SORTERS: Record<Sort, (a: Instance, b: Instance) => number> = {
   name: (a, b) => a.name.localeCompare(b.name),
   time: (a, b) => b.playSeconds - a.playSeconds,
 };
-const FILTERS: ("all" | Loader)[] = ["all", "vanilla", "fabric", "quilt"];
+const FILTERS: ("all" | Loader)[] = ["all", ...(Object.keys(LOADERS) as Loader[])];
 
 export function InstancesView() {
   const { snapshot, error, clearError, launch } = useLauncher();

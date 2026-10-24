@@ -36,7 +36,7 @@ export function InstanceTiles() {
           <span className={s.tileIcon}><Icon name="add" /></span>
           <span className={s.tileText}>
             <span className={s.tileName}>Add instance</span>
-            <span className={s.tileSub}>Vanilla, Fabric or Quilt</span>
+            <span className={s.tileSub}>Vanilla or modded</span>
           </span>
         </button>
       </div>

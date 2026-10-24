@@ -1,6 +1,6 @@
 // Mirrors of the Rust models (src-tauri/src/models). Keep in sync when those change.
 
-export type Loader = "vanilla" | "fabric" | "quilt";
+export type Loader = "vanilla" | "fabric" | "quilt" | "forge" | "neoforge" | "liteloader";
 export type AfterLaunch = "hide" | "keep" | "close";
 
 export interface Settings {
@@ -104,7 +104,7 @@ export interface DeviceCode {
   verificationUri: string;
 }
 
-export type Stage = "resolving" | "java" | "libraries" | "assets" | "starting";
+export type Stage = "resolving" | "java" | "loader" | "libraries" | "assets" | "starting";
 
 export type LaunchEvent =
   | { event: "progress"; data: { stage: Stage; done: number; total: number } }
