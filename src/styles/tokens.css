@@ -30,6 +30,7 @@
   --critical: #FF453A;
   --critical-fill: #D93A30;
   --ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --sidebar-w: 64px;
   --mono: "JetBrains Mono", "JetBrainsMono Nerd Font", monospace;
   color-scheme: dark;
 }

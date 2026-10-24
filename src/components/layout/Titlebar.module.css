@@ -1,5 +1,5 @@
 .titlebar {
-  position: fixed; top: 0; left: 64px; right: 0; height: 40px; z-index: 40;
+  position: fixed; top: 0; left: var(--sidebar-w); right: 0; height: 40px; z-index: 40;
   background: rgb(35 35 38 / 0.9); backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--card-border); box-shadow: var(--highlight);
   display: flex; align-items: center; justify-content: space-between; padding: 0 12px 0 20px;

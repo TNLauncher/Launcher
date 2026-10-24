@@ -1,5 +1,5 @@
 .sidebar {
-  position: fixed; inset: 0 auto 0 0; width: 64px; z-index: 50;
+  position: fixed; inset: 0 auto 0 0; width: var(--sidebar-w); z-index: 50;
   background: var(--sidebar); border-right: 1px solid var(--card-border);
   display: flex; flex-direction: column; align-items: center; justify-content: space-between;
   padding: 12px 0;
