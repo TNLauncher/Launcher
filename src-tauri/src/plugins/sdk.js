@@ -66,6 +66,7 @@
     instances: Object.freeze({
       list: () => request("instances.list", null),
       get: (id) => request("instances.get", { id }),
+      readLog: (id) => request("instances.readLog", { id }),
     }),
     events: Object.freeze({
       /** Returns a function that stops listening. */
@@ -74,6 +75,10 @@
         set.add(cb);
         listeners.set(name, set);
         return () => set.delete(cb);
+      },
+      /** Sends an event to every frame (`main` and open pages) of this plugin. */
+      emit(name, payload) {
+        post({ type: "emit", name: String(name), payload: payload === undefined ? null : payload });
       },
     }),
     presence: Object.freeze({
@@ -98,10 +103,28 @@
       async fetch(url, init = {}) {
         const r = await request("net.fetch", { url, method: init.method, headers: init.headers, body: init.body });
         const ok = r.status >= 200 && r.status < 300;
-        return { status: r.status, ok, contentType: r.contentType, text: () => r.body, json: () => JSON.parse(r.body) };
+        const decodeBytes = () => {
+          const bin = atob(r.bodyBase64 || "");
+          const out = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+          return out;
+        };
+        return {
+          status: r.status,
+          ok,
+          contentType: r.contentType,
+          headers: Object.freeze({ ...(r.headers || {}) }),
+          text: () => r.body,
+          json: () => JSON.parse(r.body),
+          bytes: decodeBytes,
+          arrayBuffer: () => decodeBytes().buffer,
+        };
       },
     }),
-    log: (...args) => request("log", args.map((a) => (typeof a === "string" ? a : JSON.stringify(a))).join(" ")),
+    log: (...args) => {
+      console.info("[plugin]", ...args);
+      return request("log", args.map((a) => (typeof a === "string" ? a : JSON.stringify(a))).join(" "));
+    },
     // Used by the launcher's boot script.
     async __activate(mod) {
       try {

@@ -4,7 +4,7 @@ use crate::plugins::Registry;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::process::Child;
-use std::sync::Mutex;
+use std::sync::{Mutex, RwLock};
 
 /// Shared backend state, registered with `app.manage` and injected into commands.
 pub struct AppState {
@@ -18,7 +18,7 @@ pub struct AppState {
     pub games: Mutex<HashMap<String, Child>>,
     /// Modpack imports in flight by project id; aborting one cancels it.
     pub imports: Mutex<HashMap<String, futures::future::AbortHandle>>,
-    pub plugins: Registry,
+    pub plugins: RwLock<Registry>,
 }
 
 impl AppState {
@@ -28,7 +28,7 @@ impl AppState {
         Ok(Self {
             paths: Paths { root },
             // Replaced in setup, where plugin folders and the window are known.
-            plugins: Registry::empty(std::sync::Arc::new(crate::plugins::js::Bridge::new(|_| {}))),
+            plugins: RwLock::new(Registry::empty(std::sync::Arc::new(crate::plugins::js::Bridge::new(|_| {})))),
             http,
             store_lock: Mutex::new(()),
             running: Mutex::new(HashSet::new()),

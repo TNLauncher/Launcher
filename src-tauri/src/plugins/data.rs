@@ -1,5 +1,5 @@
 //! Per-plugin JSON: what `tn.storage` keeps and the values of the plugin's declared settings.
-use super::{Plugin, SettingKind};
+use super::{Plugin, SettingKind, SettingSpec};
 use crate::error::{AppError, Result};
 use crate::state::AppState;
 use crate::storage;
@@ -42,6 +42,17 @@ pub fn storage_set(state: &AppState, plugin: &Plugin, key: &str, value: Value) -
     })
 }
 
+fn default_for(s: &SettingSpec) -> Value {
+    match (&s.default, s.kind) {
+        (Some(Value::Bool(b)), SettingKind::Toggle) => Value::Bool(*b),
+        (Some(Value::String(v)), SettingKind::Text | SettingKind::Secret) => Value::String(v.clone()),
+        (Some(Value::String(v)), SettingKind::Select) if s.options.iter().any(|o| &o.id == v) => Value::String(v.clone()),
+        (_, SettingKind::Toggle) => Value::Bool(false),
+        (_, SettingKind::Select) => Value::String(s.options.first().map(|o| o.id.clone()).unwrap_or_default()),
+        _ => Value::String(String::new()),
+    }
+}
+
 /// Every declared setting, defaulted when unset.
 pub fn settings(state: &AppState, plugin: &Plugin) -> Map<String, Value> {
     let saved: Map<String, Value> = storage::read(&file(state, plugin, "settings.json"));
@@ -50,10 +61,7 @@ pub fn settings(state: &AppState, plugin: &Plugin) -> Map<String, Value> {
         .contributes
         .settings
         .iter()
-        .map(|s| {
-            let default = if s.kind == SettingKind::Toggle { Value::Bool(false) } else { Value::String(String::new()) };
-            (s.key.clone(), saved.get(&s.key).cloned().unwrap_or(default))
-        })
+        .map(|s| (s.key.clone(), saved.get(&s.key).cloned().unwrap_or_else(|| default_for(s))))
         .collect()
 }
 
@@ -63,6 +71,7 @@ pub fn set_setting(state: &AppState, plugin: &Plugin, key: &str, value: Value) -
     let ok = match (&value, spec.kind) {
         (Value::Bool(_), SettingKind::Toggle) => true,
         (Value::String(s), SettingKind::Text | SettingKind::Secret) => s.len() <= MAX_SETTING,
+        (Value::String(s), SettingKind::Select) => spec.options.iter().any(|o| &o.id == s),
         _ => false,
     };
     if !ok {
@@ -86,7 +95,13 @@ mod tests {
         let state = AppState::new(root.clone()).unwrap();
         let manifest: Manifest = serde_json::from_value(json!({
             "id": "p", "name": "P", "version": "1", "api": 1,
-            "contributes": { "settings": [{ "key": "apiKey", "label": "API key", "type": "secret" }, { "key": "on", "label": "On", "type": "toggle" }] }
+            "contributes": {
+                "settings": [
+                    { "key": "apiKey", "label": "API key", "type": "secret" },
+                    { "key": "on", "label": "On", "type": "toggle", "default": true },
+                    { "key": "mode", "label": "Mode", "type": "select", "options": [{ "id": "fast", "label": "Fast" }, { "id": "safe", "label": "Safe" }] }
+                ]
+            }
         }))
         .unwrap();
         let plugin = Plugin { manifest, dir: root.clone(), bundled: false, source: None, account: None };
@@ -98,11 +113,14 @@ mod tests {
         assert_eq!(storage_get(&state, &plugin, "k"), Value::Null);
         assert!(storage_set(&state, &plugin, "big", json!("x".repeat(MAX_STORAGE))).is_err());
 
-        assert_eq!(settings(&state, &plugin), json!({ "apiKey": "", "on": false }).as_object().unwrap().clone());
+        assert_eq!(settings(&state, &plugin), json!({ "apiKey": "", "on": true, "mode": "fast" }).as_object().unwrap().clone());
         set_setting(&state, &plugin, "apiKey", json!("secret")).unwrap();
+        set_setting(&state, &plugin, "mode", json!("safe")).unwrap();
+        assert!(set_setting(&state, &plugin, "mode", json!("unknown")).is_err());
         assert!(set_setting(&state, &plugin, "on", json!("yes")).is_err());
         assert!(set_setting(&state, &plugin, "nope", json!(true)).is_err());
         assert_eq!(settings(&state, &plugin)["apiKey"], "secret");
+        assert_eq!(settings(&state, &plugin)["mode"], "safe");
         std::fs::remove_dir_all(root).unwrap();
     }
 }

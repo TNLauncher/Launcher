@@ -66,13 +66,13 @@ pub fn run() {
         })
         .setup(|app| {
             let root = app.path().app_data_dir()?;
-            let mut state = state::AppState::new(root)?;
+            let state = state::AppState::new(root)?;
             let handle = app.handle().clone();
             let bridge = plugins::js::Bridge::new(move |call| {
                 let _ = handle.emit_to("main", "plugin-call", call);
             });
             let bundled = app.path().resource_dir()?.join("plugins");
-            state.plugins = plugins::Registry::load(&[(bundled, true), (state.paths.plugins_dir(), false)], std::sync::Arc::new(bridge));
+            *state.plugins.write().unwrap() = plugins::Registry::load(&[(bundled, true), (state.paths.plugins_dir(), false)], std::sync::Arc::new(bridge));
             app.manage(state);
             app.manage(services::discord::Discord::spawn());
             Ok(())
@@ -110,6 +110,8 @@ pub fn run() {
             commands::mods::delete_content,
             commands::mods::install_content,
             commands::plugins::list_plugins,
+            commands::plugins::reload_plugins,
+            commands::plugins::remove_plugin,
             commands::plugins::set_plugin_enabled,
             commands::plugins::open_plugins_dir,
             commands::plugins::plugin_host_ready,

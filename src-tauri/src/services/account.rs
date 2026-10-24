@@ -80,7 +80,7 @@ fn new_id() -> String {
 fn provider_name(state: &AppState, provider: &str) -> String {
     match provider {
         MICROSOFT => "Microsoft".into(),
-        id => state.plugins.get(id).map(|p| p.manifest.name.clone()).unwrap_or_else(|_| id.into()),
+        id => plugins::get(state, id).map(|p| p.manifest.name.clone()).unwrap_or_else(|_| id.into()),
     }
 }
 

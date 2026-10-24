@@ -79,6 +79,11 @@ pub struct SettingSpec {
     pub hint: String,
     #[serde(rename = "type")]
     pub kind: SettingKind,
+    #[serde(default)]
+    pub default: Option<serde_json::Value>,
+    /// Choices when `type` is `select`.
+    #[serde(default)]
+    pub options: Vec<Choice>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -88,6 +93,7 @@ pub enum SettingKind {
     /// Shown masked, e.g. an API key.
     Secret,
     Toggle,
+    Select,
 }
 
 /// What the UI builds a source's filters from.
@@ -177,6 +183,7 @@ pub struct Failed {
 }
 
 pub struct Registry {
+    pub dirs: Vec<(PathBuf, bool)>,
     pub plugins: Vec<Arc<Plugin>>,
     pub failed: Vec<Failed>,
     pub bridge: Arc<js::Bridge>,
@@ -184,12 +191,12 @@ pub struct Registry {
 
 impl Registry {
     pub fn empty(bridge: Arc<js::Bridge>) -> Self {
-        Self { plugins: vec![], failed: vec![], bridge }
+        Self { dirs: vec![], plugins: vec![], failed: vec![], bridge }
     }
 
     /// Loads every plugin folder in `dirs` as `(dir, bundled)`; the first plugin with an id wins.
     pub fn load(dirs: &[(PathBuf, bool)], bridge: Arc<js::Bridge>) -> Self {
-        let mut reg = Self::empty(bridge);
+        let mut reg = Self { dirs: dirs.to_vec(), plugins: vec![], failed: vec![], bridge };
         for (dir, bundled) in dirs {
             let Ok(entries) = std::fs::read_dir(dir) else { continue };
             let mut folders: Vec<PathBuf> = entries.filter_map(|e| e.ok()).map(|e| e.path()).filter(|p| p.is_dir()).collect();
@@ -227,8 +234,13 @@ fn read_manifest(folder: &Path) -> Result<Manifest> {
     if m.id.is_empty() || !m.id.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-') {
         return Err(AppError::Plugin(format!("Bad plugin id: {}", m.id)));
     }
-    if let Some(s) = m.contributes.settings.iter().find(|s| s.key.is_empty() || !s.key.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')) {
-        return Err(AppError::Plugin(format!("Bad setting key: {}", s.key)));
+    for s in &m.contributes.settings {
+        if s.key.is_empty() || !s.key.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-') {
+            return Err(AppError::Plugin(format!("Bad setting key: {}", s.key)));
+        }
+        if s.kind == SettingKind::Select && s.options.is_empty() {
+            return Err(AppError::Plugin(format!("Select setting {} has no options", s.key)));
+        }
     }
     if !folder.join(&m.main).is_file() {
         return Err(AppError::Plugin(format!("{} is missing", m.main)));
@@ -268,9 +280,14 @@ pub struct PluginEntry {
     pub error: Option<String>,
 }
 
+pub fn get(state: &AppState, id: &str) -> Result<Arc<Plugin>> {
+    state.plugins.read().unwrap().get(id).cloned()
+}
+
 pub fn list(state: &AppState) -> Vec<PluginEntry> {
     let off = storage::load_disabled_plugins(state);
-    let loaded = state.plugins.plugins.iter().map(|p| {
+    let reg = state.plugins.read().unwrap();
+    let loaded = reg.plugins.iter().map(|p| {
         let m = &p.manifest;
         PluginEntry {
             id: m.id.clone(),
@@ -289,7 +306,7 @@ pub fn list(state: &AppState) -> Vec<PluginEntry> {
             error: None,
         }
     });
-    let failed = state.plugins.failed.iter().map(|f| PluginEntry {
+    let failed = reg.failed.iter().map(|f| PluginEntry {
         id: String::new(),
         name: f.name.clone(),
         version: String::new(),
@@ -308,17 +325,43 @@ pub fn list(state: &AppState) -> Vec<PluginEntry> {
     loaded.chain(failed).collect()
 }
 
+/// Re-scans the plugin folders on disk without restarting the launcher.
+pub fn reload(state: &AppState) -> Vec<PluginEntry> {
+    let (dirs, bridge) = {
+        let reg = state.plugins.read().unwrap();
+        (reg.dirs.clone(), reg.bridge.clone())
+    };
+    *state.plugins.write().unwrap() = Registry::load(&dirs, bridge);
+    list(state)
+}
+
+/// Deletes a user-installed plugin folder and reloads the registry.
+pub fn remove(state: &AppState, id: &str) -> Result<Vec<PluginEntry>> {
+    let found = get(state, id)?;
+    if found.bundled {
+        return Err(AppError::Invalid(format!("{} is built-in and cannot be deleted", found.manifest.name)));
+    }
+    std::fs::remove_dir_all(&found.dir)?;
+    let _ = std::fs::remove_dir_all(state.paths.plugin_data_dir(id));
+    let mut off = storage::load_disabled_plugins(state);
+    if off.iter().any(|d| d == id) {
+        off.retain(|d| d != id);
+        let _ = storage::save_disabled_plugins(state, &off);
+    }
+    Ok(reload(state))
+}
+
 /// An enabled plugin by id.
 pub fn enabled(state: &AppState, id: &str) -> Result<Arc<Plugin>> {
-    let found = state.plugins.get(id)?;
+    let found = get(state, id)?;
     if storage::load_disabled_plugins(state).iter().any(|d| d == id) {
         return Err(AppError::Unsupported(format!("{} is turned off", found.manifest.name)));
     }
-    Ok(found.clone())
+    Ok(found)
 }
 
 pub fn set_enabled(state: &AppState, id: &str, enabled: bool) -> Result<()> {
-    state.plugins.get(id)?;
+    get(state, id)?;
     let mut off = storage::load_disabled_plugins(state);
     off.retain(|d| d != id);
     if !enabled {
@@ -350,13 +393,17 @@ mod tests {
         write_plugin(&dir, "nomain", API_VERSION, false);
         std::fs::create_dir_all(dir.join("empty")).unwrap();
 
-        let mut state = AppState::new(root.clone()).unwrap();
-        state.plugins = Registry::load(&[(dir.clone(), true), (dir, false)], state.plugins.bridge.clone());
-        let ids: Vec<_> = state.plugins.plugins.iter().map(|p| p.manifest.id.as_str()).collect();
-        assert_eq!(ids, ["good"]);
-        // empty, nomain and old fail in both passes; the second pass also finds "good" again.
-        assert_eq!(state.plugins.failed.len(), 7);
-        assert!(state.plugins.plugins[0].bundled && state.plugins.plugins[0].source.is_some());
+        let state = AppState::new(root.clone()).unwrap();
+        let bridge = state.plugins.read().unwrap().bridge.clone();
+        *state.plugins.write().unwrap() = Registry::load(&[(dir.clone(), true), (dir, false)], bridge);
+        {
+            let reg = state.plugins.read().unwrap();
+            let ids: Vec<_> = reg.plugins.iter().map(|p| p.manifest.id.as_str()).collect();
+            assert_eq!(ids, ["good"]);
+            // empty, nomain and old fail in both passes; the second pass also finds "good" again.
+            assert_eq!(reg.failed.len(), 7);
+            assert!(reg.plugins[0].bundled && reg.plugins[0].source.is_some());
+        }
 
         assert!(enabled(&state, "good").is_ok());
         set_enabled(&state, "good", false).unwrap();

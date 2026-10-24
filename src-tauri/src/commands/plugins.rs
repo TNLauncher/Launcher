@@ -10,6 +10,16 @@ pub fn list_plugins(state: State<'_, AppState>) -> Vec<PluginEntry> {
 }
 
 #[tauri::command]
+pub fn reload_plugins(state: State<'_, AppState>) -> Vec<PluginEntry> {
+    plugins::reload(&state)
+}
+
+#[tauri::command]
+pub fn remove_plugin(state: State<'_, AppState>, id: String) -> Result<Vec<PluginEntry>> {
+    plugins::remove(&state, &id)
+}
+
+#[tauri::command]
 pub fn set_plugin_enabled(state: State<'_, AppState>, id: String, enabled: bool) -> Result<()> {
     plugins::set_enabled(&state, &id, enabled)
 }
@@ -26,25 +36,29 @@ pub fn open_plugins_dir(app: tauri::AppHandle, state: State<'_, AppState>) -> Re
 /// Current values of a plugin's declared settings.
 #[tauri::command]
 pub fn plugin_settings(state: State<'_, AppState>, id: String) -> Result<serde_json::Map<String, Value>> {
-    Ok(plugins::data::settings(&state, state.plugins.get(&id)?))
+    let p = plugins::get(&state, &id)?;
+    Ok(plugins::data::settings(&state, &p))
 }
 
 #[tauri::command]
 pub fn set_plugin_setting(state: State<'_, AppState>, id: String, key: String, value: Value) -> Result<()> {
-    plugins::data::set_setting(&state, state.plugins.get(&id)?, &key, value)
+    let p = plugins::get(&state, &id)?;
+    plugins::data::set_setting(&state, &p, &key, value)
 }
 
 /// The frontend listens for `plugin-call` events now.
 #[tauri::command]
 pub fn plugin_host_ready(state: State<'_, AppState>) {
-    state.plugins.bridge.listening();
+    let bridge = state.plugins.read().unwrap().bridge.clone();
+    bridge.listening();
 }
 
 /// A plugin frame's answer to a `plugin-call`.
 #[tauri::command]
 pub fn plugin_reply(state: State<'_, AppState>, id: u64, ok: bool, value: Value) {
     let answer = if ok { Ok(value) } else { Err(value.as_str().map_or_else(|| value.to_string(), String::from)) };
-    state.plugins.bridge.reply(id, answer);
+    let bridge = state.plugins.read().unwrap().bridge.clone();
+    bridge.reply(id, answer);
 }
 
 /// A request from a plugin frame; `plugin` is the frame the frontend saw send it, never the plugin's own word.

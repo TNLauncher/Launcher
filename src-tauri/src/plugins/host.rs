@@ -51,6 +51,21 @@ fn csp(m: &Manifest) -> String {
     )
 }
 
+fn find_head_end(html: &str) -> Option<usize> {
+    let lower = html.to_ascii_lowercase();
+    let bytes = lower.as_bytes();
+    let mut pos = 0;
+    while let Some(off) = lower[pos..].find("<head") {
+        let start = pos + off;
+        let after = bytes.get(start + 5).copied();
+        if matches!(after, Some(b'>' | b' ' | b'\t' | b'\r' | b'\n')) {
+            return Some(start + lower[start..].find('>')? + 1);
+        }
+        pos = start + 5;
+    }
+    None
+}
+
 /// Where the SDK and theme go in the plugin HTML at `rel`. The frame's origin is opaque, so every load
 /// is cross-origin: WebKitGTK only serves CORS-mode requests from the custom scheme, hence `crossorigin`.
 fn inject(html: &str, rel: &str) -> String {
@@ -58,9 +73,7 @@ fn inject(html: &str, rel: &str) -> String {
     let head = format!(
         r#"<script src="{up}__tn/sdk.js" crossorigin></script><link rel="stylesheet" href="{FONTS}"><link rel="stylesheet" href="{up}__tn/theme.css" crossorigin>"#
     );
-    // After `<head ...>`; ASCII lowercasing keeps byte offsets.
-    let lower = html.to_ascii_lowercase();
-    match lower.find("<head").and_then(|i| Some(i + lower[i..].find('>')? + 1)) {
+    match find_head_end(html) {
         Some(i) => format!("{}{head}{}", &html[..i], &html[i..]),
         None => format!("{head}{html}"),
     }
@@ -164,12 +177,24 @@ pub async fn request(app: &tauri::AppHandle, state: &AppState, plugin: &str, met
             }
             let res = req.send().await?;
             let status = res.status().as_u16();
-            let content_type = res.headers().get("content-type").and_then(|v| v.to_str().ok()).unwrap_or("").to_string();
+            let headers: HashMap<String, String> = res
+                .headers()
+                .iter()
+                .filter_map(|(k, v)| Some((k.as_str().to_ascii_lowercase(), v.to_str().ok()?.to_string())))
+                .collect();
+            let content_type = headers.get("content-type").cloned().unwrap_or_default();
             let bytes = res.bytes().await?;
             if bytes.len() > MAX_RESPONSE {
                 return Err(AppError::Plugin(format!("Response from {} is too big", init.url)));
             }
-            Ok(json!({ "status": status, "contentType": content_type, "body": String::from_utf8_lossy(&bytes) }))
+            use base64::{engine::general_purpose::STANDARD, Engine};
+            Ok(json!({
+                "status": status,
+                "contentType": content_type,
+                "headers": headers,
+                "body": String::from_utf8_lossy(&bytes),
+                "bodyBase64": STANDARD.encode(&bytes),
+            }))
         }
         "storage.get" => Ok(super::data::storage_get(state, &plugin, &key(&params)?)),
         "storage.set" => {
@@ -177,12 +202,15 @@ pub async fn request(app: &tauri::AppHandle, state: &AppState, plugin: &str, met
             Ok(Value::Null)
         }
         "settings.get" => Ok(Value::Object(super::data::settings(state, &plugin))),
-        "instances.list" | "instances.get" if !m.permissions.instances => Err(AppError::Plugin(format!("{} may not read instances", m.name))),
+        "instances.list" | "instances.get" | "instances.readLog" if !m.permissions.instances => {
+            Err(AppError::Plugin(format!("{} may not read instances", m.name)))
+        }
         "instances.list" => with_mods(state, crate::services::instances::list(state)),
         "instances.get" => {
             let one = vec![crate::services::instances::get(state, &str_param(&params, "id")?)?];
             Ok(with_mods(state, one)?.as_array_mut().and_then(|a| a.pop()).unwrap_or(Value::Null))
         }
+        "instances.readLog" => Ok(Value::String(crate::services::launcher::read_log(state, &str_param(&params, "id")?)?)),
         "presence.set" | "presence.clear" if !m.permissions.presence => Err(AppError::Plugin(format!("{} may not set the Discord status", m.name))),
         "presence.set" => {
             let p: crate::services::discord::Presence = serde_json::from_value(params)?;
@@ -232,6 +260,8 @@ mod tests {
     fn injects_sdk_into_head() {
         let out = inject("<!doctype html><HEAD lang=en><title>x</title></HEAD>", "ui/page.html");
         assert!(out.starts_with(r#"<!doctype html><HEAD lang=en><script src="../__tn/sdk.js" crossorigin>"#), "{out}");
+        let with_header = inject("<header>top</header><head><title>x</title></head>", "page.html");
+        assert!(with_header.starts_with(r#"<header>top</header><head><script src="__tn/sdk.js" crossorigin>"#), "{with_header}");
         assert!(inject("<p>hi</p>", "page.html").starts_with(r#"<script src="__tn/sdk.js" crossorigin>"#));
         assert!(inject("<p>hi</p>", "page.html").ends_with("<p>hi</p>"));
     }
