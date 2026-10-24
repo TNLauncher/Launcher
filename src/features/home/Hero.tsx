@@ -10,8 +10,9 @@ export function Hero() {
 
   return (
     <div className={s.hero}>
-      <div className={s.heroBg} />
-      <div className={s.heroBody}>
+      {/* Keyed by instance: switching re-stages the scene instead of swapping text in place. */}
+      <div key={inst?.id} className={s.heroBg} />
+      <div key={`body-${inst?.id}`} className={s.heroBody}>
         {!inst ? (
           <>
             <h1>No instances yet</h1>

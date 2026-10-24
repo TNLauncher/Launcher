@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { Button, Icon, SectionHead } from "@/components/ui";
 import { cx } from "@/lib/cx";
 import { LOADER_ICON, LOADERS } from "@/lib/format";
@@ -21,8 +22,8 @@ export function InstanceTiles() {
         )}
       />
       <div className={s.tiles}>
-        {recent.slice(0, 3).map((i) => (
-          <button key={i.id} className={s.tile} aria-pressed={i.id === selected?.id} onClick={() => select(i.id)}>
+        {recent.slice(0, 3).map((i, n) => (
+          <button key={i.id} className={s.tile} style={{ "--i": n } as CSSProperties} aria-pressed={i.id === selected?.id} onClick={() => select(i.id)}>
             <span className={s.tileIcon}>{i.icon ? <img src={i.icon} alt="" /> : <Icon name={LOADER_ICON[i.loader]} />}</span>
             <span className={s.tileText}>
               <span className={s.tileName}>{i.name}</span>
@@ -30,7 +31,7 @@ export function InstanceTiles() {
             </span>
           </button>
         ))}
-        <button className={cx(s.tile, s.add)} onClick={openNewInstance}>
+        <button className={cx(s.tile, s.add)} style={{ "--i": Math.min(recent.length, 3) } as CSSProperties} onClick={openNewInstance}>
           <span className={s.tileIcon}><Icon name="add" /></span>
           <span className={s.tileText}>
             <span className={s.tileName}>Add instance</span>

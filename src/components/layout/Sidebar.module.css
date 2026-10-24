@@ -4,7 +4,16 @@
   display: flex; flex-direction: column; align-items: center; justify-content: space-between;
   padding: 12px 0;
 }
-.sidebar nav { display: flex; flex-direction: column; gap: 4px; margin-top: 12px; }
+.sidebar nav { position: relative; display: flex; flex-direction: column; gap: 4px; margin-top: 12px; }
+/* 44px step = 40px button + 4px gap */
+.indicator {
+  position: absolute; top: 0; left: 0; width: 44px; height: 40px; border-radius: 8px; pointer-events: none;
+  background: rgb(0 113 227 / 0.15); transition: transform 380ms var(--ease);
+}
+.indicator::before {
+  content: ""; position: absolute; left: -10px; top: 10px; width: 3px; height: 20px; border-radius: 0 3px 3px 0;
+  background: var(--accent);
+}
 /* block + auto margins: the wrapper is as wide as the 44px nav, an inline img sat at its left edge */
 .logo { display: block; margin: 0 auto; width: 32px; height: 32px; border-radius: 7px; box-shadow: 0 0 0 1px var(--border); }
 .nav-btn {
@@ -13,14 +22,19 @@
   transition: background 160ms var(--ease), color 160ms var(--ease);
 }
 .nav-btn:hover { background: var(--card); color: var(--fg); }
-.nav-btn[aria-current="page"] { background: rgb(0 113 227 / 0.15); color: var(--link); }
+.nav-btn[aria-current="page"] { color: var(--link); }
+.nav-btn[aria-current="page"]:hover { background: none; }
+.nav-btn :global(.icon) { transition: transform 160ms var(--ease); }
+.nav-btn:active :global(.icon) { transform: scale(0.86); }
+.nav-btn[aria-current="page"] :global(.icon) { animation: nav-pop 360ms var(--ease); }
+@keyframes nav-pop { 40% { transform: scale(1.18); } }
 .tip {
   position: absolute; left: 56px; padding: 4px 10px; border-radius: 6px;
   background: var(--popover); border: 1px solid var(--border); box-shadow: var(--lift);
   font-size: 11px; font-weight: 500; color: var(--fg); white-space: nowrap;
-  opacity: 0; pointer-events: none; transition: opacity 120ms var(--ease);
+  opacity: 0; transform: translateX(-4px); pointer-events: none; transition: opacity 120ms var(--ease), transform 120ms var(--ease);
 }
-.nav-btn:hover .tip, .avatar:hover .tip { opacity: 1; }
+.nav-btn:hover .tip, .avatar:hover .tip { opacity: 1; transform: none; transition-delay: 150ms; }
 .avatar { position: relative; width: 32px; height: 32px; padding: 0; border-radius: 8px; display: grid; place-items: center; }
 .head { border-radius: 8px; transition: box-shadow 160ms var(--ease); }
 .avatar:hover .head { box-shadow: 0 0 0 1px rgb(255 255 255 / 0.3); }

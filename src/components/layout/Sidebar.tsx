@@ -26,15 +26,18 @@ export function Sidebar() {
     .flatMap((p) => p.pages.map((pg) => ({ view: `plugin:${p.id}:${pg.id}` as View, icon: pg.icon, label: pg.title })));
   // Plugin pages sit above Settings, which stays last.
   const nav = [...NAV.slice(0, -1), ...pages, NAV[NAV.length - 1]];
+  const active = nav.findIndex((n) => n.view === view);
 
   return (
     <aside className={s.sidebar}>
       <div>
         <img className={s.logo} src={logo} alt="TNLauncher" />
         <nav>
+          {/* One shared highlight that travels between items, so the eye follows the move. */}
+          <span className={s.indicator} hidden={active < 0} style={{ transform: `translateY(${active * 44}px)` }} />
           {nav.map((n) => (
             <button key={n.view} className={s.navBtn} aria-current={view === n.view ? "page" : undefined} onClick={() => navigate(n.view)}>
-              <Icon name={n.icon} />
+              <Icon name={n.icon} fill={view === n.view} />
               <span className={s.tip}>{n.label}</span>
             </button>
           ))}

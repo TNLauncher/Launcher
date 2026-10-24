@@ -42,16 +42,16 @@ export function LaunchDock() {
 
   let action;
   if (snapshot && !instances.length) {
-    action = <Button variant="primary" size="lg" icon="add" className={s.play} onClick={openNewInstance}>Create instance</Button>;
+    action = <Button key="create" variant="primary" size="lg" icon="add" className={s.play} onClick={openNewInstance}>Create instance</Button>;
   } else if (running) {
     action = (
-      <Button variant="danger" size="lg" icon="stop" className={s.play} disabled={log?.stopping} onClick={stop}>
+      <Button key="stop" variant="danger" size="lg" icon="stop" className={s.play} disabled={log?.stopping} onClick={stop}>
         {log?.stopping ? "Stopping" : "Stop"}
       </Button>
     );
   } else if (preparing) {
     action = (
-      <Button variant="primary" size="lg" className={cx(s.play, s.playBusy, !known && s.playSweep)} disabled aria-busy="true"
+      <Button key="busy" variant="primary" size="lg" className={cx(s.play, s.playBusy, !known && s.playSweep)} disabled aria-busy="true"
         style={{ "--p": pct } as CSSProperties}>
         {progress ? STAGE_LABEL[progress.stage] : "Starting"}
         {known && <span className={cx(s.playPct, "mono")}>{Math.floor(pct * 100)}%</span>}
@@ -59,7 +59,7 @@ export function LaunchDock() {
     );
   } else {
     action = (
-      <Button variant={busyId ? "default" : "primary"} size="lg" icon="play_arrow" className={s.play}
+      <Button key="play" variant={busyId ? "default" : "primary"} size="lg" icon="play_arrow" className={cx(s.play, !busyId && s.playReady)}
         disabled={!inst || !!busyId} aria-describedby={statusId} onClick={() => inst && launch(inst.id)}>
         Play
       </Button>
@@ -91,7 +91,7 @@ export function LaunchDock() {
             <IconButton icon="close" label="Dismiss" onClick={dismiss} />
           </div>
         ) : (
-          <span id={statusId} className={cx(s.status, preparing && s.statusSr)} role="status" title={status}>{status}</span>
+          <span id={statusId} className={cx(s.status, preparing && s.statusSr, running && s.live)} role="status" title={status}>{status}</span>
         )}
         {action}
       </div>

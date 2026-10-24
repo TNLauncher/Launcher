@@ -34,7 +34,8 @@ function Shell() {
     <>
       <Sidebar />
       <Titlebar />
-      <main className={s.main}>
+      {/* Keyed: each view opens scrolled to the top and replays its entrance. */}
+      <main key={view} className={s.main}>
         <Suspense>
           {page ? <PluginPage key={view} plugin={plugin} page={page} /> : <CurrentView view={view as keyof typeof VIEWS} />}
         </Suspense>

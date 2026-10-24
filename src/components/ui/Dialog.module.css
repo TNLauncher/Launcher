@@ -3,7 +3,12 @@
   width: 440px; padding: 0; border-radius: 18px; color: var(--fg);
   background: var(--popover); border: 1px solid var(--border); box-shadow: var(--lift), var(--highlight);
 }
-.dialog::backdrop { background: rgb(0 0 0 / 0.45); }
+.dialog::backdrop { background: rgb(0 0 0 / 0.45); backdrop-filter: blur(3px); }
+/* Rises out of the dimmed app; the backdrop arrives a beat faster than the sheet. */
+.dialog[open] { animation: dialog-in 320ms var(--ease); }
+.dialog[open]::backdrop { animation: backdrop-in 220ms ease-out; }
+@keyframes dialog-in { from { opacity: 0; transform: translateY(12px) scale(0.97); } }
+@keyframes backdrop-in { from { opacity: 0; } }
 .form { display: flex; flex-direction: column; gap: 16px; padding: 20px; }
 .head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .head h2 { margin: 0; font-size: 15px; font-weight: 600; }

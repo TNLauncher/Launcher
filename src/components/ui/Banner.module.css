@@ -3,6 +3,14 @@
   display: flex; align-items: center; justify-content: space-between; gap: 16px;
   padding: 10px 12px; border-radius: 8px;
   background: rgb(217 58 48 / 0.15); border: 1px solid rgb(255 69 58 / 0.3); color: var(--critical);
+  animation: banner-in 420ms var(--ease);
+}
+/* A short sideways nudge marks something went wrong without shouting. */
+@keyframes banner-in {
+  0% { opacity: 0; transform: translateY(-4px); }
+  35% { opacity: 1; transform: translateX(-4px); }
+  60% { transform: translateX(3px); }
+  80% { transform: translateX(-1px); }
 }
 .msg { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .msg :global(.icon) { font-size: 18px; }

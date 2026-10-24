@@ -4,10 +4,10 @@
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   background: var(--btn); border: 1px solid rgb(255 255 255 / 0.06); box-shadow: var(--highlight);
   font-size: 12px; font-weight: 500; white-space: nowrap;
-  transition: background 160ms var(--ease), transform 80ms var(--ease);
+  transition: background 160ms var(--ease), border-color 160ms var(--ease), transform 120ms var(--ease), opacity 160ms var(--ease);
 }
 .btn:hover { background: var(--btn-hover); }
-.btn:active { transform: scale(0.98); }
+.btn:active { transform: scale(0.96); transition-duration: 60ms; }
 .btn:disabled { opacity: 0.6; pointer-events: none; }
 .btn :global(.icon) { font-size: 16px; }
 

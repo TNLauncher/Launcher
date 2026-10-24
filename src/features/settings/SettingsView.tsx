@@ -38,6 +38,8 @@ export function SettingsView() {
   useEffect(() => () => clearTimeout(timer.current), []);
 
   if (!form) return <View />;
+  const saving = status === "Saving…";
+  const failed = status.startsWith("Could not");
 
   function update(patch: Partial<Settings>) {
     const next = { ...form!, ...patch };
@@ -112,7 +114,11 @@ export function SettingsView() {
         <PluginsGroup />
 
         <div className={s.settingsFoot}>
-          <div><Icon name="check_circle" /><span className="mono">{status}</span></div>
+          {/* Keyed so each new save state lands with its own beat. */}
+          <div key={status} className={cx(s.saveState, saving && s.saving, failed && s.saveFailed)} role="status">
+            <Icon name={saving ? "progress_activity" : failed ? "error" : "check_circle"} spin={saving} fill={!saving} />
+            <span className="mono">{status}</span>
+          </div>
           <Button onClick={() => setConfirmReset(true)}>Restore defaults</Button>
         </div>
       </form>

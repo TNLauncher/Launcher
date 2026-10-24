@@ -14,6 +14,12 @@
 .packs-summary { display: flex; align-items: center; justify-content: space-between; padding: 0 4px; font-size: 11px; color: var(--subtle); min-height: 18px; }
 .packs-list { display: flex; flex-direction: column; gap: 8px; transition: opacity 160ms var(--ease); }
 .packs-list.stale { opacity: 0.55; }
+.packs-list > * { animation: list-in 360ms var(--ease) backwards; }
+/* Stagger reads the list as a list; capped so long lists don't make the user wait. */
+.packs-list > *:nth-child(2) { animation-delay: 30ms; } .packs-list > *:nth-child(3) { animation-delay: 60ms; }
+.packs-list > *:nth-child(4) { animation-delay: 90ms; } .packs-list > *:nth-child(5) { animation-delay: 120ms; }
+.packs-list > *:nth-child(n + 6) { animation-delay: 150ms; }
+@keyframes list-in { from { opacity: 0; transform: translateY(6px); } }
 
 /* A row leads with the pack's own screenshot: packs are chosen by how they look as much as by what they list. */
 .pack-row {

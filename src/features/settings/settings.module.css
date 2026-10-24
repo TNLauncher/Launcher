@@ -36,4 +36,12 @@
 }
 .settings-foot > div { display: flex; align-items: center; gap: 8px; color: var(--muted); }
 .settings-foot :global(.icon) { font-size: 16px; color: var(--green); }
+.save-state :global(.icon) { animation: save-pop 420ms var(--ease); }
+.save-state span { animation: save-text 260ms var(--ease); }
+.saving :global(.icon) { color: var(--muted); animation: spin 1s linear infinite; }
+.settings-foot > .save-failed { color: var(--critical); }
+.save-failed :global(.icon) { color: var(--critical); }
+@keyframes save-pop { 0% { transform: scale(0.3); opacity: 0; } 60% { transform: scale(1.2); } }
+@keyframes save-text { from { opacity: 0; transform: translateX(-4px); } }
+@keyframes spin { to { transform: rotate(360deg); } }
 .instance-pane { display: flex; flex-direction: column; gap: 32px; padding: 16px 0 32px; }
