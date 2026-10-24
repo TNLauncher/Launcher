@@ -1,7 +1,7 @@
 import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
 
 /** `plugin:<plugin id>:<page id>` = a page a plugin contributes. */
-export type View = "home" | "instances" | "modpacks" | "mods" | "console" | "settings" | `plugin:${string}:${string}`;
+export type View = "home" | "profiles" | "instances" | "modpacks" | "mods" | "console" | "settings" | `plugin:${string}:${string}`;
 
 interface UiValue {
   view: View;

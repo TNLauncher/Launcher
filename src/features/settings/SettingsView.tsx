@@ -1,15 +1,14 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { View } from "@/components/layout/View";
-import { Button, ConfirmDialog, Icon, IconButton, Input, Select, Switch, Textarea } from "@/components/ui";
+import { Button, ConfirmDialog, Icon, Input, Select, Switch, Textarea } from "@/components/ui";
 import { cx } from "@/lib/cx";
 import { errorMessage } from "@/lib/format";
 import { useLauncher } from "@/store/LauncherContext";
-import { launcher } from "@/api/launcher";
 import { sources, type PluginEntry } from "@/api/sources";
 import { usePlugins } from "@/hooks/useSource";
 import { usePluginFailures } from "@/plugins/bridge";
-import type { DeviceCode, Settings } from "@/types";
+import type { Settings } from "@/types";
 import s from "./settings.module.css";
 
 // Keep in sync with Settings::default() in src-tauri/src/models/settings.rs.
@@ -24,7 +23,6 @@ const DEFAULTS: Omit<Settings, "username"> = {
   fullscreen: false,
   afterLaunch: "hide",
 };
-const USERNAME = /^[A-Za-z0-9_]{3,16}$/;
 const SAVE_DELAY = 400;
 
 export function SettingsView() {
@@ -40,7 +38,6 @@ export function SettingsView() {
   useEffect(() => () => clearTimeout(timer.current), []);
 
   if (!form) return <View />;
-  const usernameValid = USERNAME.test(form.username);
 
   function update(patch: Partial<Settings>) {
     const next = { ...form!, ...patch };
@@ -48,9 +45,8 @@ export function SettingsView() {
     setStatus("Saving…");
     clearTimeout(timer.current);
     timer.current = setTimeout(() => {
-      // An invalid name is kept in the field but never persisted.
-      const toSave = USERNAME.test(next.username) ? next : { ...next, username: snapshot!.settings.username };
-      saveSettings(toSave).then(
+      // The player name is edited in Profiles; never write back the copy this form loaded.
+      saveSettings({ ...next, username: snapshot!.settings.username }).then(
         () => setStatus("All changes saved"),
         (e) => setStatus(`Could not save: ${errorMessage(e)}`)
       );
@@ -128,17 +124,6 @@ export function SettingsView() {
           </Row>
         </Group>
 
-        <Group icon="manage_accounts" title="Account" aside={snapshot?.account?.providerName ?? "Offline mode"}>
-          <AccountRows />
-          <Row label="Player name" hint="Used when playing offline: singleplayer and offline-mode servers.">
-            <div className={cx(s.settingControl, s.col)}>
-              <Input maxLength={16} spellCheck={false} aria-label="Player name" aria-invalid={!usernameValid}
-                value={form.username} onChange={(e) => update({ username: e.target.value })} />
-              {!usernameValid && <span className={s.error}>3–16 letters, digits or underscores.</span>}
-            </div>
-          </Row>
-        </Group>
-
         <PluginsGroup />
 
         <div className={s.settingsFoot}>
@@ -160,113 +145,6 @@ export function SettingsView() {
         Memory, Java, window and launcher options go back to defaults. Your player name stays.
       </ConfirmDialog>
     </View>
-  );
-}
-
-/** Signed-in accounts (pick the one launches use), Microsoft sign-in, and the forms of account provider plugins. */
-function AccountRows() {
-  const { snapshot, refresh } = useLauncher();
-  const qc = useQueryClient();
-  const accounts = useQuery({ queryKey: ["accounts"], queryFn: launcher.listAccounts });
-  const providers = (usePlugins().data ?? []).filter((p) => p.enabled && p.account);
-  const [error, setError] = useState("");
-  const [ms, setMs] = useState<{ code?: DeviceCode } | null>(null);
-
-  const done = () => Promise.all([refresh(), qc.invalidateQueries({ queryKey: ["accounts"] })]).then(() => setError(""));
-  const act = (p: Promise<unknown>) => p.then(done, (e) => setError(errorMessage(e)));
-
-  async function signInMicrosoft() {
-    setMs({});
-    await act(launcher.microsoftLogin((code) => setMs({ code })));
-    setMs(null);
-  }
-
-  const offline = !snapshot?.account;
-  return (
-    <>
-      <Row label="Play as" hint="The account the game starts with. Offline uses the player name below.">
-        <div className={cx(s.settingControl, s.col)}>
-          <AccountLine name={`${snapshot?.settings.username || "Player"}`} provider="Offline" selected={offline} onSelect={() => act(launcher.selectAccount(null))} />
-          {accounts.data?.map((a) => (
-            <AccountLine
-              key={a.id}
-              name={a.name}
-              provider={a.providerName}
-              selected={a.selected}
-              onSelect={() => act(launcher.selectAccount(a.id))}
-              onRemove={() => act(launcher.removeAccount(a.id))}
-            />
-          ))}
-          {error && <span className={s.error}>{error}</span>}
-        </div>
-      </Row>
-      <Row label="Microsoft" hint="Sign in to play your licensed Minecraft: Java Edition on online servers.">
-        <div className={cx(s.settingControl, s.col)}>
-          {ms ? (
-            <span role="status">
-              {ms.code ? (
-                <>Enter <strong className={cx("mono", s.code)}>{ms.code.userCode}</strong> at{" "}
-                  <span className="mono">{ms.code.verificationUri}</span> (opened in your browser)</>
-              ) : "Requesting code…"}
-            </span>
-          ) : (
-            <Button className={s.alignEnd} onClick={signInMicrosoft}>Sign in with Microsoft</Button>
-          )}
-        </div>
-      </Row>
-      {providers.map((p) => (
-        <PluginSignIn key={p.id} plugin={p} onSignedIn={done} />
-      ))}
-    </>
-  );
-}
-
-function AccountLine(p: { name: string; provider: string; selected: boolean; onSelect(): void; onRemove?(): void }) {
-  return (
-    <div className={cx(s.settingControl, s.between)}>
-      <span>
-        <strong className="mono">{p.name}</strong> <span className="subtle">· {p.provider}</span>
-      </span>
-      <span className={s.settingControl}>
-        {p.selected ? <Icon name="check_circle" fill /> : <Button size="sm" onClick={p.onSelect}>Use</Button>}
-        {p.onRemove && <IconButton icon="delete" label={`Remove ${p.name}`} variant="danger" onClick={p.onRemove} />}
-      </span>
-    </div>
-  );
-}
-
-/** The sign-in form an account provider plugin declares. */
-function PluginSignIn({ plugin, onSignedIn }: { plugin: PluginEntry; onSignedIn(): Promise<unknown> }) {
-  const [fields, setFields] = useState<Record<string, string>>({});
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const submit = () => {
-    setBusy(true);
-    launcher
-      .pluginLogin(plugin.id, fields)
-      .then(() => (setFields({}), setError(""), onSignedIn()), (e) => setError(errorMessage(e)))
-      .finally(() => setBusy(false));
-  };
-  return (
-    <Row label={plugin.name} hint={plugin.permissions.jvm ? `${plugin.description} Loads a Java agent into the game.` : plugin.description}>
-      <div className={cx(s.settingControl, s.col)}>
-        {plugin.account!.fields.map((f) => (
-          <Input
-            key={f.key}
-            type={f.type === "secret" ? "password" : "text"}
-            spellCheck={false}
-            placeholder={f.label}
-            aria-label={`${plugin.name} ${f.label}`}
-            title={f.hint || undefined}
-            value={fields[f.key] ?? ""}
-            onChange={(e) => setFields((v) => ({ ...v, [f.key]: e.target.value }))}
-            onKeyDown={(e) => e.key === "Enter" && submit()}
-          />
-        ))}
-        <Button className={s.alignEnd} loading={busy} onClick={submit}>Sign in with {plugin.name}</Button>
-        {error && <span className={s.error}>{error}</span>}
-      </div>
-    </Row>
   );
 }
 

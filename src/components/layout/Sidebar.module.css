@@ -21,8 +21,6 @@
   opacity: 0; pointer-events: none; transition: opacity 120ms var(--ease);
 }
 .nav-btn:hover .tip, .avatar:hover .tip { opacity: 1; }
-.avatar {
-  position: relative; width: 32px; height: 32px; border-radius: 50%;
-  background: var(--card-hover); display: grid; place-items: center;
-  font-weight: 600; font-size: 13px; box-shadow: 0 0 0 1px var(--border);
-}
+.avatar { position: relative; width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center; }
+.head { border-radius: 8px; transition: box-shadow 160ms var(--ease); }
+.avatar:hover .head { box-shadow: 0 0 0 1px rgb(255 255 255 / 0.3); }

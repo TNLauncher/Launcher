@@ -62,7 +62,16 @@ export interface Account {
   provider: string;
   providerName: string;
   name: string;
+  /** 32 hex digits. */
+  uuid: string;
   selected: boolean;
+}
+
+/** A skin; `slim` = Alex model (3px arms). */
+export interface Skin {
+  /** The PNG as a data URL, fetched and cached by the backend. */
+  texture: string;
+  slim: boolean;
 }
 
 export interface Snapshot {

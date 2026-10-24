@@ -2,7 +2,7 @@
 import { Channel, convertFileSrc } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { call } from "./ipc";
-import type { Account, ContentKind, DeviceCode, GameExit, GameLog, Instance, LaunchEvent, Loader, ModFile, Screenshot, Settings, Snapshot } from "@/types";
+import type { Account, ContentKind, DeviceCode, GameExit, GameLog, Instance, LaunchEvent, Loader, ModFile, Screenshot, Settings, Skin, Snapshot } from "@/types";
 
 export const launcher = {
   getState: () => call<Snapshot>("get_state"),
@@ -18,6 +18,8 @@ export const launcher = {
   /** null = play offline. */
   selectAccount: (id: string | null) => call<void>("select_account", { id }),
   removeAccount: (id: string) => call<void>("remove_account", { id }),
+  /** null = the account has no skin. */
+  accountSkin: (id: string) => call<Skin | null>("account_skin", { id }),
   /** Signs in through an account provider plugin; `fields` are its form's values. Resolves with the player name. */
   pluginLogin: (plugin: string, fields: Record<string, string>) => call<string>("plugin_login", { plugin, fields }),
 

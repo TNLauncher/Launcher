@@ -3,7 +3,7 @@ import { Icon } from "@/components/ui/Icon";
 import { useUi, type View } from "@/store/UiContext";
 import s from "./Titlebar.module.css";
 
-const TITLES: Record<View, string> = { home: "Home", instances: "Instances", modpacks: "Modpacks", mods: "Mods", console: "Console", settings: "Settings" };
+const TITLES: Record<View, string> = { home: "Home", profiles: "Profiles", instances: "Instances", modpacks: "Modpacks", mods: "Mods", console: "Console", settings: "Settings" };
 
 // Window has `decorations: false`; drag and buttons are ours (needs core:window:* permissions).
 const appWindow = getCurrentWindow();

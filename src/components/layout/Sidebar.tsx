@@ -1,5 +1,6 @@
 import logo from "@/assets/logo.png";
 import { Icon } from "@/components/ui/Icon";
+import { SkinHead, useSkin } from "@/features/profiles/Skin";
 import { usePlugins } from "@/hooks/useSource";
 import { useLauncher } from "@/store/LauncherContext";
 import { useUi, type View } from "@/store/UiContext";
@@ -7,6 +8,7 @@ import s from "./Sidebar.module.css";
 
 const NAV: { view: View; icon: string; label: string }[] = [
   { view: "home", icon: "sports_esports", label: "Home" },
+  { view: "profiles", icon: "badge", label: "Profiles" },
   { view: "instances", icon: "layers", label: "Instances" },
   { view: "modpacks", icon: "inventory_2", label: "Modpacks" },
   { view: "mods", icon: "extension", label: "Mods" },
@@ -18,6 +20,7 @@ export function Sidebar() {
   const { view, navigate } = useUi();
   const snapshot = useLauncher().snapshot;
   const name = snapshot?.account?.name ?? (snapshot?.settings.username || "Player");
+  const skin = useSkin(snapshot?.account);
   const pages: typeof NAV = (usePlugins().data ?? [])
     .filter((p) => p.enabled)
     .flatMap((p) => p.pages.map((pg) => ({ view: `plugin:${p.id}:${pg.id}` as View, icon: pg.icon, label: pg.title })));
@@ -37,8 +40,8 @@ export function Sidebar() {
           ))}
         </nav>
       </div>
-      <button className={s.avatar} onClick={() => navigate("settings")} aria-label="Account settings">
-        <span>{name[0].toUpperCase()}</span>
+      <button className={s.avatar} onClick={() => navigate("profiles")} aria-label="Profiles">
+        <SkinHead skin={skin} name={name} size={32} className={s.head} />
         <span className={`${s.tip} mono`}>{name} · {snapshot?.account?.providerName ?? "Offline"}</span>
       </button>
     </aside>

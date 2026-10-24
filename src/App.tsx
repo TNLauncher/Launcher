@@ -12,6 +12,7 @@ import s from "@/components/layout/Shell.module.css";
 // Home is the first screen and stays in the main chunk; the rest load on first visit.
 const VIEWS: Record<Exclude<View, `plugin:${string}`>, ComponentType> = {
   home: HomeView,
+  profiles: lazy(() => import("@/features/profiles/ProfilesView").then((m) => ({ default: m.ProfilesView }))),
   instances: lazy(() => import("@/features/instances/InstancesView").then((m) => ({ default: m.InstancesView }))),
   modpacks: lazy(() => import("@/features/modpacks/ModpacksView").then((m) => ({ default: m.ModpacksView }))),
   mods: lazy(() => import("@/features/mods/ModsView").then((m) => ({ default: m.ModsView }))),
