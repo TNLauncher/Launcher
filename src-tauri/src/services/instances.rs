@@ -54,7 +54,7 @@ pub fn rename(state: &AppState, id: &str, name: &str) -> Result<()> {
 }
 
 /// Max size of a stored icon; the frontend downscales before sending.
-const MAX_ICON_LEN: usize = 256 * 1024;
+pub const MAX_ICON_LEN: usize = 256 * 1024;
 
 pub fn set_icon(state: &AppState, id: &str, icon: &str) -> Result<()> {
     if !(icon.is_empty() || icon.starts_with("data:image/")) || icon.len() > MAX_ICON_LEN {

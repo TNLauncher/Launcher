@@ -25,6 +25,8 @@ pub enum AppError {
     Unsupported(String),
     #[error("Plugin error: {0}")]
     Plugin(String),
+    #[error("Cancelled")]
+    Cancelled,
 }
 
 impl AppError {
@@ -40,6 +42,7 @@ impl AppError {
             Self::Conflict(_) => "conflict",
             Self::Unsupported(_) => "unsupported",
             Self::Plugin(_) => "plugin",
+            Self::Cancelled => "cancelled",
         }
     }
 }

@@ -34,6 +34,11 @@ pub async fn import_modpack(
 }
 
 #[tauri::command]
+pub fn cancel_modpack_import(state: State<'_, AppState>, project: String) {
+    modpacks::cancel(&state, &project)
+}
+
+#[tauri::command]
 pub fn rename_instance(state: State<'_, AppState>, id: String, name: String) -> Result<()> {
     instances::rename(&state, &id, &name)
 }

@@ -9,6 +9,8 @@ use crate::plugins::{
 };
 use crate::services::instances;
 use crate::state::AppState;
+use base64::{engine::general_purpose::STANDARD, Engine};
+use futures::future::{AbortHandle, Abortable};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::io::{Cursor, Read};
@@ -92,8 +94,54 @@ fn extract_overrides(bytes: &[u8], dir: &Path, prefixes: &[String]) -> Result<()
     Ok(())
 }
 
+/// Image bytes as a `data:` URL; `None` for formats a webview may not sniff or icons too big to store.
+fn icon_data_url(bytes: &[u8]) -> Option<String> {
+    let mime = match bytes {
+        [0x89, b'P', b'N', b'G', ..] => "png",
+        [0xFF, 0xD8, 0xFF, ..] => "jpeg",
+        [b'G', b'I', b'F', ..] => "gif",
+        [b'R', b'I', b'F', b'F', _, _, _, _, b'W', b'E', b'B', b'P', ..] => "webp",
+        _ => return None,
+    };
+    let url = format!("data:image/{mime};base64,{}", STANDARD.encode(bytes));
+    (url.len() <= instances::MAX_ICON_LEN).then_some(url)
+}
+
+/// Deletes a half-installed instance dir unless disarmed: covers errors and cancels, which drop the future mid-await.
+struct Cleanup<'a>(Option<&'a Path>);
+
+impl Drop for Cleanup<'_> {
+    fn drop(&mut self) {
+        if let Some(dir) = self.0 {
+            let _ = std::fs::remove_dir_all(dir);
+        }
+    }
+}
+
 /// Installs `version` (an id) of a modpack project as a new instance, or its newest version when `None`.
+/// [`cancel`] with the same project stops it.
 pub async fn import(
+    state: &AppState,
+    source_id: &str,
+    project: &str,
+    version: Option<&str>,
+    progress: &(dyn Fn(ImportProgress) + Sync),
+) -> Result<Instance> {
+    let (handle, reg) = AbortHandle::new_pair();
+    state.imports.lock().unwrap().insert(project.into(), handle);
+    let result = Abortable::new(install(state, source_id, project, version, progress), reg).await;
+    state.imports.lock().unwrap().remove(project);
+    result.unwrap_or(Err(AppError::Cancelled))
+}
+
+/// Stops the import of `project`, if one is running.
+pub fn cancel(state: &AppState, project: &str) {
+    if let Some(h) = state.imports.lock().unwrap().remove(project) {
+        h.abort();
+    }
+}
+
+async fn install(
     state: &AppState,
     source_id: &str,
     project: &str,
@@ -121,24 +169,26 @@ pub async fn import(
     let bytes = http::fetch_bytes(&state.http, &file.url).await?;
     let plan = source.plan_pack(&root_files(&bytes)?).await?;
     let loader = loader_of(&plan)?;
+    // Kept locally so the row does not hit the source on every render; a missing icon is not worth failing over.
+    let icon = match source.project(project).await.ok().and_then(|p| p.icon_url) {
+        Some(url) => http::fetch_bytes(&state.http, &url).await.ok().and_then(|b| icon_data_url(&b)),
+        None => None,
+    };
     let instance = Instance {
         pack: Some(PackRef { source: source_id.into(), project: project.into(), version: picked.number.clone() }),
+        icon: icon.unwrap_or_default(),
         ..instances::new(&plan.name, &plan.game_version, loader, plan.loader_version.clone())
     };
     let dir = state.paths.instance_dir(&instance.id)?;
+    let mut cleanup = Cleanup(Some(&dir));
 
-    let result = async {
-        let jobs = jobs(&dir, &allowed, &plan.files)?;
-        progress(ImportProgress { done: 0, total: jobs.len() });
-        http::download_all(&state.http, jobs, &|done, total| progress(ImportProgress { done, total })).await?;
-        extract_overrides(&bytes, &dir, &plan.overrides)?;
-        instances::add(state, &instance)
-    }
-    .await;
-    if result.is_err() {
-        let _ = std::fs::remove_dir_all(&dir);
-    }
-    result.map(|_| instance)
+    let jobs = jobs(&dir, &allowed, &plan.files)?;
+    progress(ImportProgress { done: 0, total: jobs.len() });
+    http::download_all(&state.http, jobs, &|done, total| progress(ImportProgress { done, total })).await?;
+    extract_overrides(&bytes, &dir, &plan.overrides)?;
+    instances::add(state, &instance)?;
+    cleanup.0 = None;
+    Ok(instance)
 }
 
 #[cfg(test)]
@@ -161,6 +211,13 @@ mod tests {
         assert!(jobs(dir, &hosts, &[file("https://evil.com/b.jar")]).is_err());
         let traversal = PackFile { path: "../a.jar".into(), urls: vec!["https://cdn.modrinth.com/a.jar".into()], size: None };
         assert!(jobs(dir, &hosts, &[traversal]).is_err());
+    }
+
+    #[test]
+    fn sniffs_icons() {
+        assert!(icon_data_url(b"\x89PNG\r\n").unwrap().starts_with("data:image/png;base64,"));
+        assert!(icon_data_url(b"RIFF\0\0\0\0WEBPVP8").unwrap().starts_with("data:image/webp;"));
+        assert!(icon_data_url(b"<svg/>").is_none());
     }
 
     #[test]

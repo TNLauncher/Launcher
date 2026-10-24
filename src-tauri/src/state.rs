@@ -16,6 +16,8 @@ pub struct AppState {
     pub running: Mutex<HashSet<String>>,
     /// Live game processes by instance id; held so the UI can stop them.
     pub games: Mutex<HashMap<String, Child>>,
+    /// Modpack imports in flight by project id; aborting one cancels it.
+    pub imports: Mutex<HashMap<String, futures::future::AbortHandle>>,
     pub plugins: Registry,
 }
 
@@ -31,6 +33,7 @@ impl AppState {
             store_lock: Mutex::new(()),
             running: Mutex::new(HashSet::new()),
             games: Mutex::new(HashMap::new()),
+            imports: Mutex::new(HashMap::new()),
         })
     }
 
