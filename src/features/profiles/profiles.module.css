@@ -33,7 +33,11 @@
   background: var(--view); border-left: 1px solid var(--card-border);
   display: flex; flex-direction: column; gap: 20px;
 }
+.side-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .side h1 { margin: 0; font-size: 26px; line-height: 32px; font-weight: 300; letter-spacing: -0.02em; }
+/* Finishes its 360° turn before stopping (onAnimationIteration) so a fast refetch never snaps back mid-turn. */
+.spinning :global(.icon) { animation: turn 650ms var(--ease) infinite; }
+@keyframes turn { to { transform: rotate(360deg); } }
 
 .list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .row { position: relative; }

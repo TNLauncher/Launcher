@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { View } from "@/components/layout/View";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { Button, ConfirmDialog, Dot, Icon, IconButton, Input, Pill, PillGroup, Skeleton } from "@/components/ui";
@@ -23,11 +23,19 @@ export function ProfilesView() {
   const accounts = useQuery({ queryKey: ["accounts"], queryFn: launcher.listAccounts });
   const [error, setError] = useState("");
   const [removing, setRemoving] = useState<Account | null>(null);
+  const [spinning, setSpinning] = useState(false);
+  const refreshing = useRef(false);
 
   // A new sign-in may bring a new skin for the same player.
   const done = () =>
     Promise.all([refresh(), qc.invalidateQueries({ queryKey: ["accounts"] }), qc.invalidateQueries({ queryKey: ["skin"] })]).then(() => setError(""));
   const act = (p: Promise<unknown>) => p.then(done, (e) => setError(errorMessage(e)));
+  const refreshSkins = () => {
+    if (spinning) return;
+    refreshing.current = true;
+    setSpinning(true);
+    void qc.invalidateQueries({ queryKey: ["skin"] }).finally(() => (refreshing.current = false));
+  };
 
   if (!loaded) return <View />;
 
@@ -36,7 +44,18 @@ export function ProfilesView() {
       <Stage account={active} />
 
       <div className={s.side}>
-        <h1>Profiles</h1>
+        <div className={s.sideHead}>
+          <h1>Profiles</h1>
+          <IconButton
+            icon="refresh"
+            label="Refresh skins"
+            disabled={!accounts.data?.length}
+            className={cx(spinning && s.spinning)}
+            onClick={refreshSkins}
+            onAnimationIteration={() => !refreshing.current && setSpinning(false)}
+            onAnimationEnd={() => setSpinning(false)}
+          />
+        </div>
 
         {accounts.isPending ? (
           <ul className={s.list} aria-label="Profiles">
