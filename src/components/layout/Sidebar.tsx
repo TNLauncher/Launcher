@@ -3,7 +3,7 @@ import { Icon } from "@/components/ui/Icon";
 import { SkinHead, useSkin } from "@/features/profiles/Skin";
 import { usePlugins } from "@/hooks/useSource";
 import { useLauncher } from "@/store/LauncherContext";
-import { useUi, type View } from "@/store/UiContext";
+import { useUi, type Route, type View } from "@/store/UiContext";
 import { preloadView } from "@/views";
 import s from "./Sidebar.module.css";
 
@@ -17,16 +17,39 @@ const NAV: { view: View; icon: string; label: string }[] = [
   { view: "settings", icon: "tune", label: "Settings" },
 ];
 
-export function Sidebar() {
-  const { view, navigate } = useUi();
-  const snapshot = useLauncher().snapshot;
-  const name = snapshot?.account?.name ?? (snapshot?.settings.username || "Player");
-  const skin = useSkin(snapshot?.account);
+/** Sidebar sections, plugin pages included. */
+function useNav(): typeof NAV {
   const pages: typeof NAV = (usePlugins().data ?? [])
     .filter((p) => p.enabled)
     .flatMap((p) => p.pages.map((pg) => ({ view: `plugin:${p.id}:${pg.id}` as View, icon: pg.icon, label: pg.title })));
   // Plugin pages sit above Settings, which stays last.
-  const nav = [...NAV.slice(0, -1), ...pages, NAV[NAV.length - 1]];
+  return [...NAV.slice(0, -1), ...pages, NAV[NAV.length - 1]];
+}
+
+/** Names a screen: its section, and its detail page if one is open. */
+export function useRouteLabel(): (r: Route) => { section: string; detail?: string } {
+  const nav = useNav();
+  const instances = useLauncher().snapshot?.instances;
+  return (r) => ({
+    section: nav.find((n) => n.view === r.view)?.label ?? "Page",
+    detail: r.pack?.hit.title ?? (r.instance ? (instances?.find((i) => i.id === r.instance)?.name ?? "Instance") : undefined),
+  });
+}
+
+/** What a detail page's back button returns to. */
+export function useBackLabel(): string {
+  const { route, previous } = useUi();
+  const label = useRouteLabel()(previous ?? route);
+  return previous ? (label.detail ?? label.section) : label.section;
+}
+
+export function Sidebar() {
+  const { route, navigate } = useUi();
+  const { view } = route;
+  const snapshot = useLauncher().snapshot;
+  const name = snapshot?.account?.name ?? (snapshot?.settings.username || "Player");
+  const skin = useSkin(snapshot?.account);
+  const nav = useNav();
   const active = nav.findIndex((n) => n.view === view);
 
   return (

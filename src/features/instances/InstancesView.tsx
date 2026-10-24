@@ -1,4 +1,4 @@
-import { lazy, Suspense, useMemo, useState } from "react";
+import { lazy, Suspense, useMemo } from "react";
 import { View } from "@/components/layout/View";
 import { sources } from "@/api/sources";
 import { Banner, Button, Chip, EmptyState, Icon, IconButton, Meta, Pill, PillGroup, ProgressBar, SearchInput, Select } from "@/components/ui";
@@ -6,7 +6,7 @@ import { cx } from "@/lib/cx";
 import { LOADERS, recency } from "@/lib/format";
 import { imports as importStore, useImportProgress, useImports, type PendingImport } from "@/store/imports";
 import { useLauncher } from "@/store/LauncherContext";
-import { useUi } from "@/store/UiContext";
+import { useRouteState, useUi } from "@/store/UiContext";
 import type { Instance, Loader } from "@/types";
 import { InstanceRow } from "./InstanceRow";
 import s from "./instances.module.css";
@@ -26,11 +26,10 @@ const FILTERS: ("all" | Loader)[] = ["all", ...(Object.keys(LOADERS) as Loader[]
 export function InstancesView() {
   const { snapshot, error, clearError, launch } = useLauncher();
   const imports = useImports();
-  const { openNewInstance, navigate } = useUi();
-  const [query, setQuery] = useState("");
-  const [loader, setLoader] = useState<"all" | Loader>("all");
-  const [sort, setSort] = useState<Sort>("played");
-  const [openId, setOpenId] = useState<string | null>(null);
+  const { route, openNewInstance, navigate, back } = useUi();
+  const [query, setQuery] = useRouteState("instances.query", "");
+  const [loader, setLoader] = useRouteState<"all" | Loader>("instances.loader", "all");
+  const [sort, setSort] = useRouteState<Sort>("instances.sort", "played");
   const all = snapshot?.instances ?? [];
 
   const counts = useMemo(() => {
@@ -44,13 +43,13 @@ export function InstancesView() {
     .filter((i) => (loader === "all" || i.loader === loader) && (!q || `${i.name} ${i.version}`.toLowerCase().includes(q)))
     .sort(SORTERS[sort]);
 
-  const opened = all.find((i) => i.id === openId);
+  const opened = route.instance ? all.find((i) => i.id === route.instance) : undefined;
 
   return (
     <View>
       {opened && (
         <Suspense>
-          <InstancePage instance={opened} onBack={() => setOpenId(null)} />
+          <InstancePage instance={opened} onBack={back} />
         </Suspense>
       )}
       <div className={s.page} hidden={!!opened} onPointerOver={loadPage} onFocus={loadPage}>
@@ -99,7 +98,7 @@ export function InstancesView() {
           ) : !list.length ? (
             <EmptyState icon="search_off">Nothing matches this filter.</EmptyState>
           ) : (
-            list.map((i) => <InstanceRow key={i.id} instance={i} onOpen={() => setOpenId(i.id)} />)
+            list.map((i) => <InstanceRow key={i.id} instance={i} onOpen={() => navigate("instances", { instance: i.id })} />)
           )}
         </div>
 

@@ -1,5 +1,6 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { memo, useCallback, useRef, useState } from "react";
+import { useRouteState } from "@/store/UiContext";
 import { launcher } from "@/api/launcher";
 import { sources, type Hit, type SourceInfo } from "@/api/sources";
 import { Banner, Button, Chip, ConfirmDialog, EmptyState, Icon, IconButton, Pill, PillGroup, SearchInput, Skeleton, Switch, Tab, Tabs } from "@/components/ui";
@@ -53,7 +54,7 @@ const IRIS = { source: "modrinth", project: "YL57xq9U" };
 export function InstanceContent({ instance }: { instance: Instance }) {
   const modded = instance.loader !== "vanilla";
   // `plugin:<id>:<tab>` = a tab a plugin contributes.
-  const [tab, setTab] = useState<ContentKind | "screenshots" | "settings" | `plugin:${string}`>(modded ? "mod" : "resourcepack");
+  const [tab, setTab] = useRouteState<ContentKind | "screenshots" | "settings" | `plugin:${string}`>("instance.tab", modded ? "mod" : "resourcepack");
   const kind = tab === "screenshots" || tab === "settings" || tab.startsWith("plugin:") ? "mod" : (tab as ContentKind);
   const pluginTabs = (usePlugins().data ?? []).filter((p) => p.enabled).flatMap((p) => p.instanceTabs.map((t) => ({ plugin: p, tab: t, key: `plugin:${p.id}:${t.id}` as const })));
   const openPluginTab = pluginTabs.find((t) => t.key === tab);

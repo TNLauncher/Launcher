@@ -9,7 +9,8 @@ import { useFavorites } from "@/hooks/useSource";
 import { ago, compact, errorMessage, LOADERS, megabytes } from "@/lib/format";
 import { useInstalling } from "@/store/imports";
 import { useLauncher } from "@/store/LauncherContext";
-import { useUi } from "@/store/UiContext";
+import { useBackLabel } from "@/components/layout/Sidebar";
+import { useRouteState, useUi } from "@/store/UiContext";
 import { packColor } from "./ModpacksView";
 import s from "./modpacks.module.css";
 
@@ -23,7 +24,8 @@ export function PackDetail({ source, hit, preferredVersion, onBack }: { source: 
   const id = hit.id;
   const project = useQuery({ queryKey: ["project", source.id, id], queryFn: () => sources.project(source.id, id) });
   const versions = useQuery({ queryKey: ["pack-versions", source.id, id], queryFn: () => sources.versions(source.id, id, { kind: "modpack" }) });
-  const [tab, setTab] = useState<Section>("description");
+  const [tab, setTab] = useRouteState<Section>("pack.tab", "description");
+  const backLabel = useBackLabel();
   const [mc, setMc] = useState("");
   const [versionId, setVersionId] = useState("");
   const top = useRef<HTMLDivElement>(null);
@@ -56,7 +58,7 @@ export function PackDetail({ source, hit, preferredVersion, onBack }: { source: 
         <div className={s.packHeroInner}>
           <div className={s.packBar}>
             <Button variant="overlay" size="sm" icon="arrow_back" onClick={onBack}>
-              Modpacks
+              {backLabel}
             </Button>
             <IconButton
               icon="star"

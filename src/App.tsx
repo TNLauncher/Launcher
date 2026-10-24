@@ -7,7 +7,7 @@ import { Toaster } from "@/components/ui/Toast";
 import { PluginHost } from "@/plugins/PluginHost";
 import { PluginPage } from "@/plugins/PluginPage";
 import { LauncherProvider } from "@/store/LauncherContext";
-import { UiProvider, useUi } from "@/store/UiContext";
+import { registerScroller, savedScroll, UiProvider, useRouteKey, useUi } from "@/store/UiContext";
 import { viewComponent } from "@/views";
 import s from "@/components/layout/Shell.module.css";
 
@@ -19,14 +19,17 @@ function CurrentView({ view }: { view: Parameters<typeof viewComponent>[0] }) {
 }
 
 function Shell() {
-  const { view, newInstanceOpen } = useUi();
+  const { route, newInstanceOpen } = useUi();
+  const { view } = route;
+  const key = useRouteKey();
   const [, plugin, page] = view.split(":");
   const main = useRef<HTMLElement>(null);
-  // Each view opens at the top; the scroller itself persists so the old view stays up while the next one loads.
-  // Layout effect: the new view paints already scrolled to the top.
+  // New screens open at the top, Back/Forward land where the screen was left; the scroller itself persists so
+  // the old view stays up while the next one loads. Layout effect: the screen paints already at its position.
   useLayoutEffect(() => {
-    main.current?.scrollTo(0, 0);
-  }, [view]);
+    registerScroller(main.current);
+    main.current?.scrollTo(0, savedScroll(key));
+  }, [key]);
   return (
     <>
       <Sidebar />

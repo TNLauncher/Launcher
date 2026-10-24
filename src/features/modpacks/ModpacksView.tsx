@@ -1,5 +1,5 @@
 import { keepPreviousData, useInfiniteQuery, useQuery } from "@tanstack/react-query";
-import { lazy, memo, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, memo, Suspense, useCallback, useEffect, useMemo, useRef } from "react";
 import { getVersions } from "@/api/mojang";
 import { sources, type Hit, type SourceInfo } from "@/api/sources";
 import { View } from "@/components/layout/View";
@@ -10,6 +10,7 @@ import { useFavorites, useSource } from "@/hooks/useSource";
 import { SourcePicker } from "@/plugins/SourcePicker";
 import { ago, compact, errorMessage, LOADERS } from "@/lib/format";
 import { useInstalling } from "@/store/imports";
+import { useRouteState, useUi } from "@/store/UiContext";
 import s from "./modpacks.module.css";
 
 /** Loaders the launcher can run modpacks on. */
@@ -47,13 +48,16 @@ function Catalog({ source }: { source: SourceInfo }) {
   const packCategories = source.categories.modpack ?? [];
   // Stable so memoized rows skip re-rendering while the user types.
   const categoryLabel = useMemo(() => Object.fromEntries(packCategories.map((c) => [c.id, c.label])), [packCategories]);
-  const [query, setQuery] = useState("");
-  const [gameVersion, setGameVersion] = useState("");
-  const [loader, setLoader] = useState<PackLoader>("");
-  const [categories, setCategories] = useState<string[]>([]);
-  const [sort, setSort] = useState(source.sorts[0]?.id ?? "");
-  const [open, setOpen] = useState<Hit | null>(null);
-  const [favOnly, setFavOnly] = useState(false);
+  const { route, navigate, back } = useUi();
+  const [query, setQuery] = useRouteState("packs.query", "");
+  const [gameVersion, setGameVersion] = useRouteState("packs.gameVersion", "");
+  const [loader, setLoader] = useRouteState<PackLoader>("packs.loader", "");
+  const [categories, setCategories] = useRouteState<string[]>("packs.categories", []);
+  const [sort, setSort] = useRouteState("packs.sort", source.sorts[0]?.id ?? "");
+  const [favOnly, setFavOnly] = useRouteState("packs.favOnly", false);
+  // A pack opened under another source stays closed until that source is picked again.
+  const open = route.pack?.source === source.id ? route.pack.hit : null;
+  const setOpen = useCallback((hit: Hit) => navigate("modpacks", { pack: { source: source.id, hit } }), [navigate, source.id]);
   const favorites = useFavorites(source.id, "modpack");
   const debounced = useDebounced(query.trim(), 300);
   const filters = { query: debounced, gameVersion: gameVersion || undefined, loader: loader || undefined, categories, sort };
@@ -96,7 +100,7 @@ function Catalog({ source }: { source: SourceInfo }) {
     <>
       {open && (
         <Suspense>
-          <PackDetail source={source} hit={open} preferredVersion={gameVersion} onBack={() => setOpen(null)} />
+          <PackDetail source={source} hit={open} preferredVersion={gameVersion} onBack={back} />
         </Suspense>
       )}
       {/* Hovering any pack warms the detail chunk, so opening one doesn't wait on it. */}

@@ -7,6 +7,7 @@ import { InstanceContent } from "@/features/content/InstanceContent";
 import { lastPlayed, LOADER_ICON, loaderLabel, playTime } from "@/lib/format";
 import { useSourceEnabled } from "@/hooks/useSource";
 import { useLauncher } from "@/store/LauncherContext";
+import { useBackLabel } from "@/components/layout/Sidebar";
 import type { Instance } from "@/types";
 // The page reuses the modpack hero.
 import s from "@/features/modpacks/modpacks.module.css";
@@ -22,6 +23,7 @@ export function InstancePage({ instance: i, onBack }: { instance: Instance; onBa
   const running = isRunning(i.id);
   const starting = busyId === i.id;
   const color = pack.data?.color;
+  const backLabel = useBackLabel();
 
   return (
     <div className={cx(s.packPage, s.instancePage)} style={color != null ? ({ "--pack": `#${color.toString(16).padStart(6, "0")}` } as React.CSSProperties) : undefined}>
@@ -29,7 +31,7 @@ export function InstancePage({ instance: i, onBack }: { instance: Instance; onBa
         {banner && <img className={s.packHeroBg} src={banner} alt="" />}
         <div className={s.packHeroInner}>
           <Button variant="overlay" size="sm" icon="arrow_back" className={s.packBack} onClick={onBack}>
-            Instances
+            {backLabel}
           </Button>
           <div className={s.packHeroMain}>
             <span className={cx(s.packIcon, s.big)}>{icon ? <img src={icon} alt="" /> : <Icon name={LOADER_ICON[i.loader]} />}</span>

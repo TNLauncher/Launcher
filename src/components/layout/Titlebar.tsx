@@ -1,20 +1,38 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Icon } from "@/components/ui/Icon";
-import { useUi, type View } from "@/store/UiContext";
+import { useUi } from "@/store/UiContext";
+import { useRouteLabel } from "./Sidebar";
 import s from "./Titlebar.module.css";
-
-const TITLES: Record<View, string> = { home: "Home", profiles: "Profiles", instances: "Instances", modpacks: "Modpacks", mods: "Mods", console: "Console", settings: "Settings" };
 
 // Window has `decorations: false`; drag and buttons are ours (needs core:window:* permissions).
 const appWindow = getCurrentWindow();
 
 export function Titlebar() {
-  const { view } = useUi();
+  const { route, navigate, back, forward, canBack, canForward } = useUi();
+  const { section, detail } = useRouteLabel()(route);
   return (
     <header className={s.titlebar} data-tauri-drag-region>
-      <span className={s.title} data-tauri-drag-region>
-        TNLauncher <span data-tauri-drag-region>{TITLES[view]}</span>
-      </span>
+      <div className={s.lead} data-tauri-drag-region>
+        <div className={s.history}>
+          <button aria-label="Back" title="Back (Alt+←)" disabled={!canBack && !detail} onClick={back}>
+            <Icon name="arrow_back" />
+          </button>
+          <button aria-label="Forward" title="Forward (Alt+→)" disabled={!canForward} onClick={forward}>
+            <Icon name="arrow_forward" />
+          </button>
+        </div>
+        <nav className={s.crumbs} aria-label="Breadcrumb" data-tauri-drag-region>
+          {detail ? (
+            <>
+              <button className={s.crumb} onClick={() => navigate(route.view)}>{section}</button>
+              <Icon name="chevron_right" className={s.sep} />
+              <span className={s.current} aria-current="page" data-tauri-drag-region>{detail}</span>
+            </>
+          ) : (
+            <span className={s.current} aria-current="page" data-tauri-drag-region>{section}</span>
+          )}
+        </nav>
+      </div>
       <div className={s.winBtns}>
         <button aria-label="Minimize" onClick={() => appWindow.minimize()}>
           <Icon name="minimize" />
