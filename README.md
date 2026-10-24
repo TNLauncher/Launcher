@@ -58,7 +58,10 @@ Environment variables are read from `.env` files in the project root (`.env` < `
 
 | Variable | Description |
 |---|---|
-| `TN_MS_CLIENT_ID` | Microsoft Entra (Azure) Application Client ID for OAuth 2.0 Device Code sign-in |
+| `TN_MS_CLIENT_ID` | Microsoft Entra (Azure) Application Client ID for OAuth 2.0 Device Code sign-in. Defaults to TNLauncher's own ID |
+
+> [!IMPORTANT]
+> The Microsoft client ID hardcoded in `src-tauri/src/config.rs` belongs to TNLauncher and is approved by Microsoft for this application only. **Do not use it in other applications or forks.** If you fork TNLauncher or reuse its code, [register your own Azure application](https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-register-app), request Minecraft API access at <https://aka.ms/mce-reviewappid>, and set `TN_MS_CLIENT_ID` to your own ID.
 
 ---
 
