@@ -1,12 +1,24 @@
+import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { launcher } from "@/api/launcher";
+import { BackendError } from "@/api/ipc";
 import { getVersions, type ManifestVersion } from "@/api/mojang";
-import { Banner, Button, Checkbox, Dialog, Field, Input, Pill, PillGroup, Select, toast } from "@/components/ui";
-import { errorMessage, LOADERS } from "@/lib/format";
+import { Banner, Button, Dialog, Icon, Input, Select, Switch, toast } from "@/components/ui";
+import { cx } from "@/lib/cx";
+import { errorMessage, LOADER_ICON, LOADERS } from "@/lib/format";
 import { useLauncher } from "@/store/LauncherContext";
 import { useUi } from "@/store/UiContext";
 import type { Loader } from "@/types";
-import s from "./instances.module.css";
+import s from "./NewInstanceDialog.module.css";
+
+const LOADER_HINT: Record<Loader, string> = {
+  vanilla: "The game, no mods",
+  fabric: "Lightweight, quick to update",
+  quilt: "Fabric fork, runs most Fabric mods",
+  forge: "Classic, the biggest mod library",
+  neoforge: "Modern Forge, 1.20.2 and up",
+  liteloader: "Legacy, up to 1.12.2",
+};
 
 /** Mounted only while open, so every opening starts from fresh state. */
 export function NewInstanceDialog() {
@@ -26,13 +38,22 @@ export function NewInstanceDialog() {
 
   const shown = (versions ?? []).filter((v) => v.type === "release" || (snapshots && v.type === "snapshot"));
   const chosen = shown.some((v) => v.id === version) ? version : (shown[0]?.id ?? "");
+  const modded = loader !== "vanilla";
+  const check = useQuery({
+    queryKey: ["loaderVersion", chosen, loader],
+    queryFn: () => launcher.loaderVersion(chosen, loader),
+    enabled: modded && !!chosen,
+    retry: (n, e) => !(e instanceof BackendError && e.kind === "unsupported") && n < 1,
+  });
+  const unsupported = check.error instanceof BackendError && check.error.kind === "unsupported";
+  const fallbackName = modded ? `${chosen} ${LOADERS[loader]}` : chosen;
 
   async function submit() {
-    if (!chosen) return;
+    if (!chosen || unsupported) return;
     setCreating(true);
     setError("");
     try {
-      const inst = await launcher.createInstance(name, chosen, loader);
+      const inst = await launcher.createInstance(name.trim() || fallbackName, chosen, loader);
       select(inst.id);
       await refresh();
       closeNewInstance();
@@ -47,6 +68,7 @@ export function NewInstanceDialog() {
   return (
     <Dialog
       open
+      className={s.dialog}
       title="New instance"
       onClose={closeNewInstance}
       onSubmit={submit}
@@ -64,32 +86,63 @@ export function NewInstanceDialog() {
       actions={
         <>
           <Button onClick={closeNewInstance}>Cancel</Button>
-          <Button type="submit" variant="primary" disabled={creating || !chosen}>
+          <Button type="submit" variant="primary" disabled={creating || !chosen || unsupported || (modded && check.isPending)}>
             {creating ? "Creating…" : "Create"}
           </Button>
         </>
       }
     >
-      <Field label="Name">
-        <Input placeholder={chosen || "My world"} maxLength={48} value={name} onChange={(e) => setName(e.target.value)} />
-      </Field>
-      <Field label="Minecraft version" asLabel={false}>
-        <div className={s.rowInline}>
-          <Select label="Minecraft version" className={s.grow} value={chosen} onChange={setVersion}
-            placeholder={versions ? "No versions" : "Loading versions…"}
-            options={shown.map((v) => ({ value: v.id, label: v.id, hint: v.type === "snapshot" ? "snapshot" : undefined }))} />
-          <Checkbox checked={snapshots} onChange={setSnapshots}>Snapshots</Checkbox>
-        </div>
-      </Field>
-      <Field label="Mod loader" asLabel={false}>
-        <PillGroup label="Mod loader">
+      <div className={s.body}>
+        <fieldset className={s.loaders}>
+          <legend className={s.label}>Mod loader</legend>
           {(Object.keys(LOADERS) as Loader[]).map((l) => (
-            <Pill key={l} pressed={loader === l} onClick={() => setLoader(l)}>
-              {LOADERS[l]}
-            </Pill>
+            <label key={l} className={cx(s.loader, "sheen")}>
+              <input type="radio" name="loader" value={l} checked={loader === l} onChange={() => setLoader(l)} />
+              <span className={s.loaderIcon}><Icon name={LOADER_ICON[l]} /></span>
+              <span className={s.loaderText}>
+                <span className={s.loaderName}>{LOADERS[l]}</span>
+                <span className={s.loaderHint}>{LOADER_HINT[l]}</span>
+              </span>
+            </label>
           ))}
-        </PillGroup>
-      </Field>
+        </fieldset>
+
+        <div className={s.side}>
+          <div className={s.field}>
+            <div className={s.labelRow}>
+              <span className={s.label}>Minecraft version</span>
+              <label className={s.snap}>
+                Snapshots
+                <Switch checked={snapshots} onChange={setSnapshots} label="Show snapshots" />
+              </label>
+            </div>
+            <Select label="Minecraft version" value={chosen} onChange={setVersion}
+              placeholder={versions ? "No versions" : "Loading versions…"}
+              options={shown.map((v) => ({ value: v.id, label: v.id, hint: v.type === "snapshot" ? "snapshot" : undefined }))} />
+            <p className={s.status} aria-live="polite" data-tone={!modded ? "muted" : check.isSuccess ? "ok" : check.isError ? "bad" : "muted"}>
+              {!modded ? (
+                <><Icon name="deployed_code" />Plain Minecraft, as Mojang ships it</>
+              ) : !chosen ? null : check.isPending ? (
+                <><Icon name="progress_activity" spin />Looking up {LOADERS[loader]} for {chosen}…</>
+              ) : check.isSuccess ? (
+                <><Icon name="check_circle" fill />{LOADERS[loader]} {check.data} will be installed</>
+              ) : unsupported ? (
+                <><Icon name="block" />{errorMessage(check.error)}</>
+              ) : (
+                <><Icon name="wifi_off" />Could not check {LOADERS[loader]}: {errorMessage(check.error)}</>
+              )}
+            </p>
+          </div>
+
+          <label className={s.field}>
+            <span className={s.labelRow}>
+              <span className={s.label}>Name</span>
+              <span className={s.optional}>Optional</span>
+            </span>
+            <Input placeholder={fallbackName || "My world"} maxLength={48} value={name} onChange={(e) => setName(e.target.value)} />
+          </label>
+        </div>
+      </div>
       {error && <Banner message={error} />}
     </Dialog>
   );

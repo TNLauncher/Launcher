@@ -1,0 +1,46 @@
+.dialog { width: min(620px, calc(100vw - 32px)); }
+
+/* Loader list on the left drives everything on the right, so it gets the column and the height. */
+.body { display: grid; grid-template-columns: 228px 1fr; gap: 20px; align-items: start; }
+.label { font-size: 12px; color: var(--muted); }
+.label-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 20px; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.side { display: flex; flex-direction: column; gap: 18px; padding-top: 5px; }
+
+.loaders { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 4px; border: 1px solid var(--card-border); border-radius: var(--r-md); background: rgb(0 0 0 / 0.14); }
+.loaders legend { float: left; width: 100%; padding: 2px 8px 6px; }
+.loader {
+  display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: var(--r-sm); cursor: pointer;
+  transition: background var(--quick) var(--butter), transform var(--soft) var(--spring);
+}
+.loader:hover { background: var(--card); }
+.loader:active { transform: scale(0.98); transition: transform var(--press) var(--butter); }
+.loader input { position: absolute; opacity: 0; pointer-events: none; }
+.loader:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }
+.loader:has(input:checked) { background: rgb(10 132 255 / 0.16); box-shadow: inset 0 0 0 1px rgb(10 132 255 / 0.32); }
+
+.loader-icon {
+  width: 30px; height: 30px; flex-shrink: 0; display: grid; place-items: center; border-radius: 9px;
+  background: var(--btn); color: var(--muted); transition: background var(--quick) var(--butter), color var(--quick) var(--butter);
+}
+.loader-icon :global(.icon) { font-size: 18px; }
+.loader:has(input:checked) .loader-icon { background: var(--accent-fill); color: #fff; }
+.loader-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.loader-name { font-size: 13px; font-weight: 500; color: var(--fg); }
+.loader-hint { font-size: 11px; color: var(--subtle); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.loader:has(input:checked) .loader-hint { color: var(--muted); }
+
+.snap { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); cursor: pointer; }
+
+/* Fixed height: switching loaders swaps the message without nudging the form. */
+.status { display: flex; align-items: center; gap: 6px; min-height: 18px; margin: 0; font-size: 12px; color: var(--subtle); }
+.status :global(.icon) { font-size: 15px; flex-shrink: 0; }
+.status[data-tone="ok"] { color: var(--muted); }
+.status[data-tone="ok"] :global(.icon) { color: var(--green); }
+.status[data-tone="bad"] { color: var(--warning); }
+
+.optional { font-size: 11px; color: var(--subtle); }
+
+@media (max-width: 560px) {
+  .body { grid-template-columns: 1fr; }
+}

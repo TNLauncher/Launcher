@@ -25,6 +25,8 @@ export const launcher = {
 
   createInstance: (name: string, version: string, loader: Loader) =>
     call<Instance>("create_instance", { name, version, loader }),
+  /** The loader version a new instance would get; rejects with kind `unsupported` when the loader skips `version`. */
+  loaderVersion: (version: string, loader: Loader) => call<string>("loader_version", { version, loader }),
   renameInstance: (id: string, name: string) => call<void>("rename_instance", { id, name }),
   /** `icon` is a `data:image/...` URL, or "" to reset. */
   setInstanceIcon: (id: string, icon: string) => call<void>("set_instance_icon", { id, icon }),
