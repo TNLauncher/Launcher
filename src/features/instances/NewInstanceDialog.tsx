@@ -13,7 +13,7 @@ import s from "./NewInstanceDialog.module.css";
 const LOADER_HINT: Record<Loader, string> = {
   vanilla: "The game, no mods",
   fabric: "Lightweight, quick to update",
-  quilt: "Fabric fork, runs most Fabric mods",
+  quilt: "Runs most Fabric mods",
   forge: "Classic, the biggest mod library",
   neoforge: "Modern Forge, 1.20.2 and up",
   liteloader: "Legacy, up to 1.12.2",
@@ -96,8 +96,8 @@ export function NewInstanceDialog() {
       }
     >
       <div className={s.body}>
-        <fieldset className={s.loaders}>
-          <legend className={s.label}>Mod loader</legend>
+        <div className={s.loaders} role="radiogroup" aria-labelledby="new-instance-loader">
+          <span className={cx(s.label, s.loadersLabel)} id="new-instance-loader">Mod loader</span>
           {(Object.keys(LOADERS) as Loader[]).map((l) => (
             <label key={l} className={cx(s.loader, "sheen")}>
               <input type="radio" name="loader" value={l} checked={loader === l} onChange={() => setLoader(l)} />
@@ -108,7 +108,7 @@ export function NewInstanceDialog() {
               </span>
             </label>
           ))}
-        </fieldset>
+        </div>
 
         <div className={s.side}>
           <label className={s.field}>
