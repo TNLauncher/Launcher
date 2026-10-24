@@ -155,7 +155,7 @@ async fn minecraft(c: &reqwest::Client, ms: &Value) -> Result<Account> {
 
 fn client_id() -> Result<&'static str> {
     MS_CLIENT_ID.filter(|s| !s.is_empty()).ok_or_else(|| {
-        AppError::Unsupported("Microsoft sign-in is not configured: set TN_MS_CLIENT_ID in .env.local and rebuild".into())
+        AppError::Unsupported("Microsoft sign-in is not configured: TN_MS_CLIENT_ID is empty".into())
     })
 }
 
