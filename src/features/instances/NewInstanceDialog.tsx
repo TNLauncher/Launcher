@@ -95,6 +95,13 @@ export function NewInstanceDialog() {
         </>
       }
     >
+      <label className={s.field}>
+        <span className={s.labelRow}>
+          <span className={s.label}>Name</span>
+          <span className={s.optional}>Optional</span>
+        </span>
+        <Input placeholder={fallbackName || "My world"} maxLength={48} value={name} onChange={(e) => setName(e.target.value)} />
+      </label>
       <div className={s.body}>
         <fieldset className={s.loaders}>
           <legend className={s.label}>Mod loader</legend>
@@ -141,14 +148,6 @@ export function NewInstanceDialog() {
                 }))} />
             </div>
           )}
-
-          <label className={s.field}>
-            <span className={s.labelRow}>
-              <span className={s.label}>Name</span>
-              <span className={s.optional}>Optional</span>
-            </span>
-            <Input placeholder={fallbackName || "My world"} maxLength={48} value={name} onChange={(e) => setName(e.target.value)} />
-          </label>
         </div>
       </div>
       {games.isError && <Banner message={`Could not load ${loaderName} versions: ${errorMessage(games.error)}`} onRetry={() => games.refetch()} />}

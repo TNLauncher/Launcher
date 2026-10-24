@@ -1,11 +1,12 @@
 .dialog { width: min(620px, calc(100vw - 32px)); }
 
 /* Loader list on the left drives everything on the right, so it gets the column and the height. */
-.body { display: grid; grid-template-columns: 228px 1fr; gap: 20px; align-items: start; }
+.body { display: grid; grid-template-columns: 228px 1fr; gap: 20px; }
 .label { font-size: 12px; color: var(--muted); }
 .label-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 20px; }
 .field { display: flex; flex-direction: column; gap: 6px; }
-.side { display: flex; flex-direction: column; gap: 18px; padding-top: 5px; }
+/* Settles at the bottom of the loader list, so the picks sit level with where the list ends. */
+.side { display: flex; flex-direction: column; justify-content: flex-end; gap: 18px; padding-bottom: 4px; }
 
 .loaders { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 4px; border: 1px solid var(--card-border); border-radius: var(--r-md); background: rgb(0 0 0 / 0.14); }
 .loaders legend { float: left; width: 100%; padding: 2px 8px 6px; }
