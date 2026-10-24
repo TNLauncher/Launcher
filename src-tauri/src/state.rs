@@ -72,6 +72,9 @@ impl Paths {
     pub fn plugins_file(&self) -> PathBuf {
         self.root.join("disabled-plugins.json")
     }
+    pub fn favorites_file(&self) -> PathBuf {
+        self.root.join("favorites.json")
+    }
     pub fn instances_file(&self) -> PathBuf {
         self.root.join("instances.json")
     }

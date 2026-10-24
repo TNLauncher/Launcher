@@ -81,6 +81,8 @@ pub fn run() {
             commands::app::get_state,
             commands::settings::save_settings,
             commands::net::fetch_json,
+            commands::favorites::list_favorites,
+            commands::favorites::set_favorite,
             commands::account::list_accounts,
             commands::account::select_account,
             commands::account::remove_account,
