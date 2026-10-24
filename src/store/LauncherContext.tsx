@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { launcher } from "@/api/launcher";
+import { toast } from "@/components/ui/Toast";
 import { broadcast } from "@/plugins/bridge";
 import { gameLogs } from "./gameLogs";
 import { sources, type Hit, type Version } from "@/api/sources";
@@ -143,6 +144,7 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
         select(inst.id);
         await refresh();
         setImports((list) => list.filter((p) => p.projectId !== id));
+        toast(`${pack.title} is ready to play`);
       } catch (e) {
         patchImport(id, { error: errorMessage(e) });
       } finally {

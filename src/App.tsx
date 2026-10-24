@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { lazy, Suspense, type ComponentType } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Titlebar } from "@/components/layout/Titlebar";
+import { Toaster } from "@/components/ui/Toast";
 import { HomeView } from "@/features/home/HomeView";
 import { PluginHost } from "@/plugins/PluginHost";
 import { PluginPage } from "@/plugins/PluginPage";
@@ -39,6 +40,7 @@ function Shell() {
         </Suspense>
       </main>
       <PluginHost />
+      <Toaster />
       {newInstanceOpen && (
         <Suspense>
           <NewInstanceDialog />

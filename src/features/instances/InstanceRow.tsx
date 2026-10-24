@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { launcher } from "@/api/launcher";
-import { Button, Chip, ConfirmDialog, Dot, Icon, IconButton, Input, Meta } from "@/components/ui";
+import { Button, Chip, ConfirmDialog, Dot, Icon, IconButton, Input, Meta, toast } from "@/components/ui";
 import { cx } from "@/lib/cx";
 import { errorMessage, lastPlayed, LOADER_ICON, loaderLabel, playTime, plural } from "@/lib/format";
 import { useLauncher } from "@/store/LauncherContext";
@@ -124,7 +124,7 @@ export function InstanceRow({ instance: i, onOpen }: { instance: Instance; onOpe
         onCancel={() => setConfirmDelete(false)}
         onConfirm={() => {
           setConfirmDelete(false);
-          run(() => launcher.deleteInstance(i.id));
+          run(() => launcher.deleteInstance(i.id).then(() => toast(`${i.name} deleted`, "info", "delete")));
         }}
       >
         Its worlds, mods and settings will be removed from disk. This cannot be undone.

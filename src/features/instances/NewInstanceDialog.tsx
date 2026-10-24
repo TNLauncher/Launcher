@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { launcher } from "@/api/launcher";
 import { getVersions, type ManifestVersion } from "@/api/mojang";
-import { Banner, Button, Checkbox, Dialog, Field, Input, Pill, PillGroup, Select } from "@/components/ui";
+import { Banner, Button, Checkbox, Dialog, Field, Input, Pill, PillGroup, Select, toast } from "@/components/ui";
 import { errorMessage, LOADERS } from "@/lib/format";
 import { useLauncher } from "@/store/LauncherContext";
 import { useUi } from "@/store/UiContext";
@@ -36,6 +36,7 @@ export function NewInstanceDialog() {
       select(inst.id);
       await refresh();
       closeNewInstance();
+      toast(`${inst.name} created`);
     } catch (err) {
       setError(errorMessage(err));
     } finally {

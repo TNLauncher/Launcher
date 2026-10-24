@@ -18,3 +18,4 @@ export { Select, type SelectOption } from "./Select";
 export { Skeleton } from "./Skeleton";
 export { Switch } from "./Switch";
 export { Tab, Tabs } from "./Tabs";
+export { toast, Toaster } from "./Toast";

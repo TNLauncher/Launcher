@@ -1,0 +1,19 @@
+@layer kit {
+/* Above the 72px launch dock, clear of the window corner. */
+.stack { position: fixed; right: 20px; bottom: 88px; z-index: 60; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; pointer-events: none; }
+.toast {
+  display: flex; align-items: center; gap: 10px; max-width: 360px; padding: 10px 14px 10px 12px; border-radius: 12px;
+  background: rgb(44 44 46 / 0.92); backdrop-filter: blur(16px) saturate(1.4);
+  border: 1px solid var(--border); box-shadow: var(--lift), var(--highlight);
+  font-size: 12px; font-weight: 500; pointer-events: auto; cursor: pointer;
+  animation: toast-in 380ms var(--ease) backwards;
+}
+.leaving { animation: toast-out 180ms ease-in both; }
+.icon { font-size: 18px; animation: toast-icon 460ms var(--ease) 80ms backwards; }
+.success .icon { color: var(--green); }
+.info .icon { color: var(--accent); }
+.critical .icon { color: var(--critical); }
+@keyframes toast-in { from { opacity: 0; transform: translateY(12px) scale(0.96); filter: blur(4px); } }
+@keyframes toast-out { to { opacity: 0; transform: translateX(16px); } }
+@keyframes toast-icon { from { transform: scale(0.4) rotate(-40deg); opacity: 0; } }
+}
