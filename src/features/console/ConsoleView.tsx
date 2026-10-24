@@ -5,7 +5,7 @@ import { Button, Dot, EmptyState, Icon, IconButton, Pill, PillGroup, SearchInput
 import { cx } from "@/lib/cx";
 import { compact, errorMessage, STAGE_LABEL } from "@/lib/format";
 import { gameLogs, useGameLog, type Level, type LogLine, type Session } from "@/store/gameLogs";
-import { useLauncher, useProgress, useRecentInstances } from "@/store/LauncherContext";
+import { useLauncher, useProgress, useRecentInstances, useSelectedInstance } from "@/store/LauncherContext";
 import { useUi } from "@/store/UiContext";
 import type { Instance } from "@/types";
 import s from "./console.module.css";
@@ -22,8 +22,8 @@ const STICK_PX = 32;
 const RAIL_BUCKETS = 240;
 
 export function ConsoleView() {
-  const { selected } = useLauncher();
-  const { openNewInstance } = useUi();
+  const selected = useSelectedInstance();
+  const openNewInstance = useUi((st) => st.openNewInstance);
   if (!selected) {
     return (
       <View className={s.console}>
@@ -122,12 +122,15 @@ interface ToolbarProps {
 }
 
 function Toolbar({ instance, log, filter, setFilter, query, setQuery, counts, total, items }: ToolbarProps) {
-  const { select, launch, busyId, isRunning } = useLauncher();
+  const select = useLauncher((st) => st.select);
+  const launch = useLauncher((st) => st.launch);
+  const starting = useLauncher((st) => st.busyId === instance.id);
+  const busy = useLauncher((st) => st.busyId !== null);
+  const running = useLauncher((st) => st.snapshot?.running.includes(instance.id) ?? false);
   const instances = useRecentInstances();
   const search = useRef<HTMLInputElement>(null);
   const [copied, setCopied] = useState(false);
   const [actionError, setActionError] = useState("");
-  const running = isRunning(instance.id);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -174,8 +177,8 @@ function Toolbar({ instance, log, filter, setFilter, query, setQuery, counts, to
               {log?.stopping ? "Stopping" : "Stop"}
             </Button>
           ) : (
-            <Button variant="primary" icon="play_arrow" className={s.runBtn} loading={busyId === instance.id} disabled={!!busyId} onClick={() => launch(instance.id)}>
-              {busyId === instance.id ? "Starting" : "Launch"}
+            <Button variant="primary" icon="play_arrow" className={s.runBtn} loading={starting} disabled={busy} onClick={() => launch(instance.id)}>
+              {starting ? "Starting" : "Launch"}
             </Button>
           )}
         </div>
@@ -199,13 +202,13 @@ function Toolbar({ instance, log, filter, setFilter, query, setQuery, counts, to
 }
 
 function SessionState({ instance, log, error }: { instance: Instance; log: Session | undefined; error: string }) {
-  const { busyId, isRunning } = useLauncher();
+  const preparing = useLauncher((st) => st.busyId === instance.id);
+  const running = useLauncher((st) => st.snapshot?.running.includes(instance.id) ?? false);
   const progress = useProgress();
-  const running = isRunning(instance.id);
 
   let [label, tone]: [string, Tone] = ["Not running", "neutral"];
   if (error) [label, tone] = [error, "red"];
-  else if (busyId === instance.id && progress) [label, tone] = [`Preparing · ${STAGE_LABEL[progress.stage]}`, "orange"];
+  else if (preparing && progress) [label, tone] = [`Preparing · ${STAGE_LABEL[progress.stage]}`, "orange"];
   else if (running && log?.stopping) [label, tone] = ["Stopping…", "orange"];
   else if (running) return <Running since={instance.lastPlayed} />;
   else if (log?.exit?.stopped) [label, tone] = ["Stopped", "neutral"];
@@ -250,7 +253,7 @@ interface BodyProps {
 }
 
 function LogBody({ instance, log, items, rev, query, filtered, onToggle, onClear }: BodyProps) {
-  const { busyId } = useLauncher();
+  const starting = useLauncher((st) => st.busyId === instance.id);
   const scroller = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
   const [following, setFollowing] = useState(true);
@@ -309,7 +312,7 @@ function LogBody({ instance, log, items, rev, query, filtered, onToggle, onClear
           No lines match this filter.
         </EmptyState>
       );
-    } else if (busyId === instance.id) {
+    } else if (starting) {
       empty = <EmptyState icon="hourglass_top">Waiting for the game to start…</EmptyState>;
     }
     return <div className={s.consoleBody}>{empty}</div>;

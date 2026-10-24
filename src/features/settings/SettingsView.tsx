@@ -27,16 +27,17 @@ const DEFAULTS: Omit<Settings, "username"> = {
 const SAVE_DELAY = 400;
 
 export function SettingsView() {
-  const { snapshot, saveSettings } = useLauncher();
-  const [form, setForm] = useState<Settings | null>(snapshot?.settings ?? null);
+  const settings = useLauncher((st) => st.snapshot?.settings ?? null);
+  const saveSettings = useLauncher((st) => st.saveSettings);
+  const [form, setForm] = useState<Settings | null>(settings);
   const [status, setStatus] = useState("Changes save automatically");
   const statusChanged = useChanged(status);
   const [confirmReset, setConfirmReset] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
-    if (!form && snapshot) setForm(snapshot.settings);
-  }, [snapshot, form]);
+    if (!form && settings) setForm(settings);
+  }, [settings, form]);
   useEffect(() => () => clearTimeout(timer.current), []);
 
   if (!form) return <View />;
@@ -50,7 +51,8 @@ export function SettingsView() {
     clearTimeout(timer.current);
     timer.current = setTimeout(() => {
       // The player name is edited in Profiles; never write back the copy this form loaded.
-      saveSettings({ ...next, username: snapshot!.settings.username }).then(
+      const username = useLauncher.getState().snapshot!.settings.username;
+      saveSettings({ ...next, username }).then(
         () => setStatus("All changes saved"),
         (e) => setStatus(`Could not save: ${errorMessage(e)}`)
       );

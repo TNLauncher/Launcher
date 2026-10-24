@@ -29,7 +29,7 @@ function useNav(): typeof NAV {
 /** Names a screen: its section, and its detail page if one is open. */
 export function useRouteLabel(): (r: Route) => { section: string; detail?: string } {
   const nav = useNav();
-  const instances = useLauncher().snapshot?.instances;
+  const instances = useLauncher((st) => st.snapshot?.instances);
   return (r) => ({
     section: nav.find((n) => n.view === r.view)?.label ?? "Page",
     detail: r.pack?.hit.title ?? (r.instance ? (instances?.find((i) => i.id === r.instance)?.name ?? "Instance") : undefined),
@@ -38,17 +38,19 @@ export function useRouteLabel(): (r: Route) => { section: string; detail?: strin
 
 /** What a detail page's back button returns to. */
 export function useBackLabel(): string {
-  const { route, previous } = useUi();
+  const route = useUi((st) => st.route);
+  const previous = useUi((st) => st.previous);
   const label = useRouteLabel()(previous ?? route);
   return previous ? (label.detail ?? label.section) : label.section;
 }
 
 export function Sidebar() {
-  const { route, navigate } = useUi();
-  const { view } = route;
-  const snapshot = useLauncher().snapshot;
-  const name = snapshot?.account?.name ?? (snapshot?.settings.username || "Player");
-  const skin = useSkin(snapshot?.account);
+  const view = useUi((st) => st.route.view);
+  const navigate = useUi((st) => st.navigate);
+  const account = useLauncher((st) => st.snapshot?.account);
+  const username = useLauncher((st) => st.snapshot?.settings.username);
+  const name = account?.name ?? (username || "Player");
+  const skin = useSkin(account);
   const nav = useNav();
   const active = nav.findIndex((n) => n.view === view);
 
@@ -70,7 +72,7 @@ export function Sidebar() {
       </div>
       <button className={s.avatar} onClick={() => navigate("profiles")} onPointerEnter={() => preloadView("profiles")} aria-label="Profiles">
         <SkinHead skin={skin} name={name} size={32} className={s.head} />
-        <span className={`${s.tip} mono`}>{name} · {snapshot?.account?.providerName ?? "Offline"}</span>
+        <span className={`${s.tip} mono`}>{name} · {account?.providerName ?? "Offline"}</span>
       </button>
     </aside>
   );

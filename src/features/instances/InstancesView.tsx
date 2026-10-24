@@ -1,4 +1,4 @@
-import { lazy, Suspense, useMemo } from "react";
+import { lazy, Suspense, useCallback, useMemo } from "react";
 import { View } from "@/components/layout/View";
 import { sources } from "@/api/sources";
 import { Banner, Button, Chip, EmptyState, Icon, IconButton, Meta, Pill, PillGroup, ProgressBar, SearchInput, Select } from "@/components/ui";
@@ -22,15 +22,22 @@ const SORTERS: Record<Sort, (a: Instance, b: Instance) => number> = {
   time: (a, b) => b.playSeconds - a.playSeconds,
 };
 const FILTERS: ("all" | Loader)[] = ["all", ...(Object.keys(LOADERS) as Loader[])];
+const EMPTY: Instance[] = [];
 
 export function InstancesView() {
-  const { snapshot, error, clearError, launch } = useLauncher();
+  const all = useLauncher((st) => st.snapshot?.instances) ?? EMPTY;
+  const dataDir = useLauncher((st) => st.snapshot?.dataDir);
+  const error = useLauncher((st) => st.error);
+  const clearError = useLauncher((st) => st.clearError);
+  const launch = useLauncher((st) => st.launch);
   const imports = useImports();
-  const { route, openNewInstance, navigate, back } = useUi();
+  const openedId = useUi((st) => st.route.instance);
+  const openNewInstance = useUi((st) => st.openNewInstance);
+  const navigate = useUi((st) => st.navigate);
+  const back = useUi((st) => st.back);
   const [query, setQuery] = useRouteState("instances.query", "");
   const [loader, setLoader] = useRouteState<"all" | Loader>("instances.loader", "all");
   const [sort, setSort] = useRouteState<Sort>("instances.sort", "played");
-  const all = snapshot?.instances ?? [];
 
   const counts = useMemo(() => {
     const c: Record<string, number> = { all: all.length };
@@ -39,11 +46,16 @@ export function InstancesView() {
   }, [all]);
 
   const q = query.trim().toLowerCase();
-  const list = all
-    .filter((i) => (loader === "all" || i.loader === loader) && (!q || `${i.name} ${i.version}`.toLowerCase().includes(q)))
-    .sort(SORTERS[sort]);
+  const list = useMemo(
+    () =>
+      all
+        .filter((i) => (loader === "all" || i.loader === loader) && (!q || `${i.name} ${i.version}`.toLowerCase().includes(q)))
+        .sort(SORTERS[sort]),
+    [all, loader, q, sort]
+  );
 
-  const opened = route.instance ? all.find((i) => i.id === route.instance) : undefined;
+  const opened = openedId ? all.find((i) => i.id === openedId) : undefined;
+  const openInstance = useCallback((id: string) => navigate("instances", { instance: id }), [navigate]);
 
   return (
     <View>
@@ -98,13 +110,13 @@ export function InstancesView() {
           ) : !list.length ? (
             <EmptyState icon="search_off">Nothing matches this filter.</EmptyState>
           ) : (
-            list.map((i) => <InstanceRow key={i.id} instance={i} onOpen={() => navigate("instances", { instance: i.id })} />)
+            list.map((i) => <InstanceRow key={i.id} instance={i} onOpen={openInstance} />)
           )}
         </div>
 
         <div className={s.pageFoot}>
           <span>Java: <b>managed by launcher</b></span>
-          <span className="mono selectable">{snapshot?.dataDir}</span>
+          <span className="mono selectable">{dataDir}</span>
         </div>
       </div>
     </View>
@@ -113,7 +125,7 @@ export function InstancesView() {
 
 /** A modpack still downloading; replaced by the real instance row once it lands. */
 function ImportRow({ pending: p }: { pending: PendingImport }) {
-  const { startImport } = useLauncher();
+  const startImport = useLauncher((st) => st.startImport);
   const { done, total } = useImportProgress(p.projectId);
   const pct = total ? (done / total) * 100 : 0;
   return (

@@ -2,13 +2,14 @@ import { Button, Meta } from "@/components/ui";
 import { useChanged } from "@/hooks/useChanged";
 import { cx } from "@/lib/cx";
 import { lastPlayed, loaderLabel, plural } from "@/lib/format";
-import { useLauncher } from "@/store/LauncherContext";
+import { useLauncher, useSelectedInstance } from "@/store/LauncherContext";
 import { useUi } from "@/store/UiContext";
 import s from "./home.module.css";
 
 export function Hero() {
-  const { selected: inst, snapshot } = useLauncher();
-  const { openNewInstance } = useUi();
+  const inst = useSelectedInstance();
+  const modCount = useLauncher((st) => (inst ? st.snapshot?.modCounts[inst.id] ?? 0 : 0));
+  const openNewInstance = useUi((st) => st.openNewInstance);
   const restage = useChanged(inst?.id);
 
   return (
@@ -32,7 +33,7 @@ export function Hero() {
             <Meta
               items={[
                 <span>{inst.version} · {loaderLabel(inst)}</span>,
-                inst.loader !== "vanilla" && <span>{plural(snapshot?.modCounts[inst.id] ?? 0, "mod")}</span>,
+                inst.loader !== "vanilla" && <span>{plural(modCount, "mod")}</span>,
                 <span>{lastPlayed(inst.lastPlayed)}</span>,
               ]}
             />

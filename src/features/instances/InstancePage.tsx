@@ -14,14 +14,15 @@ import s from "@/features/modpacks/modpacks.module.css";
 
 /** One instance: header with launch, then its mods, resource packs and shaders. */
 export function InstancePage({ instance: i, onBack }: { instance: Instance; onBack(): void }) {
-  const { launch, busyId, isRunning } = useLauncher();
+  const launch = useLauncher((st) => st.launch);
+  const running = useLauncher((st) => st.snapshot?.running.includes(i.id) ?? false);
+  const starting = useLauncher((st) => st.busyId === i.id);
+  const busy = useLauncher((st) => st.busyId !== null);
   const ref = i.pack;
   const sourceOn = useSourceEnabled(ref?.source);
   const pack = useQuery({ queryKey: ["project", ref?.source, ref?.project], queryFn: () => sources.project(ref!.source, ref!.project), enabled: !!ref && sourceOn });
   const banner = pack.data?.gallery.find((g) => g.featured)?.url ?? pack.data?.gallery[0]?.url;
   const icon = i.icon || pack.data?.iconUrl;
-  const running = isRunning(i.id);
-  const starting = busyId === i.id;
   const color = pack.data?.color;
   const backLabel = useBackLabel();
 
@@ -51,7 +52,7 @@ export function InstancePage({ instance: i, onBack }: { instance: Instance; onBa
             </div>
             <div className={s.instanceActions}>
               <IconButton icon="folder_open" label="Open instance folder" variant="overlay" onClick={() => launcher.openInstanceDir(i.id)} />
-              <Button variant="primary" size="lg" icon="play_arrow" loading={starting} disabled={running || !!busyId} onClick={() => launch(i.id)}>
+              <Button variant="primary" size="lg" icon="play_arrow" loading={starting} disabled={running || busy} onClick={() => launch(i.id)}>
                 {running ? "Running" : starting ? "Starting" : "Play"}
               </Button>
             </div>

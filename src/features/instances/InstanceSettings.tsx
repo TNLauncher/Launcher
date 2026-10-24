@@ -21,13 +21,13 @@ const SECTIONS = {
 
 /** Per-instance overrides of the global settings, Prism style: every section is global until switched to custom. */
 export function InstanceSettingsPane({ instance }: { instance: Instance }) {
-  const { snapshot, refresh } = useLauncher();
+  const global = useLauncher((st) => st.snapshot?.settings);
+  const refresh = useLauncher((st) => st.refresh);
   const [form, setForm] = useState(instance.settings);
   const [status, setStatus] = useState("");
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   useEffect(() => () => clearTimeout(timer.current), []);
-  if (!snapshot) return null;
-  const global = snapshot.settings;
+  if (!global) return null;
 
   function update(patch: Partial<InstanceSettings>) {
     const next = { ...form, ...patch };

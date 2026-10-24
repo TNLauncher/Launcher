@@ -19,7 +19,10 @@ const SAVE_DELAY = 400;
 
 /** Player accounts: the one launches use on a turntable, every signed-in one to switch to, and sign-in. */
 export function ProfilesView() {
-  const { snapshot, refresh } = useLauncher();
+  const loaded = useLauncher((st) => st.snapshot !== null);
+  const active = useLauncher((st) => st.snapshot?.account ?? null);
+  const offlineName = useLauncher((st) => st.snapshot?.settings.username || "Player");
+  const refresh = useLauncher((st) => st.refresh);
   const qc = useQueryClient();
   const accounts = useQuery({ queryKey: ["accounts"], queryFn: launcher.listAccounts });
   const [error, setError] = useState("");
@@ -30,9 +33,7 @@ export function ProfilesView() {
     Promise.all([refresh(), qc.invalidateQueries({ queryKey: ["accounts"] }), qc.invalidateQueries({ queryKey: ["skin"] })]).then(() => setError(""));
   const act = (p: Promise<unknown>) => p.then(done, (e) => setError(errorMessage(e)));
 
-  if (!snapshot) return <View />;
-  const active = snapshot.account;
-  const offlineName = snapshot.settings.username || "Player";
+  if (!loaded) return <View />;
   const hasSavedOffline = accounts.data?.some((a) => a.provider === "offline");
 
   return (
@@ -149,8 +150,9 @@ function Uuid({ uuid }: { uuid: string }) {
 
 /** The name offline play uses; an invalid one is kept in the field but never saved. */
 function OfflineName() {
-  const { snapshot, saveSettings } = useLauncher();
-  const [value, setValue] = useState(snapshot!.settings.username);
+  const username = useLauncher((st) => st.snapshot!.settings.username);
+  const saveSettings = useLauncher((st) => st.saveSettings);
+  const [value, setValue] = useState(username);
   const [status, setStatus] = useState("");
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   useEffect(() => () => clearTimeout(timer.current), []);
@@ -162,7 +164,8 @@ function OfflineName() {
     if (!USERNAME.test(next)) return setStatus("");
     setStatus("Saving…");
     timer.current = setTimeout(() => {
-      saveSettings({ ...snapshot!.settings, username: next }).then(
+      const settings = useLauncher.getState().snapshot!.settings;
+      saveSettings({ ...settings, username: next }).then(
         () => setStatus("Saved"),
         (e) => setStatus(`Could not save: ${errorMessage(e)}`)
       );

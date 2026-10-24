@@ -22,8 +22,10 @@ const PRERELEASE = /alpha|beta|rc|pre|snapshot/i;
 
 /** Mounted only while open, so every opening starts from fresh state. */
 export function NewInstanceDialog() {
-  const { closeNewInstance, navigate } = useUi();
-  const { refresh, select } = useLauncher();
+  const closeNewInstance = useUi((st) => st.closeNewInstance);
+  const navigate = useUi((st) => st.navigate);
+  const refresh = useLauncher((st) => st.refresh);
+  const select = useLauncher((st) => st.select);
   const [versions, setVersions] = useState<ManifestVersion[] | null>(null);
   const [name, setName] = useState("");
   const [version, setVersion] = useState("");

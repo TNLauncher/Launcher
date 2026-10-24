@@ -142,8 +142,8 @@ function InstallCard(p: {
   version: Version | undefined;
   onVersion(id: string): void;
 }) {
-  const { startImport } = useLauncher();
-  const { navigate } = useUi();
+  const startImport = useLauncher((st) => st.startImport);
+  const navigate = useUi((st) => st.navigate);
   const installing = useInstalling(p.hit.id);
   const file = p.version && primaryFile(p.version);
 

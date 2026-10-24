@@ -15,7 +15,7 @@ export interface ContentItem extends ModFile {
  * Files of one kind in an instance, enriched with their project on the content source.
  * The backend hashes the files and asks the source; cached on the file list's names and sizes.
  */
-export function useContent(instanceId: string, kind: ContentKind) {
+export function useContent(instanceId: string, kind: ContentKind, identify = true) {
   const qc = useQueryClient();
   const source = useSource()?.id;
   const files = useQuery({ queryKey: ["content", instanceId, kind], queryFn: () => launcher.listContent(instanceId, kind) });
@@ -24,7 +24,7 @@ export function useContent(instanceId: string, kind: ContentKind) {
   const known = useQuery({
     queryKey: ["content-identify", source, instanceId, kind, signature],
     queryFn: () => sources.identifyContent(source!, instanceId, kind),
-    enabled: !!source && !!files.data?.length,
+    enabled: identify && !!source && !!files.data?.length,
     staleTime: Infinity,
   });
 

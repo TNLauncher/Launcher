@@ -2,13 +2,15 @@ import { Button, Icon, SectionHead } from "@/components/ui";
 import { useChanged } from "@/hooks/useChanged";
 import { cx } from "@/lib/cx";
 import { LOADER_ICON, LOADERS } from "@/lib/format";
-import { useLauncher, useRecentInstances } from "@/store/LauncherContext";
+import { useLauncher, useRecentInstances, useSelectedInstance } from "@/store/LauncherContext";
 import { useUi } from "@/store/UiContext";
 import s from "./home.module.css";
 
 export function InstanceTiles() {
-  const { selected, select } = useLauncher();
-  const { openNewInstance, navigate } = useUi();
+  const selected = useSelectedInstance();
+  const select = useLauncher((st) => st.select);
+  const openNewInstance = useUi((st) => st.openNewInstance);
+  const navigate = useUi((st) => st.navigate);
   const recent = useRecentInstances();
   const picked = useChanged(selected?.id);
 

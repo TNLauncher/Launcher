@@ -1,4 +1,5 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo } from "react";
+import { create } from "zustand";
 import { launcher } from "@/api/launcher";
 import { BackendError } from "@/api/ipc";
 import { toast } from "@/components/ui/Toast";
@@ -20,16 +21,17 @@ export interface LaunchError {
   message: string;
 }
 
-interface LauncherValue {
+export interface LauncherState {
   snapshot: Snapshot | null;
-  /** The instance the Play button targets. */
-  selected: Instance | undefined;
+  initError: unknown;
+  selectedId: string;
+  /** Id of the instance installing/starting; its progress is in `useProgress()`. */
+  busyId: string | null;
+  progress: Progress | null;
+  error: LaunchError | null;
   select(id: string): void;
   refresh(): Promise<void>;
   launch(id: string): Promise<void>;
-  /** Id of the instance installing/starting; its progress is in `useProgress()`. */
-  busyId: string | null;
-  error: LaunchError | null;
   clearError(): void;
   saveSettings(settings: Settings): Promise<void>;
   isRunning(id: string): boolean;
@@ -37,9 +39,6 @@ interface LauncherValue {
   startImport(source: string, pack: PackHit, version?: Version): void;
 }
 
-const LauncherContext = createContext<LauncherValue | null>(null);
-// Separate so per-file download ticks re-render only progress consumers, not the whole app.
-const ProgressContext = createContext<Progress | null>(null);
 const STARTING: Progress = { stage: "resolving", done: 0, total: 0 };
 const SELECTED_KEY = "selected";
 
@@ -51,140 +50,123 @@ function readSelected(): string {
   }
 }
 
-export function LauncherProvider({ children }: { children: ReactNode }) {
-  const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
-  const [selectedId, setSelectedId] = useState(readSelected);
-  const [busyId, setBusyId] = useState<string | null>(null);
-  const [progress, setProgress] = useState<Progress | null>(null);
-  const frame = useRef(0);
-  const [error, setError] = useState<LaunchError | null>(null);
+let frame = 0;
 
-  const refresh = useCallback(async () => setSnapshot(await launcher.getState()), []);
+export const useLauncher = create<LauncherState>((set, get) => ({
+  snapshot: null,
+  initError: null,
+  selectedId: readSelected(),
+  busyId: null,
+  progress: null,
+  error: null,
 
-  const select = useCallback((id: string) => {
-    setSelectedId(id);
+  refresh: async () => {
+    const snapshot = await launcher.getState();
+    set({ snapshot, initError: null });
+  },
+
+  select: (id: string) => {
+    set({ selectedId: id });
     try {
       localStorage.setItem(SELECTED_KEY, id);
     } catch {
       /* storage unavailable: selection just won't persist */
     }
-  }, []);
+  },
 
-  const launch = useCallback(
-    async (id: string) => {
-      setError(null);
-      select(id);
-      setBusyId(id);
-      broadcast("game-launching", { instanceId: id });
-      setProgress(STARTING);
-      gameLogs.reset(id);
-      // Backend reports every downloaded file (thousands for assets): commit at most once per frame.
-      let latest = STARTING;
-      try {
-        await launcher.launch(id, (e) => {
-          if (e.event !== "progress") return;
-          latest = e.data;
-          frame.current ||= requestAnimationFrame(() => {
-            frame.current = 0;
-            setProgress(latest);
-          });
+  launch: async (id: string) => {
+    const { select, refresh } = get();
+    select(id);
+    set({ error: null, busyId: id, progress: STARTING });
+    broadcast("game-launching", { instanceId: id });
+    gameLogs.reset(id);
+    // Backend reports every downloaded file (thousands for assets): commit at most once per frame.
+    let latest = STARTING;
+    try {
+      await launcher.launch(id, (e) => {
+        if (e.event !== "progress") return;
+        latest = e.data;
+        frame ||= requestAnimationFrame(() => {
+          frame = 0;
+          set({ progress: latest });
         });
-        broadcast("game-started", { instanceId: id });
-      } catch (e) {
-        broadcast("game-exited", { instanceId: id, code: null });
-        setError({ id, message: errorMessage(e) });
-      } finally {
-        cancelAnimationFrame(frame.current);
-        frame.current = 0;
-        setBusyId(null);
-        setProgress(null);
-        await refresh();
-      }
-    },
-    [refresh, select]
-  );
+      });
+      broadcast("game-started", { instanceId: id });
+    } catch (e) {
+      broadcast("game-exited", { instanceId: id, code: null });
+      set({ error: { id, message: errorMessage(e) } });
+    } finally {
+      cancelAnimationFrame(frame);
+      frame = 0;
+      set({ busyId: null, progress: null });
+      await refresh();
+    }
+  },
 
-  const saveSettings = useCallback(async (settings: Settings) => {
-    setSnapshot((s) => (s ? { ...s, settings } : s));
+  saveSettings: async (settings: Settings) => {
+    set((s) => (s.snapshot ? { snapshot: { ...s.snapshot, settings } } : s));
     await launcher.saveSettings(settings);
-  }, []);
+  },
 
-  const clearError = useCallback(() => setError(null), []);
+  clearError: () => set({ error: null }),
 
-  const startImport = useCallback(
-    async (source: string, pack: PackHit, version?: Version) => {
-      const id = pack.id;
-      if (imports.has(id)) return;
-      imports.start({ source, projectId: id, title: pack.title, iconUrl: pack.iconUrl, version, error: "" });
-      try {
-        const inst = await sources.importModpack(source, id, version?.id, (p) => imports.progress(id, p));
-        select(inst.id);
-        await refresh();
-        imports.dismiss(id);
-        toast(`${pack.title} is ready to play`);
-      } catch (e) {
-        if (e instanceof BackendError && e.kind === "cancelled") imports.dismiss(id);
-        else imports.fail(id, errorMessage(e));
-      }
-    },
-    [refresh, select]
-  );
+  isRunning: (id: string) => get().snapshot?.running.includes(id) ?? false,
+
+  startImport: async (source: string, pack: PackHit, version?: Version) => {
+    const id = pack.id;
+    if (imports.has(id)) return;
+    imports.start({ source, projectId: id, title: pack.title, iconUrl: pack.iconUrl, version, error: "" });
+    try {
+      const inst = await sources.importModpack(source, id, version?.id, (p) => imports.progress(id, p));
+      get().select(inst.id);
+      await get().refresh();
+      imports.dismiss(id);
+      toast(`${pack.title} is ready to play`);
+    } catch (e) {
+      if (e instanceof BackendError && e.kind === "cancelled") imports.dismiss(id);
+      else imports.fail(id, errorMessage(e));
+    }
+  },
+}));
+
+/** Boots the initial snapshot and game listeners once at the app shell level. */
+export function useLauncherInit() {
+  const initError = useLauncher((s) => s.initError);
+  if (initError) throw initError;
 
   useEffect(() => {
+    const { refresh } = useLauncher.getState();
     // Without the first snapshot there is nothing to show: rethrow into render so the app-level boundary offers a retry.
-    refresh().catch((e) =>
-      setSnapshot(() => {
-        throw e;
-      })
-    );
+    refresh().catch((e) => useLauncher.setState({ initError: e }));
     const unlisten = [
       gameLogs.listen(),
       launcher.onGameExit(({ id, code }) => {
         broadcast("game-exited", { instanceId: id, code });
-        if (!gameLogs.exited(id, code) && code) setError({ id, message: `Game crashed with exit code ${code}. Its log is in Console.` });
-        refresh();
+        if (!gameLogs.exited(id, code) && code) {
+          useLauncher.setState({ error: { id, message: `Game crashed with exit code ${code}. Its log is in Console.` } });
+        }
+        void refresh();
       }),
     ];
     return () => unlisten.forEach((u) => void u.then((f) => f()));
-  }, [refresh]);
-
-  const value = useMemo<LauncherValue>(() => {
-    const instances = snapshot?.instances ?? [];
-    const selected =
-      instances.find((i) => i.id === selectedId) ?? [...instances].sort((a, b) => recency(b) - recency(a))[0];
-    return {
-      snapshot,
-      selected,
-      select,
-      refresh,
-      launch,
-      busyId,
-      error,
-      clearError,
-      saveSettings,
-      isRunning: (id) => snapshot?.running.includes(id) ?? false,
-      startImport,
-    };
-  }, [snapshot, selectedId, select, refresh, launch, busyId, error, clearError, saveSettings, startImport]);
-
-  return (
-    <LauncherContext.Provider value={value}>
-      <ProgressContext.Provider value={progress}>{children}</ProgressContext.Provider>
-    </LauncherContext.Provider>
-  );
-}
-
-export function useLauncher(): LauncherValue {
-  const ctx = useContext(LauncherContext);
-  if (!ctx) throw new Error("useLauncher must be used inside <LauncherProvider>");
-  return ctx;
+  }, []);
 }
 
 /** Progress of the running install/launch, null when idle. */
-export const useProgress = () => useContext(ProgressContext);
+export const useProgress = () => useLauncher((s) => s.progress);
+
+/** The instance the Play button targets. Re-evaluates only when instances or selectedId change. */
+export function useSelectedInstance(): Instance | undefined {
+  const instances = useLauncher((s) => s.snapshot?.instances);
+  const selectedId = useLauncher((s) => s.selectedId);
+  return useMemo(() => {
+    if (!instances?.length) return undefined;
+    return instances.find((i) => i.id === selectedId) ?? [...instances].sort((a, b) => recency(b) - recency(a))[0];
+  }, [instances, selectedId]);
+}
 
 /** Instances sorted by most recently played. */
 export function useRecentInstances(): Instance[] {
-  const { snapshot } = useLauncher();
-  return useMemo(() => [...(snapshot?.instances ?? [])].sort((a, b) => recency(b) - recency(a)), [snapshot]);
+  const instances = useLauncher((s) => s.snapshot?.instances);
+  return useMemo(() => [...(instances ?? [])].sort((a, b) => recency(b) - recency(a)), [instances]);
 }

@@ -58,7 +58,11 @@ export function InstanceContent({ instance }: { instance: Instance }) {
   const kind = tab === "screenshots" || tab === "settings" || tab.startsWith("plugin:") ? "mod" : (tab as ContentKind);
   const pluginTabs = (usePlugins().data ?? []).filter((p) => p.enabled).flatMap((p) => p.instanceTabs.map((t) => ({ plugin: p, tab: t, key: `plugin:${p.id}:${t.id}` as const })));
   const openPluginTab = pluginTabs.find((t) => t.key === tab);
-  const content = { mod: useContent(instance.id, "mod"), resourcepack: useContent(instance.id, "resourcepack"), shader: useContent(instance.id, "shader") };
+  const content = {
+    mod: useContent(instance.id, "mod", tab === "mod" || tab === "shader"),
+    resourcepack: useContent(instance.id, "resourcepack", tab === "resourcepack"),
+    shader: useContent(instance.id, "shader", tab === "shader"),
+  };
   const current = content[kind];
   const source = useSource();
   const needsLoader = kind !== "resourcepack" && !modded;
@@ -145,9 +149,9 @@ function IrisNotice({ instance, onInstalled }: { instance: Instance; onInstalled
 }
 
 function InstalledPane({ instance, kind, content, sourceName }: { instance: Instance; kind: ContentKind; content: ReturnType<typeof useContent>; sourceName?: string }) {
-  const { refresh, isRunning } = useLauncher();
+  const refresh = useLauncher((st) => st.refresh);
   // The game rewrites options.txt and Iris' config on exit, and Windows locks loaded jars.
-  const running = isRunning(instance.id);
+  const running = useLauncher((st) => st.snapshot?.running.includes(instance.id) ?? false);
   const info = KINDS[kind];
   const [filter, setFilter] = useState("");
   const [error, setError] = useState("");

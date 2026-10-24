@@ -4,7 +4,7 @@ import { useChanged } from "@/hooks/useChanged";
 import { cx } from "@/lib/cx";
 import { errorMessage, LOADER_ICON, LOADERS, lastPlayed, STAGE_LABEL } from "@/lib/format";
 import { gameLogs, useGameStopping } from "@/store/gameLogs";
-import { useLauncher, useProgress, useRecentInstances } from "@/store/LauncherContext";
+import { useLauncher, useProgress, useRecentInstances, useSelectedInstance } from "@/store/LauncherContext";
 import { useUi } from "@/store/UiContext";
 import s from "./home.module.css";
 
@@ -19,10 +19,12 @@ export function LaunchDock() {
 
 /** Kept apart from the action so per-frame launch progress doesn't re-render the picker. */
 function DockInstance() {
-  const { selected: inst, select, snapshot } = useLauncher();
-  const { navigate } = useUi();
+  const inst = useSelectedInstance();
+  const select = useLauncher((st) => st.select);
+  const ramMb = useLauncher((st) => st.snapshot?.settings.ramMb ?? 0);
+  const navigate = useUi((st) => st.navigate);
   const instances = useRecentInstances();
-  const ramGb = +((snapshot?.settings.ramMb ?? 0) / 1024).toFixed(1);
+  const ramGb = +(ramMb / 1024).toFixed(1);
   if (!inst) return <div className={s.dockLeft} />;
   return (
     <div className={s.dockLeft}>
@@ -40,24 +42,31 @@ function DockInstance() {
 }
 
 function DockAction() {
-  const { selected: inst, launch, busyId, error, clearError, isRunning, snapshot } = useLauncher();
+  const inst = useSelectedInstance();
+  const launch = useLauncher((st) => st.launch);
+  const busyId = useLauncher((st) => st.busyId);
+  const busyName = useLauncher((st) => (st.busyId ? st.snapshot?.instances.find((i) => i.id === st.busyId)?.name : undefined));
+  const error = useLauncher((st) => st.error);
+  const clearError = useLauncher((st) => st.clearError);
+  const running = useLauncher((st) => (inst ? st.snapshot?.running.includes(inst.id) ?? false : false));
+  const loaded = useLauncher((st) => st.snapshot !== null);
+  const hasInstances = useLauncher((st) => !!st.snapshot?.instances.length);
   const progress = useProgress();
-  const { navigate, openNewInstance } = useUi();
-  const hasInstances = !!snapshot?.instances.length;
+  const navigate = useUi((st) => st.navigate);
+  const openNewInstance = useUi((st) => st.openNewInstance);
   const stopping = useGameStopping(inst?.id);
   const [stopError, setStopError] = useState<string | null>(null);
   const statusId = useId();
-  const running = !!inst && isRunning(inst.id);
   const preparing = !!inst && busyId === inst.id;
   const known = !!progress && progress.total > 0;
   const pct = known ? progress.done / progress.total : 0;
 
   const failure = stopError ?? (inst && error?.id === inst.id ? error.message : null);
   let status = "";
-  if (!inst) status = snapshot ? "No instances yet" : "";
+  if (!inst) status = loaded ? "No instances yet" : "";
   else if (running) status = "In game";
   else if (preparing) status = progress ? `${STAGE_LABEL[progress.stage]}…` : "Starting…";
-  else if (busyId) status = `Starting ${snapshot?.instances.find((i) => i.id === busyId)?.name ?? "another instance"}…`;
+  else if (busyId) status = `Starting ${busyName ?? "another instance"}…`;
   else status = lastPlayed(inst.lastPlayed);
 
   function stop() {
@@ -71,12 +80,12 @@ function DockAction() {
     clearError();
   }
 
-  const state = snapshot && !hasInstances ? "create" : running ? "stop" : preparing ? "busy" : "play";
+  const state = loaded && !hasInstances ? "create" : running ? "stop" : preparing ? "busy" : "play";
   // Each state arrives as a new button, but only after a real change: opening Home shows it settled.
   const swap = useChanged(state) && s.swap;
 
   let action;
-  if (snapshot && !hasInstances) {
+  if (loaded && !hasInstances) {
     action = <Button key="create" variant="primary" size="lg" icon="add" className={cx(s.play, swap)} onClick={openNewInstance}>Create instance</Button>;
   } else if (running) {
     action = (

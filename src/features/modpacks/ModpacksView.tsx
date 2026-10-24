@@ -48,7 +48,9 @@ function Catalog({ source }: { source: SourceInfo }) {
   const packCategories = source.categories.modpack ?? [];
   // Stable so memoized rows skip re-rendering while the user types.
   const categoryLabel = useMemo(() => Object.fromEntries(packCategories.map((c) => [c.id, c.label])), [packCategories]);
-  const { route, navigate, back } = useUi();
+  const pack = useUi((st) => st.route.pack);
+  const navigate = useUi((st) => st.navigate);
+  const back = useUi((st) => st.back);
   const [query, setQuery] = useRouteState("packs.query", "");
   const [gameVersion, setGameVersion] = useRouteState("packs.gameVersion", "");
   const [loader, setLoader] = useRouteState<PackLoader>("packs.loader", "");
@@ -56,7 +58,7 @@ function Catalog({ source }: { source: SourceInfo }) {
   const [sort, setSort] = useRouteState("packs.sort", source.sorts[0]?.id ?? "");
   const [favOnly, setFavOnly] = useRouteState("packs.favOnly", false);
   // A pack opened under another source stays closed until that source is picked again.
-  const open = route.pack?.source === source.id ? route.pack.hit : null;
+  const open = pack?.source === source.id ? pack.hit : null;
   const setOpen = useCallback((hit: Hit) => navigate("modpacks", { pack: { source: source.id, hit } }), [navigate, source.id]);
   const favorites = useFavorites(source.id, "modpack");
   const debounced = useDebounced(query.trim(), 300);

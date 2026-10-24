@@ -8,7 +8,12 @@ import s from "./Titlebar.module.css";
 const appWindow = getCurrentWindow();
 
 export function Titlebar() {
-  const { route, navigate, back, forward, canBack, canForward } = useUi();
+  const route = useUi((st) => st.route);
+  const canBack = useUi((st) => st.canBack);
+  const canForward = useUi((st) => st.canForward);
+  const navigate = useUi((st) => st.navigate);
+  const back = useUi((st) => st.back);
+  const forward = useUi((st) => st.forward);
   const { section, detail } = useRouteLabel()(route);
   return (
     <header className={s.titlebar} data-tauri-drag-region>

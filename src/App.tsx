@@ -6,8 +6,8 @@ import { Titlebar } from "@/components/layout/Titlebar";
 import { Toaster } from "@/components/ui/Toast";
 import { PluginHost } from "@/plugins/PluginHost";
 import { PluginPage } from "@/plugins/PluginPage";
-import { LauncherProvider } from "@/store/LauncherContext";
-import { registerScroller, savedScroll, UiProvider, useRouteKey, useUi } from "@/store/UiContext";
+import { useLauncherInit } from "@/store/LauncherContext";
+import { registerScroller, savedScroll, useRouteKey, useUi, useUiInit } from "@/store/UiContext";
 import { viewComponent } from "@/views";
 import s from "@/components/layout/Shell.module.css";
 
@@ -18,9 +18,20 @@ function CurrentView({ view }: { view: Parameters<typeof viewComponent>[0] }) {
   return <Current />;
 }
 
+function NewInstanceModal() {
+  const open = useUi((st) => st.newInstanceOpen);
+  if (!open) return null;
+  return (
+    <Suspense>
+      <NewInstanceDialog />
+    </Suspense>
+  );
+}
+
 function Shell() {
-  const { route, newInstanceOpen } = useUi();
-  const { view } = route;
+  useLauncherInit();
+  useUiInit();
+  const view = useUi((st) => st.route.view);
   const key = useRouteKey();
   const [, plugin, page] = view.split(":");
   const main = useRef<HTMLElement>(null);
@@ -44,11 +55,7 @@ function Shell() {
       </main>
       <PluginHost />
       <Toaster />
-      {newInstanceOpen && (
-        <Suspense>
-          <NewInstanceDialog />
-        </Suspense>
-      )}
+      <NewInstanceModal />
     </>
   );
 }
@@ -60,11 +67,7 @@ export function App() {
   return (
     <ErrorBoundary full>
       <QueryClientProvider client={queryClient}>
-        <LauncherProvider>
-          <UiProvider>
-            <Shell />
-          </UiProvider>
-        </LauncherProvider>
+        <Shell />
       </QueryClientProvider>
     </ErrorBoundary>
   );
