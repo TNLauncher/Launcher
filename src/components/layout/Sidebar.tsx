@@ -58,7 +58,7 @@ export function Sidebar() {
         <img className={s.logo} src={logo} alt="TNLauncher" />
         <nav>
           {/* One shared highlight that travels between items, so the eye follows the move. */}
-          <span className={s.indicator} hidden={active < 0} style={{ transform: `translateY(${active * 44}px)` }} />
+          <span className={s.indicator} hidden={active < 0} style={{ top: `${active * 44}px` }} />
           {nav.map((n) => (
             <button key={n.view} className={s.navBtn} aria-current={view === n.view ? "page" : undefined} onClick={() => navigate(n.view)}
               onPointerEnter={() => preloadView(n.view)} onFocus={() => preloadView(n.view)}>

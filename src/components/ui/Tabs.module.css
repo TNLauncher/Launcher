@@ -10,5 +10,5 @@
 .tab[aria-selected="true"] :global(.icon) { color: var(--accent); }
 .count { font-size: 11px; color: var(--subtle); }
 .line { position: absolute; left: 0; bottom: -1px; height: 2px; border-radius: 2px; background: var(--accent); pointer-events: none; }
-.line[data-ready] { transition: transform var(--soft) var(--spring), width var(--soft) var(--spring); }
+.line[data-ready] { transition: left var(--soft) var(--spring), width var(--soft) var(--spring); }
 }

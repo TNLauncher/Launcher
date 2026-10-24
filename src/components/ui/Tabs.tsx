@@ -16,7 +16,7 @@ export function Tabs({ label, className, children }: { label: string; className?
     el.hidden = !tab;
     if (!tab) return;
     el.style.width = `${tab.offsetWidth - 16}px`;
-    el.style.transform = `translateX(${tab.offsetLeft + 8}px)`;
+    el.style.left = `${tab.offsetLeft + 8}px`;
     if (!el.dataset.ready) requestAnimationFrame(() => (el.dataset.ready = "1"));
   });
   return (

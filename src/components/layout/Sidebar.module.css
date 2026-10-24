@@ -5,10 +5,11 @@
   padding: 12px 0;
 }
 .sidebar nav { position: relative; display: flex; flex-direction: column; gap: 4px; margin-top: 12px; }
-/* 44px step = 40px button + 4px gap */
+/* 44px step = 40px button + 4px gap. `top` (not `transform`): WebKitGTK's Skia compositor flashes
+   a layer's pre-transition `m_transform` for one frame when a `transform` transition ends (webkit.org/b/321993). */
 .indicator {
   position: absolute; top: 0; left: 0; width: 44px; height: 40px; border-radius: var(--r-sm); pointer-events: none;
-  background: rgb(0 113 227 / 0.15); transition: transform var(--slow) var(--spring);
+  background: rgb(0 113 227 / 0.15); transition: top var(--slow) var(--spring);
 }
 .indicator::before {
   content: ""; position: absolute; left: -10px; top: 10px; width: 3px; height: 20px; border-radius: 0 3px 3px 0;
