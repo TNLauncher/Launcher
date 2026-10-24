@@ -23,9 +23,16 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           version=$(jq -r .version src-tauri/tauri.conf.json)
-          gh release create "v$version" --draft --generate-notes --target "$GITHUB_SHA" \
-            --title "TNLauncher v$version" ${{ inputs.prerelease && '--prerelease' || '' }}
-          echo "id=$(gh api "repos/$GITHUB_REPOSITORY/releases" --jq ".[] | select(.tag_name == \"v$version\") | .id")" >> "$GITHUB_OUTPUT"
+          id=$(gh api "repos/$GITHUB_REPOSITORY/releases" \
+            --method POST \
+            -f tag_name="v$version" \
+            -f target_commitish="$GITHUB_SHA" \
+            -f name="TNLauncher v$version" \
+            -F draft=true \
+            -F prerelease=${{ inputs.prerelease && 'true' || 'false' }} \
+            -F generate_release_notes=true \
+            --jq .id)
+          echo "id=$id" >> "$GITHUB_OUTPUT"
 
   build:
     needs: create-release
