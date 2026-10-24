@@ -8,13 +8,14 @@ import s from "./skin.module.css";
 
 /** The account's skin; null offline or when it has none (or it failed to load), undefined while loading. */
 export function useSkin(account: Account | null | undefined): Skin | null | undefined {
+  const online = !!account && account.provider !== "offline";
   const q = useQuery({
     queryKey: ["skin", account?.id],
     queryFn: () => launcher.accountSkin(account!.id),
-    enabled: !!account,
+    enabled: online,
     staleTime: Infinity,
   });
-  if (!account) return null;
+  if (!online) return null;
   return q.isPending ? undefined : q.data ?? null;
 }
 

@@ -33,6 +33,7 @@ export function ProfilesView() {
   if (!snapshot) return <View />;
   const active = snapshot.account;
   const offlineName = snapshot.settings.username || "Player";
+  const hasSavedOffline = accounts.data?.some((a) => a.provider === "offline");
 
   return (
     <View className={s.view}>
@@ -49,7 +50,9 @@ export function ProfilesView() {
               {accounts.data?.map((a) => (
                 <ProfileRow key={a.id} account={a} name={a.name} provider={a.providerName} selected={a.selected} onUse={() => act(launcher.selectAccount(a.id))} onRemove={() => setRemoving(a)} />
               ))}
-              <ProfileRow name={offlineName} provider="Offline" selected={!active} onUse={() => act(launcher.selectAccount(null))} />
+              {(!hasSavedOffline || !active) && (
+                <ProfileRow name={offlineName} provider="Offline" selected={!active} onUse={() => act(launcher.selectAccount(null))} />
+              )}
             </>
           )}
         </ul>
@@ -69,7 +72,9 @@ export function ProfilesView() {
           setRemoving(null);
         }}
       >
-        The launcher forgets this {removing?.providerName} sign-in. Your worlds and instances stay; sign in again to play with it.
+        {removing?.provider === "offline"
+          ? "The launcher forgets this offline profile. Your worlds and instances stay."
+          : `The launcher forgets this ${removing?.providerName} sign-in. Your worlds and instances stay; sign in again to play with it.`}
       </ConfirmDialog>
     </View>
   );
@@ -103,6 +108,7 @@ function useModelScale(stage: RefObject<HTMLElement | null>) {
 function Stage({ account, offlineName }: { account: Account | null; offlineName: string }) {
   const skin = useSkin(account);
   const name = account?.name ?? offlineName;
+  const online = !!account && account.provider !== "offline";
   const stage = useRef<HTMLElement>(null);
   const px = useModelScale(stage);
   const [turned, setTurned] = useState(false);
@@ -117,8 +123,8 @@ function Stage({ account, offlineName }: { account: Account | null; offlineName:
       <div className={s.identity}>
         <h2 className={cx(s.name, "selectable")}>{name}</h2>
         <div className={s.status}>
-          <Dot tone={account ? "green" : "neutral"} />
-          {account ? `Signed in with ${account.providerName} · used for every launch` : "Offline · used for every launch, offline-mode servers only"}
+          <Dot tone={online ? "green" : "neutral"} />
+          {online ? `Signed in with ${account.providerName} · used for every launch` : "Offline · used for every launch, offline-mode servers only"}
         </div>
         {account ? <Uuid uuid={account.uuid} /> : <OfflineName />}
       </div>
@@ -199,26 +205,74 @@ function ProfileRow(p: { account?: Account; name: string; provider: string; sele
   );
 }
 
-/** Microsoft sign-in and the forms of account provider plugins, one at a time. */
+/** Microsoft sign-in, account provider plugins and offline profiles, one at a time. */
 function AddProfile({ onSignedIn }: { onSignedIn(): Promise<unknown> }) {
   const providers = (usePlugins().data ?? []).filter((p) => p.enabled && p.account);
   const [tab, setTab] = useState("microsoft");
   const plugin = providers.find((p) => p.id === tab);
+  const offline = tab === "offline";
   return (
     <section className={s.add} aria-labelledby="add-profile">
       <div className={s.addHead}>
         <h2 id="add-profile">Add a profile</h2>
-        {providers.length > 0 && (
-          <PillGroup label="Sign in with">
-            <Pill pressed={!plugin} onClick={() => setTab("microsoft")}>Microsoft</Pill>
-            {providers.map((p) => (
-              <Pill key={p.id} pressed={plugin?.id === p.id} onClick={() => setTab(p.id)}>{p.name}</Pill>
-            ))}
-          </PillGroup>
-        )}
+        <PillGroup label="Add profile with">
+          <Pill pressed={!plugin && !offline} onClick={() => setTab("microsoft")}>Microsoft</Pill>
+          {providers.map((p) => (
+            <Pill key={p.id} pressed={plugin?.id === p.id} onClick={() => setTab(p.id)}>{p.name}</Pill>
+          ))}
+          <Pill pressed={offline} onClick={() => setTab("offline")}>Offline</Pill>
+        </PillGroup>
       </div>
-      {plugin ? <PluginSignIn key={plugin.id} plugin={plugin} onSignedIn={onSignedIn} /> : <MicrosoftSignIn onSignedIn={onSignedIn} />}
+      {offline ? (
+        <OfflineAdd onSignedIn={onSignedIn} />
+      ) : plugin ? (
+        <PluginSignIn key={plugin.id} plugin={plugin} onSignedIn={onSignedIn} />
+      ) : (
+        <MicrosoftSignIn onSignedIn={onSignedIn} />
+      )}
     </section>
+  );
+}
+
+function OfflineAdd({ onSignedIn }: { onSignedIn(): Promise<unknown> }) {
+  const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const trimmed = name.trim();
+  const valid = USERNAME.test(trimmed);
+  const dirty = trimmed.length > 0 && !valid;
+
+  const submit = () => {
+    if (!valid || busy) return;
+    setBusy(true);
+    launcher
+      .addOfflineAccount(trimmed)
+      .then(() => (setName(""), setError(""), onSignedIn()), (e) => setError(errorMessage(e)))
+      .finally(() => setBusy(false));
+  };
+
+  return (
+    <form className={s.form} onSubmit={(e) => (e.preventDefault(), submit())}>
+      <p className={s.formHint}>For singleplayer and offline-mode servers, without signing in.</p>
+      <label className={s.field}>
+        <span>Username</span>
+        <Input
+          maxLength={16}
+          spellCheck={false}
+          autoComplete="off"
+          placeholder="Player"
+          aria-invalid={dirty}
+          aria-describedby="add-offline-hint"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+        <span id="add-offline-hint" className={cx(s.fieldHint, dirty && s.error)}>
+          3–16 letters, digits or underscores.
+        </span>
+      </label>
+      <Button type="submit" variant="primary" disabled={!valid} loading={busy}>Add offline profile</Button>
+      {error && <p className={s.error} role="alert">{error}</p>}
+    </form>
   );
 }
 
