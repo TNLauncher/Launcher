@@ -1,0 +1,50 @@
+.wrap { display: grid; place-items: center; min-height: 100%; padding: 48px 24px; }
+.full { position: fixed; inset: 0; z-index: 100; background: radial-gradient(900px circle at 50% 0%, rgb(255 69 58 / 0.06), transparent 60%), var(--view); }
+
+.drag { position: fixed; top: 0; left: 0; right: 0; height: 40px; display: flex; justify-content: flex-end; align-items: center; padding: 0 12px; }
+.close { width: 28px; height: 28px; border-radius: 6px; display: grid; place-items: center; color: var(--muted); }
+.close:hover { background: rgb(255 69 58 / 0.18); color: var(--critical); }
+.close :global(.icon) { font-size: 15px; }
+
+.panel {
+  width: min(520px, 100%); display: flex; flex-direction: column; align-items: flex-start;
+  animation: panel-in var(--slow) var(--butter) backwards;
+}
+@keyframes panel-in { from { opacity: 0; transform: translateY(10px); filter: blur(6px); } }
+
+/* The one moment: the mark drops in tilted and springs level, like a part knocked loose. */
+.mark {
+  width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center; margin-bottom: 20px;
+  background: rgb(255 69 58 / 0.12); border: 1px solid rgb(255 69 58 / 0.22); box-shadow: var(--highlight), 0 8px 20px -10px rgb(255 69 58 / 0.5);
+  color: var(--critical);
+  animation: mark-in 720ms var(--spring) 80ms backwards;
+}
+.mark :global(.icon) { font-size: 22px; }
+@keyframes mark-in { from { opacity: 0; transform: translateY(-12px) rotate(-18deg) scale(0.7); } }
+
+.title { font-size: 20px; font-weight: 600; letter-spacing: -0.01em; text-wrap: balance; }
+.lead { margin: 6px 0 0; color: var(--muted); max-width: 60ch; text-wrap: pretty; }
+
+.message {
+  align-self: stretch; margin: 20px 0 0; padding: 12px 14px; border-radius: var(--r-sm);
+  background: var(--lowest); border: 1px solid var(--card-border);
+  font-family: var(--mono); font-size: 12px; line-height: 1.5; color: var(--fg);
+  overflow-wrap: anywhere; max-height: 9lh; overflow-y: auto;
+}
+
+.actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+
+.details { align-self: stretch; margin-top: 24px; border-top: 1px solid var(--card-border); padding-top: 12px; }
+.details summary {
+  display: flex; align-items: center; gap: 4px; list-style: none; cursor: pointer;
+  font-size: 12px; font-weight: 500; color: var(--subtle); transition: color var(--quick) var(--butter);
+}
+.details summary::-webkit-details-marker { display: none; }
+.details summary:hover { color: var(--fg); }
+.details summary :global(.icon) { font-size: 16px; transition: transform var(--soft) var(--spring); }
+.details[open] summary :global(.icon) { transform: rotate(90deg); }
+.kind { margin-left: auto; padding: 2px 8px; border-radius: 999px; background: var(--card); font-family: var(--mono); font-size: 11px; color: var(--muted); }
+.stack {
+  margin: 10px 0 0; padding: 12px 14px; max-height: 220px; overflow: auto; border-radius: var(--r-sm);
+  background: var(--lowest); color: var(--subtle); white-space: pre; line-height: 1.6;
+}

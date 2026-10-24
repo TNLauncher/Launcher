@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { lazy, Suspense, useLayoutEffect, useRef } from "react";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Titlebar } from "@/components/layout/Titlebar";
 import { Toaster } from "@/components/ui/Toast";
@@ -31,9 +32,12 @@ function Shell() {
       <Sidebar />
       <Titlebar />
       <main ref={main} className={s.main}>
-        <Suspense>
-          {page ? <PluginPage key={view} plugin={plugin} page={page} /> : <CurrentView view={view as Parameters<typeof viewComponent>[0]} />}
-        </Suspense>
+        {/* Keyed by view: a crashed screen resets as soon as you navigate away. */}
+        <ErrorBoundary key={view}>
+          <Suspense>
+            {page ? <PluginPage key={view} plugin={plugin} page={page} /> : <CurrentView view={view as Parameters<typeof viewComponent>[0]} />}
+          </Suspense>
+        </ErrorBoundary>
       </main>
       <PluginHost />
       <Toaster />
@@ -51,12 +55,14 @@ const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 5 
 
 export function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <LauncherProvider>
-        <UiProvider>
-          <Shell />
-        </UiProvider>
-      </LauncherProvider>
-    </QueryClientProvider>
+    <ErrorBoundary full>
+      <QueryClientProvider client={queryClient}>
+        <LauncherProvider>
+          <UiProvider>
+            <Shell />
+          </UiProvider>
+        </LauncherProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }

@@ -131,7 +131,12 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
   );
 
   useEffect(() => {
-    refresh();
+    // Without the first snapshot there is nothing to show: rethrow into render so the app-level boundary offers a retry.
+    refresh().catch((e) =>
+      setSnapshot(() => {
+        throw e;
+      })
+    );
     const unlisten = [
       gameLogs.listen(),
       launcher.onGameExit(({ id, code }) => {

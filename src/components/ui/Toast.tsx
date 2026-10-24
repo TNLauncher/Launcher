@@ -21,11 +21,12 @@ function dismiss(id: number) {
   setTimeout(() => set(items.filter((t) => t.id !== id)), EXIT_MS);
 }
 
-/** Confirms an action that otherwise finishes silently. Errors stay inline where they happened. */
+/** Confirms an action that otherwise finishes silently. Errors stay inline where they happened; critical is the catch-all for ones nobody handled. */
 export function toast(message: string, tone: Tone = "success", icon = ICON[tone]) {
   const id = ++nextId;
   set([...items.slice(-2), { id, message, tone, icon }]);
-  setTimeout(() => dismiss(id), SHOWN_MS);
+  // Errors take longer to read and may need copying down.
+  setTimeout(() => dismiss(id), tone === "critical" ? SHOWN_MS * 2 : SHOWN_MS);
 }
 
 export function Toaster() {
@@ -37,7 +38,7 @@ export function Toaster() {
         <div key={t.id} className={cx(s.slot, t.leaving && s.leaving)}>
           <div className={cx(s.toast, s[t.tone])} onClick={() => dismiss(t.id)}>
             <Icon name={t.icon} fill className={s.icon} />
-            <span>{t.message}</span>
+            <span className={s.text}>{t.message}</span>
           </div>
         </div>
       ))}

@@ -16,6 +16,7 @@
 .leaving { animation: collapse 320ms var(--butter) forwards; }
 .leaving .toast { animation: toast-out 240ms var(--butter) forwards; }
 .icon { font-size: 18px; animation: toast-icon var(--slow) var(--spring) 90ms backwards; }
+.text { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
 .success .icon { color: var(--green); }
 .info .icon { color: var(--accent); }
 .critical .icon { color: var(--critical); }
