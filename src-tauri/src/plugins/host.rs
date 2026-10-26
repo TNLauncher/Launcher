@@ -2,6 +2,8 @@
 //! through the bridge (`tn.*` in the SDK), each checked against its manifest.
 use super::{Manifest, Plugin};
 use crate::error::{AppError, Result};
+use crate::models::ContentKind;
+use crate::services::{mods, repair};
 use crate::state::AppState;
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -156,8 +158,21 @@ struct FetchInit {
     body: Option<String>,
 }
 
+/// Requests that change an instance; the UI reloads it after one succeeds.
+const CHANGES: &[&str] = &["instances.repair", "instances.restoreFiles", "instances.change", "content.install", "content.setEnabled", "content.delete"];
+
 /// A request a plugin frame sent through the bridge. `plugin` is who the frontend saw send it.
 pub async fn request(app: &tauri::AppHandle, state: &AppState, plugin: &str, method: &str, params: Value) -> Result<Value> {
+    let instance = params.get("instance").or_else(|| params.get("id")).and_then(Value::as_str).map(String::from);
+    let out = handle(app, state, plugin, method, params).await;
+    if let (Ok(_), Some(id)) = (&out, instance.filter(|_| CHANGES.contains(&method))) {
+        use tauri::Emitter;
+        let _ = app.emit("instance-changed", id);
+    }
+    out
+}
+
+async fn handle(app: &tauri::AppHandle, state: &AppState, plugin: &str, method: &str, params: Value) -> Result<Value> {
     use tauri::Manager;
     let plugin = super::enabled(state, plugin)?;
     let m = &plugin.manifest;
@@ -211,6 +226,78 @@ pub async fn request(app: &tauri::AppHandle, state: &AppState, plugin: &str, met
             Ok(with_mods(state, one)?.as_array_mut().and_then(|a| a.pop()).unwrap_or(Value::Null))
         }
         "instances.readLog" => Ok(Value::String(crate::services::launcher::read_log(state, &str_param(&params, "id")?)?)),
+        "instances.mods" | "instances.crashReports" | "instances.missingFiles" | "instances.launchSettings" | "content.identify" if !m.permissions.instances => {
+            Err(AppError::Plugin(format!("{} may not read instances", m.name)))
+        }
+        "instances.mods" => Ok(serde_json::to_value(repair::scan_mods(state, &str_param(&params, "id")?)?)?),
+        "instances.crashReports" => Ok(Value::String(repair::crash_reports(state, &str_param(&params, "id")?)?)),
+        "instances.missingFiles" => Ok(serde_json::to_value(repair::missing_files(state, &str_param(&params, "id")?).await?)?),
+        "instances.launchSettings" => Ok(serde_json::to_value(repair::launch_facts(state, &str_param(&params, "id")?)?)?),
+        "content.identify" => {
+            let (id, source) = (str_param(&params, "instance")?, str_param(&params, "source")?);
+            let kind: ContentKind = serde_json::from_value(params.get("kind").cloned().unwrap_or(Value::Null))?;
+            let algo = super::enabled(state, &source)?.manifest.contributes.source.as_ref().map(|s| s.hash).unwrap_or_default();
+            let hashes = mods::hashes(state, &id, kind, algo)?;
+            Ok(serde_json::to_value(mods::identify(state, &source, hashes).await?)?)
+        }
+        "instances.repair" | "instances.restoreFiles" | "instances.change" | "content.install" | "content.setEnabled" | "content.delete"
+            if !(m.permissions.instances && m.permissions.content) =>
+        {
+            Err(AppError::Plugin(format!("{} may not change instances", m.name)))
+        }
+        "instances.repair" => {
+            use tauri::Emitter;
+            let id = str_param(&params, "id")?;
+            let plugin_id = m.id.clone();
+            // Progress goes to this plugin's frames as the `repair-progress` event.
+            let report = repair::repair(app, &id, &|progress| {
+                let _ = app.emit("plugin-event", json!({ "plugin": plugin_id, "name": "repair-progress", "payload": { "instance": id, "progress": progress } }));
+            })
+            .await?;
+            Ok(serde_json::to_value(report)?)
+        }
+        "instances.restoreFiles" => Ok(repair::restore_files(state, &str_param(&params, "id")?).await?.into()),
+        "instances.change" => {
+            let change: repair::Change = serde_json::from_value(params.get("change").cloned().unwrap_or(Value::Null))?;
+            Ok(Value::String(repair::change(state, &str_param(&params, "id")?, change).await?))
+        }
+        "content.install" | "content.setEnabled" | "content.delete" if state.is_running(&str_param(&params, "instance")?) => {
+            Err(AppError::Conflict("Close the game first".into()))
+        }
+        "content.install" => {
+            let (id, source, project) = (str_param(&params, "instance")?, str_param(&params, "source")?, str_param(&params, "project")?);
+            let kind: ContentKind = serde_json::from_value(params.get("kind").cloned().unwrap_or(Value::Null))?;
+            let opt = |k: &str| params.get(k).and_then(Value::as_str).map(String::from);
+            // Projects already installed, so the new one's dependencies are not added twice.
+            let skip = if kind == ContentKind::Mod { repair::installed_projects(state, &source, &id).await?.0 } else { vec![] };
+            mods::install(state, &source, &id, kind, &project, opt("version").as_deref(), opt("replace").as_deref(), &skip).await?;
+            Ok(Value::Null)
+        }
+        "content.setEnabled" => {
+            let (id, file) = (str_param(&params, "instance")?, str_param(&params, "file")?);
+            let kind: ContentKind = serde_json::from_value(params.get("kind").cloned().unwrap_or(Value::Null))?;
+            let want = params.get("enabled").and_then(Value::as_bool).ok_or_else(|| AppError::Invalid("Missing enabled".into()))?;
+            let now = mods::list(state, &id, kind)?.into_iter().find(|f| f.file == file).ok_or_else(|| AppError::NotFound(format!("No file {file}")))?;
+            if now.enabled != want {
+                mods::toggle(state, &id, kind, &file)?;
+            }
+            Ok(Value::Null)
+        }
+        "content.delete" => {
+            let kind: ContentKind = serde_json::from_value(params.get("kind").cloned().unwrap_or(Value::Null))?;
+            mods::delete(state, &str_param(&params, "instance")?, kind, &str_param(&params, "file")?)?;
+            Ok(Value::Null)
+        }
+        // Catalogs are public: any plugin may browse the enabled sources.
+        "sources.search" => {
+            let query: crate::plugins::api::SearchQuery = serde_json::from_value(params.get("query").cloned().unwrap_or(Value::Null))?;
+            Ok(serde_json::to_value(super::enabled(state, &str_param(&params, "source")?)?.source()?.search(&query).await?)?)
+        }
+        "sources.versions" => {
+            let filter: crate::plugins::api::VersionFilter = serde_json::from_value(params.get("filter").cloned().unwrap_or(Value::Null))?;
+            let source = super::enabled(state, &str_param(&params, "source")?)?;
+            Ok(serde_json::to_value(source.source()?.versions(&str_param(&params, "project")?, &filter).await?)?)
+        }
         "presence.set" | "presence.clear" if !m.permissions.presence => Err(AppError::Plugin(format!("{} may not set the Discord status", m.name))),
         "presence.set" => {
             let p: crate::services::discord::Presence = serde_json::from_value(params)?;

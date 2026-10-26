@@ -1,8 +1,8 @@
 //! What a mod jar says about itself: ids, version, required mods and conflicts.
 //! Each loader reads its own metadata file, so a jar is read the way the instance's loader would read it.
 use crate::models::Loader;
+use serde::Serialize;
 use serde_json::Value;
-use std::cmp::Ordering;
 use std::io::{Cursor, Read, Seek};
 use zip::ZipArchive;
 
@@ -10,7 +10,8 @@ use zip::ZipArchive;
 const MAX_DEPTH: u32 = 3;
 
 /// A version requirement as the mod wrote it.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(tag = "kind", content = "value", rename_all = "lowercase")]
 pub enum Range {
     Any,
     /// Fabric/Quilt: any of these predicates, each a space-separated AND (`>=1.2 <2`).
@@ -19,13 +20,14 @@ pub enum Range {
     Maven(String),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Dep {
     pub id: String,
     pub range: Range,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ModMeta {
     pub id: String,
     pub name: String,
@@ -292,99 +294,6 @@ fn text_manifest_version<R: Read + Seek>(zip: &mut ZipArchive<R>) -> Option<Stri
         .map(|v| v.trim().to_string())
 }
 
-/// Numeric parts of a version; build metadata (`+mc1.20`) is dropped, a pre-release sorts before its release.
-pub fn cmp(a: &str, b: &str) -> Ordering {
-    let split = |s: &str| {
-        let s = s.split('+').next().unwrap_or(s);
-        let (core, pre) = s.split_once('-').map_or((s, None), |(c, p)| (c, Some(p)));
-        let nums = |x: &str| x.split(|c: char| !c.is_ascii_digit()).filter(|n| !n.is_empty()).map(|n| n.parse::<u64>().unwrap_or(0)).collect::<Vec<_>>();
-        (nums(core), pre.map(nums))
-    };
-    let ((mut ac, ap), (mut bc, bp)) = (split(a), split(b));
-    let len = ac.len().max(bc.len());
-    ac.resize(len, 0);
-    bc.resize(len, 0);
-    ac.cmp(&bc).then_with(|| match (ap, bp) {
-        (None, None) => Ordering::Equal,
-        (None, Some(_)) => Ordering::Greater,
-        (Some(_), None) => Ordering::Less,
-        (Some(x), Some(y)) => x.cmp(&y),
-    })
-}
-
-fn fabric_single(pred: &str, v: &str) -> bool {
-    let pred = pred.trim();
-    if pred.is_empty() || pred == "*" {
-        return true;
-    }
-    let (op, rest) = [">=", "<=", ">", "<", "=", "~", "^"].into_iter().find_map(|op| pred.strip_prefix(op).map(|r| (op, r.trim()))).unwrap_or(("", pred));
-    let parts: Vec<&str> = rest.split('.').collect();
-    // `1.20.x`: every version starting with 1.20.
-    if let Some(wild) = parts.iter().position(|p| matches!(*p, "x" | "X" | "*")) {
-        let have: Vec<&str> = v.split(['.', '-', '+']).collect();
-        return have.len() >= wild && parts[..wild].iter().zip(&have).all(|(w, h)| cmp(w, h) == Ordering::Equal);
-    }
-    let o = cmp(v, rest);
-    let nums: Vec<u64> = parts.iter().map(|p| p.split(|c: char| !c.is_ascii_digit()).next().and_then(|n| n.parse().ok()).unwrap_or(0)).collect();
-    let below = |next: String| cmp(v, &next) == Ordering::Less;
-    match op {
-        ">=" => o != Ordering::Less,
-        "<=" => o != Ordering::Greater,
-        ">" => o == Ordering::Greater,
-        "<" => o == Ordering::Less,
-        "~" => o != Ordering::Less && below(format!("{}.{}", nums[0], nums.get(1).copied().unwrap_or(0) + 1)),
-        "^" => o != Ordering::Less && below(format!("{}", nums[0] + 1)),
-        _ => o == Ordering::Equal,
-    }
-}
-
-fn maven_ok(spec: &str, v: &str) -> bool {
-    let spec = spec.trim();
-    // A bare version is a recommendation the loader does not enforce.
-    if !spec.starts_with(['[', '(']) {
-        return true;
-    }
-    let mut groups = vec![];
-    let mut cur = String::new();
-    for c in spec.chars() {
-        cur.push(c);
-        if c == ']' || c == ')' {
-            groups.push(std::mem::take(&mut cur).trim_start_matches(',').trim().to_string());
-        }
-    }
-    groups.iter().any(|g| {
-        let (lo_inc, hi_inc) = (g.starts_with('['), g.ends_with(']'));
-        let inner = &g[1..g.len() - 1];
-        let (lo, hi) = inner.split_once(',').map_or((inner, inner), |(l, h)| (l.trim(), h.trim()));
-        let lo_ok = lo.is_empty() || matches!((cmp(v, lo), lo_inc), (Ordering::Greater, _) | (Ordering::Equal, true));
-        let hi_ok = hi.is_empty() || matches!((cmp(v, hi), hi_inc), (Ordering::Less, _) | (Ordering::Equal, true));
-        lo_ok && hi_ok
-    })
-}
-
-/// Whether `version` meets `range`. Unknown or templated versions pass: a wrong "missing" is worse than a quiet miss.
-pub fn satisfies(range: &Range, version: &str) -> bool {
-    if version.is_empty() || version.contains('$') {
-        return true;
-    }
-    let check = |v: &str| match range {
-        Range::Any => true,
-        Range::Fabric(any) => any.iter().any(|p| p.split_whitespace().all(|one| fabric_single(one, v))),
-        Range::Maven(spec) => maven_ok(spec, v),
-    };
-    // Forge jars often prefix the game version: `1.20.1-15.2.0`.
-    check(version) || version.split_once('-').is_some_and(|(_, rest)| rest.starts_with(|c: char| c.is_ascii_digit()) && check(rest))
-}
-
-/// The range for people: `>=0.5.8`, `[1.2,)`; empty for any version.
-pub fn describe(range: &Range) -> String {
-    match range {
-        Range::Any => String::new(),
-        Range::Fabric(any) => any.join(" or "),
-        Range::Maven(spec) => spec.clone(),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -400,50 +309,6 @@ mod tests {
         z.finish().unwrap().into_inner()
     }
 
-    fn fabric_range(p: &str) -> Range {
-        Range::Fabric(vec![p.into()])
-    }
-
-    #[test]
-    fn fabric_predicates() {
-        let cases = [
-            (">=0.5.8", "0.5.8", true),
-            (">=0.5.8", "0.5.3", false),
-            (">=1.20 <1.21", "1.20.1", true),
-            (">=1.20 <1.21", "1.21", false),
-            ("1.20.x", "1.20.4", true),
-            ("1.20.x", "1.21", false),
-            ("~1.2.3", "1.2.9", true),
-            ("~1.2.3", "1.3.0", false),
-            ("^0.15.0", "0.16.1", true),
-            ("^0.15.0", "1.0.0", false),
-            ("1.20.1", "1.20.1", true),
-            ("1.20.1", "1.20.2", false),
-            (">=0.5.0", "0.5.3+mc1.20.1", true),
-            (">=1.0.0", "1.0.0-beta.2", false),
-        ];
-        for (p, v, want) in cases {
-            assert_eq!(satisfies(&fabric_range(p), v), want, "{p} vs {v}");
-        }
-        assert!(satisfies(&Range::Fabric(vec!["1.19.x".into(), "1.20.x".into()]), "1.20.1"), "any of the list");
-        assert!(satisfies(&fabric_range(">=9"), "${version}"), "templated version passes");
-    }
-
-    #[test]
-    fn maven_ranges() {
-        let r = |s: &str| Range::Maven(s.into());
-        assert!(satisfies(&r("[5.8.1,)"), "5.9"));
-        assert!(!satisfies(&r("[5.8.1,)"), "5.8"));
-        assert!(satisfies(&r("[1.0,2.0)"), "1.5"));
-        assert!(!satisfies(&r("[1.0,2.0)"), "2.0"));
-        assert!(satisfies(&r("(,2.0]"), "2.0"));
-        assert!(satisfies(&r("[1.20.1]"), "1.20.1"));
-        assert!(!satisfies(&r("[1.20.1]"), "1.20.2"));
-        assert!(satisfies(&r("[1,2),[3,4)"), "3.5"));
-        assert!(satisfies(&r("1.0"), "0.1"), "a bare version only recommends");
-        assert!(satisfies(&r("[15,)"), "1.20.1-15.2.0"), "game-version prefix is skipped");
-    }
-
     #[test]
     fn reads_fabric_with_bundled_jars() {
         let inner = jar(&[("fabric.mod.json", br#"{"id":"fabric-api-base","version":"0.4.1"}"#)]);
@@ -457,7 +322,7 @@ mod tests {
         assert!(m.provides.contains(&("fabric".into(), "0.92.0".into())));
         assert!(m.provides.contains(&("fabric-api-base".into(), "0.4.1".into())), "bundled jars provide their ids");
         assert_eq!(m.depends.len(), 2);
-        assert_eq!(m.breaks[0], Dep { id: "optifabric".into(), range: fabric_range("<1.13") });
+        assert_eq!(m.breaks[0], Dep { id: "optifabric".into(), range: Range::Fabric(vec!["<1.13".into()]) });
         assert_eq!(m.mixins, ["fabric-api.mixins.json"]);
         assert!(matches!(scan(Cursor::new(outer), Loader::Forge).unwrap(), Scan::Foreign("Fabric")));
     }

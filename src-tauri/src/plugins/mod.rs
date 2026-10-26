@@ -128,6 +128,12 @@ pub struct PageSpec {
     pub icon: String,
     /// HTML file in the plugin folder.
     pub entry: String,
+    /// Instance tabs: also a button in the instance header that opens the tab.
+    #[serde(default)]
+    pub header: bool,
+    /// Instance tabs: offered next to the error when the game crashes or fails to start.
+    #[serde(default)]
+    pub crash: bool,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -142,6 +148,10 @@ pub struct Permissions {
     /// Read the instance list (`tn.instances`) and game start/exit events.
     #[serde(default)]
     pub instances: bool,
+    /// Change instances (`tn.content`, `tn.instances.repair`/`restoreFiles`/`change`): add, swap, switch off and
+    /// delete content, repair files, change memory, Java and loader. Needs `instances` too.
+    #[serde(default)]
+    pub content: bool,
     /// Set the Discord status (`tn.presence`).
     #[serde(default)]
     pub presence: bool,

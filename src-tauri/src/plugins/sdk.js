@@ -67,6 +67,20 @@
       list: () => request("instances.list", null),
       get: (id) => request("instances.get", { id }),
       readLog: (id) => request("instances.readLog", { id }),
+      mods: (id) => request("instances.mods", { id }),
+      crashReports: (id) => request("instances.crashReports", { id }),
+      missingFiles: (id) => request("instances.missingFiles", { id }),
+      launchSettings: (id) => request("instances.launchSettings", { id }),
+      /** Progress arrives as the `repair-progress` event. */
+      repair: (id) => request("instances.repair", { id }),
+      restoreFiles: (id) => request("instances.restoreFiles", { id }),
+      change: (id, change) => request("instances.change", { id, change }),
+    }),
+    content: Object.freeze({
+      identify: (instance, source, kind) => request("content.identify", { instance, source, kind }),
+      install: (p) => request("content.install", p),
+      setEnabled: (instance, kind, file, enabled) => request("content.setEnabled", { instance, kind, file, enabled }),
+      delete: (instance, kind, file) => request("content.delete", { instance, kind, file }),
     }),
     events: Object.freeze({
       /** Returns a function that stops listening. */
@@ -88,6 +102,8 @@
     /** Opens a web page in the system browser. */
     open: (url) => request("open", { url: String(url) }),
     sources: Object.freeze({
+      search: (source, query) => request("sources.search", { source, query }),
+      versions: (source, project, filter) => request("sources.versions", { source, project, filter }),
       register(impl) {
         if (registered.source) throw new Error("A content source is already registered");
         registered.source = impl;

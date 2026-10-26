@@ -38,7 +38,12 @@ export interface Manifest {
     /** Sidebar pages. */
     pages?: View[];
     /** Tabs on every instance page; `tn.context.instance` is that instance's id. */
-    instanceTabs?: View[];
+    instanceTabs?: (View & {
+      /** Also a button in the instance header that opens the tab. */
+      header?: boolean;
+      /** Offered next to the error when the game crashes or fails to start. */
+      crash?: boolean;
+    })[];
     /** Makes the plugin an account provider: these fields make up its sign-in form. `activate` must call `tn.accounts.register`. */
     account?: { fields: { key: string; label: string; hint?: string; type: "text" | "secret" }[] };
     /** Options the user fills in Settings; read them with `tn.settings.get()`. */
@@ -60,6 +65,8 @@ export interface Manifest {
     downloads?: string[];
     /** Read instances (`tn.instances`) and receive `game-started` / `game-exited`. */
     instances?: boolean;
+    /** Change instances (`tn.content`, `tn.instances.repair` / `restoreFiles` / `change`); needs `instances` too. */
+    content?: boolean;
     /** Set the Discord status (`tn.presence`). */
     presence?: boolean;
     /** Load a Java agent into the game (`AccountSession.javaAgent`); it runs code in the game. */
@@ -81,7 +88,7 @@ export interface Instance {
   name: string;
   /** Minecraft version. */
   version: string;
-  loader: "vanilla" | "fabric" | "quilt";
+  loader: "vanilla" | "fabric" | "quilt" | "forge" | "neoforge" | "liteloader";
   loaderVersion: string;
   /** Unix seconds, 0 = never. */
   lastPlayed: number;
@@ -95,6 +102,60 @@ export interface Instance {
   mods: number;
 }
 
+/** A version requirement as a mod wrote it. */
+export type Range = { kind: "any" } | { /** Any of these; each is space-separated ANDs (`>=1.2 <2`). */ kind: "fabric"; value: string[] } | { /** `[1.2,2)`; a bare version only recommends. */ kind: "maven"; value: string };
+
+export interface ModMeta {
+  id: string;
+  name: string;
+  version: string;
+  /** Other ids it answers to, with versions: `provides` and the jars bundled inside it. */
+  provides: [string, string][];
+  depends: { id: string; range: Range }[];
+  breaks: { id: string; range: Range }[];
+  /** Mixin config files at the jar root. */
+  mixins: string[];
+}
+
+export interface ModEntry {
+  file: string;
+  enabled: boolean;
+  /** Set for a mod of the instance's loader. */
+  meta: ModMeta | null;
+  /** The loader a jar for another loader is made for. */
+  foreign: "Fabric" | "Quilt" | "Forge" | "NeoForge" | null;
+  /** Not a readable archive. */
+  broken: boolean;
+}
+
+export interface MissingFile {
+  path: string;
+  name: string;
+  /** The launcher may download it; otherwise only by hand from `page`. */
+  downloadable: boolean;
+  page: string | null;
+}
+
+export interface RepairProgress {
+  step: "game" | "pack" | "mods";
+  /** Install stage while `step` is "game". */
+  stage: "resolving" | "java" | "loader" | "libraries" | "assets" | "starting" | null;
+  done: number;
+  total: number;
+}
+
+export interface RepairReport {
+  /** Game, loader, library and asset files downloaded again. */
+  gameFiles: number;
+  packFiles: number;
+  /** Half-downloaded leftovers removed. */
+  partials: number;
+  /** Unreadable jars the pack cannot restore. */
+  broken: string[];
+  /** Why pack files could not be checked. */
+  packError: string | null;
+}
+
 export interface GameEvents {
   /** Play was pressed; downloads may follow. */
   "game-launching": { instanceId: string };
@@ -103,6 +164,8 @@ export interface GameEvents {
   "game-log": { instanceId: string; line: string; err: boolean };
   /** The game stopped, or failed to start (`code` null). */
   "game-exited": { instanceId: string; code: number | null };
+  /** Progress of a `tn.instances.repair` this plugin started. */
+  "repair-progress": { instance: string; progress: RepairProgress };
   /** Fired in every frame of this plugin when `tn.storage.set` writes or removes a key. */
   "storage-changed": { key: string; value: unknown };
   /** Fired in every frame of this plugin when the user changes a setting in Settings. */
@@ -321,6 +384,28 @@ export interface TN {
     get(id: string): Promise<Instance>;
     /** Tail of the instance's last `launcher.log`; "" if never launched. */
     readLog(id: string): Promise<string>;
+    /** Every jar in `mods/`, on and off, read the way the instance's loader reads it. */
+    mods(id: string): Promise<ModEntry[]>;
+    /** Crash report and JVM error file the last session wrote, joined; "" when none. */
+    crashReports(id: string): Promise<string>;
+    /** Files of the instance's modpack gone from disk; [] when it is not from a pack. */
+    missingFiles(id: string): Promise<MissingFile[]>;
+    launchSettings(id: string): Promise<{ ramMb: number; /** The user picked their own Java. */ customJava: boolean }>;
+    /** Needs `permissions.content`. Rehashes game and pack files and downloads damaged ones; never changes which mods are installed. */
+    repair(id: string): Promise<RepairReport>;
+    /** Needs `permissions.content`. Downloads the missing pack files the launcher may fetch; resolves with how many. */
+    restoreFiles(id: string): Promise<number>;
+    /** Needs `permissions.content`. Resolves with what changed, for people. */
+    change(id: string, change: { kind: "setRam"; mb: number } | { kind: "autoJava" } | { kind: "updateLoader" }): Promise<string>;
+  };
+  /** Content of an instance. `identify` needs `permissions.instances`, the rest `permissions.content`; changes fail while the game runs. */
+  content: {
+    /** Files the source recognises, by file name. */
+    identify(instance: string, source: string, kind: ContentKind): Promise<Record<string, { project: ProjectSummary; versionNumber: string }>>;
+    /** Installs a fitting build (newest when no `version`) with its required mods; `replace` swaps that file in place. */
+    install(p: { instance: string; source: string; kind: ContentKind; project: string; version?: string; replace?: string }): Promise<void>;
+    setEnabled(instance: string, kind: ContentKind, file: string, enabled: boolean): Promise<void>;
+    delete(instance: string, kind: ContentKind, file: string): Promise<void>;
   };
   /** Needs `permissions.instances` for game events. Returns a function that stops listening. */
   events: {
@@ -333,7 +418,12 @@ export interface TN {
   presence: { set(p: Presence): Promise<void>; clear(): Promise<void> };
   /** Opens an http(s) page in the system browser. */
   open(url: string): Promise<void>;
-  sources: { register(source: ContentSource): void };
+  sources: {
+    register(source: ContentSource): void;
+    /** Browse another enabled source. */
+    search(source: string, query: SearchQuery): Promise<Page>;
+    versions(source: string, project: string, filter: VersionFilter): Promise<Version[]>;
+  };
   accounts: { register(provider: AccountProvider): void };
   net: { fetch(url: string, init?: FetchInit): Promise<FetchResponse> };
   /** Printed to the launcher's log. */

@@ -3,7 +3,6 @@
 
 pub mod auth;
 pub mod command;
-pub mod crashlog;
 pub mod http;
 pub mod install;
 pub mod installer;
