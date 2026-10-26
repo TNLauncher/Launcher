@@ -17,7 +17,8 @@ import { useLauncher } from "@/store/LauncherContext";
 import { useRouteState, useUi, type ContentTarget } from "@/store/UiContext";
 import type { ContentKind, Instance } from "@/types";
 import s from "./content.module.css";
-import { label, useContent, type ContentItem } from "./useContent";
+import { UpdateDialog } from "./UpdateDialog";
+import { label, useContent, type ContentItem, type UpdateCandidate } from "./useContent";
 
 const loadContentDetail = () => import("./ContentDetail");
 const ContentDetail = lazy(() => loadContentDetail().then((m) => ({ default: m.ContentDetail })));
@@ -214,6 +215,7 @@ function InstalledPane({
   const [filter, setFilter] = useState("");
   const [error, setError] = useState("");
   const [removing, setRemoving] = useState<ContentItem | null>(null);
+  const [reviewing, setReviewing] = useState<UpdateCandidate[] | null>(null);
   const { items, updatableCount, updatingAll, busyFiles } = content;
 
   const act = (action: Promise<unknown>) =>
@@ -225,10 +227,11 @@ function InstalledPane({
         refresh();
       });
 
-  const handleUpdateAll = async () => {
+  const handleUpdateAll = async (picked: UpdateCandidate[]) => {
+    setReviewing(null);
     setError("");
     try {
-      const count = await content.updateAll();
+      const count = await content.updateAll(new Set(picked.map((c) => c.file)));
       if (count > 0) toast(`Updated ${plural(count, info.noun.replace(/s$/, ""))}`);
     } catch (e) {
       setError(errorMessage(e));
@@ -264,11 +267,12 @@ function InstalledPane({
                 icon="upgrade"
                 loading={updatingAll}
                 disabled={running}
-                onClick={handleUpdateAll}
+                onClick={() => setReviewing(content.candidates)}
               >
                 Update all ({updatableCount})
               </Button>
             )}
+            <UpdateDialog candidates={reviewing} onClose={() => setReviewing(null)} onConfirm={handleUpdateAll} />
             <IconButton icon="folder_open" label={`Open ${info.folder} folder`} onClick={() => act(launcher.openInstanceDir(instance.id, info.folder))} />
           </div>
         </div>

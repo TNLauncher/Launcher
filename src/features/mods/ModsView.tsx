@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { View } from "@/components/layout/View";
 import { Button, EmptyState, Select } from "@/components/ui";
 import { InstanceContent } from "@/features/content/InstanceContent";
+import { UpdateDialog } from "@/features/content/UpdateDialog";
 import { useInstanceBulkUpdate } from "@/features/content/useContent";
 import { cx } from "@/lib/cx";
 import { loaderLabel } from "@/lib/format";
@@ -55,14 +56,17 @@ function BulkUpdateBtn({ instance }: { instance: Instance }) {
   const bulk = useInstanceBulkUpdate(instance);
   if (!bulk.canUpdate) return null;
   return (
-    <Button
-      icon="upgrade"
-      loading={bulk.busy}
-      disabled={running}
-      title="Update all mods, resource packs and shaders"
-      onClick={bulk.runUpdateAll}
-    >
-      Update all
-    </Button>
+    <>
+      <Button
+        icon="upgrade"
+        loading={bulk.checking || bulk.busy}
+        disabled={running}
+        title="Check mods, resource packs and shaders for updates"
+        onClick={bulk.check}
+      >
+        Update all
+      </Button>
+      <UpdateDialog candidates={bulk.candidates} onClose={bulk.dismiss} onConfirm={bulk.apply} />
+    </>
   );
 }

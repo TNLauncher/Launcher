@@ -1,0 +1,76 @@
+.dialog { width: 600px; max-width: calc(100vw - 32px); }
+
+.all { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); cursor: pointer; user-select: none; }
+.all:hover { color: var(--fg); }
+
+.list {
+  max-height: min(440px, 60vh); overflow-y: auto; padding: 4px;
+  --list-bg: color-mix(in srgb, var(--popover), #fff 6%);
+  border-radius: var(--r-md); background: var(--list-bg); border: 1px solid var(--card-border);
+  scrollbar-width: thin; scrollbar-color: var(--btn-hover) transparent;
+}
+.group + .group { margin-top: 4px; }
+.groupHead {
+  position: sticky; top: -4px; z-index: 1; display: flex; align-items: center; gap: 6px;
+  margin: 0; padding: 8px 10px 6px; font-size: 11px; font-weight: 600; color: var(--muted);
+  background: var(--list-bg);
+}
+.groupHead :global(.icon) { font-size: 15px; }
+.groupCount { font: 500 11px var(--mono); font-variant-numeric: tabular-nums; color: var(--subtle); }
+
+.row {
+  display: grid; grid-template-columns: auto 32px minmax(0, 1fr) auto; align-items: center; gap: 12px;
+  min-height: 52px; padding: 8px 12px 8px 10px; border-radius: var(--r-sm); cursor: pointer;
+  transition: background var(--quick) var(--butter);
+}
+.row:hover { background: var(--card-hover); }
+.row:has(:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }
+.row :focus-visible { outline: none; }
+
+.icon {
+  width: 32px; height: 32px; border-radius: 8px; overflow: hidden; display: grid; place-items: center;
+  background: var(--btn); color: var(--icon); transition: opacity var(--quick) var(--butter), filter var(--quick) var(--butter);
+}
+.icon img { width: 100%; height: 100%; object-fit: cover; }
+.icon :global(.icon) { font-size: 18px; }
+
+.text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.title, .file { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.title { font-weight: 500; transition: color var(--quick) var(--butter); }
+.file { font: 11px var(--mono); color: var(--subtle); }
+
+.jump { display: flex; align-items: center; gap: 6px; font: 12px var(--mono); font-variant-numeric: tabular-nums; }
+.from, .to { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.from { color: var(--subtle); }
+.arrow { font-size: 14px; color: var(--subtle); }
+.to { color: var(--accent); font-weight: 500; transition: color var(--quick) var(--butter); }
+.channel {
+  padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 500; text-transform: capitalize;
+  background: rgb(255 159 10 / 0.15); color: var(--warning);
+}
+
+/* Left out of the update: the row steps back, the version stops promising. */
+.off .icon { opacity: 0.45; filter: grayscale(1); }
+.off .title { color: var(--muted); }
+.off .to { color: var(--subtle); }
+
+.summary { margin-right: auto; align-self: center; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* Checkbox drawn from the palette; the tick springs in, the one authored moment. */
+.box {
+  appearance: none; flex-shrink: 0; width: 18px; height: 18px; margin: 0; display: grid; place-items: center;
+  border-radius: 6px; border: 1.5px solid var(--subtle); background: transparent; cursor: pointer;
+  transition: background var(--quick) var(--butter), border-color var(--quick) var(--butter);
+}
+.box:hover { border-color: var(--fg); }
+.box:checked, .box:indeterminate { background: var(--accent-fill); border-color: var(--accent-fill); }
+.box::after { content: ""; width: 10px; height: 10px; background: #fff; transform: scale(0); transition: transform var(--quick) var(--spring); }
+.box:checked::after {
+  transform: scale(1);
+  clip-path: polygon(14% 44%, 0 59%, 38% 96%, 100% 22%, 86% 8%, 37% 66%);
+}
+.box:indeterminate::after { transform: scale(1); height: 2px; border-radius: 1px; clip-path: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .row, .icon, .title, .to, .box, .box::after { transition: none; }
+}

@@ -4,6 +4,7 @@ import { sources } from "@/api/sources";
 import { Button, Chip, Icon, IconButton } from "@/components/ui";
 import { cx } from "@/lib/cx";
 import { InstanceContent } from "@/features/content/InstanceContent";
+import { UpdateDialog } from "@/features/content/UpdateDialog";
 import { useInstanceBulkUpdate } from "@/features/content/useContent";
 import { lastPlayed, LOADER_ICON, loaderLabel, playTime } from "@/lib/format";
 import { useSourceEnabled } from "@/hooks/useSource";
@@ -59,14 +60,15 @@ export function InstancePage({ instance: i, onBack }: { instance: Instance; onBa
                 <Button
                   variant="overlay"
                   icon="upgrade"
-                  loading={bulkUpdate.busy}
+                  loading={bulkUpdate.checking || bulkUpdate.busy}
                   disabled={running}
-                  title="Update all mods, resource packs and shaders"
-                  onClick={bulkUpdate.runUpdateAll}
+                  title="Check mods, resource packs and shaders for updates"
+                  onClick={bulkUpdate.check}
                 >
                   Update all
                 </Button>
               )}
+              <UpdateDialog candidates={bulkUpdate.candidates} onClose={bulkUpdate.dismiss} onConfirm={bulkUpdate.apply} />
               <IconButton icon="folder_open" label="Open instance folder" variant="overlay" onClick={() => launcher.openInstanceDir(i.id)} />
               <Button variant="primary" size="lg" icon="play_arrow" loading={starting} disabled={running || busy} onClick={() => launch(i.id)}>
                 {running ? "Running" : starting ? "Starting" : "Play"}
