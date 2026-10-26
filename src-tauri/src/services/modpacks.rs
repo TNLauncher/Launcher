@@ -14,7 +14,7 @@ use base64::{engine::general_purpose::STANDARD, Engine};
 use futures::future::{AbortHandle, Abortable};
 use serde::Serialize;
 use std::collections::HashMap;
-use std::io::{Cursor, Read};
+use std::io::{Cursor, Read, Seek};
 use std::path::{Component, Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -118,13 +118,33 @@ async fn collect_manual(files: &[PackFile], downloads: Option<&Path>, dir: &Path
     }
 }
 
-/// Top-level text files of the archive, which is where pack formats keep their manifest.
-fn root_files(bytes: &[u8]) -> Result<HashMap<String, String>> {
-    let mut zip = zip::ZipArchive::new(Cursor::new(bytes))?;
+trait ReadSeek: Read + Seek + Send {}
+impl<T: Read + Seek + Send> ReadSeek for T {}
+
+/// A modpack archive: downloaded into memory, or a file the user picked (which may be gigabytes of worlds).
+enum Archive {
+    Bytes(Vec<u8>),
+    File(PathBuf),
+}
+
+impl Archive {
+    fn open(&self) -> Result<zip::ZipArchive<Box<dyn ReadSeek + '_>>> {
+        let reader: Box<dyn ReadSeek> = match self {
+            Self::Bytes(b) => Box::new(Cursor::new(b.as_slice())),
+            Self::File(p) => Box::new(std::io::BufReader::new(std::fs::File::open(p)?)),
+        };
+        Ok(zip::ZipArchive::new(reader)?)
+    }
+}
+
+/// Text files at the top of the archive and one folder down, which is where pack formats keep their manifest
+/// (MultiMC exports wrap the instance in a folder).
+fn root_files(archive: &Archive) -> Result<HashMap<String, String>> {
+    let mut zip = archive.open()?;
     let mut out = HashMap::new();
     for i in 0..zip.len() {
         let mut entry = zip.by_index(i)?;
-        if entry.is_dir() || entry.name().contains('/') || entry.size() > MAX_MANIFEST {
+        if entry.is_dir() || entry.name().matches('/').count() > 1 || entry.size() > MAX_MANIFEST {
             continue;
         }
         let mut buf = String::new();
@@ -136,8 +156,8 @@ fn root_files(bytes: &[u8]) -> Result<HashMap<String, String>> {
     Ok(out)
 }
 
-fn extract_overrides(bytes: &[u8], dir: &Path, prefixes: &[String]) -> Result<()> {
-    let mut zip = zip::ZipArchive::new(Cursor::new(bytes))?;
+fn extract_overrides(archive: &Archive, dir: &Path, prefixes: &[String]) -> Result<()> {
+    let mut zip = archive.open()?;
     for prefix in prefixes {
         for i in 0..zip.len() {
             let mut entry = zip.by_index(i)?;
@@ -197,6 +217,34 @@ pub async fn import(
     result.unwrap_or(Err(AppError::Cancelled))
 }
 
+/// Installs a modpack archive from disk as a new instance: the first enabled plugin that reads its
+/// manifest (a content source's `planPack` or an importer) plans it. [`cancel`] with the path stops it.
+pub async fn import_file(state: &AppState, path: &Path, downloads: Option<&Path>, progress: &(dyn Fn(ImportProgress) + Sync)) -> Result<Instance> {
+    let key = path.to_string_lossy().into_owned();
+    let (handle, reg) = AbortHandle::new_pair();
+    state.imports.lock().unwrap().insert(key.clone(), handle);
+    let result = Abortable::new(install_file(state, path, downloads, progress), reg).await;
+    state.imports.lock().unwrap().remove(&key);
+    result.unwrap_or(Err(AppError::Cancelled))
+}
+
+async fn install_file(state: &AppState, path: &Path, downloads: Option<&Path>, progress: &(dyn Fn(ImportProgress) + Sync)) -> Result<Instance> {
+    let archive = Archive::File(path.into());
+    let root = root_files(&archive)?;
+    for plugin in plugins::all_enabled(state) {
+        let plan = match (&plugin.source, &plugin.importer) {
+            (Some(source), _) => source.plan_pack(&root).await,
+            (None, Some(importer)) => importer.plan(&root).await,
+            (None, None) => continue,
+        };
+        // A plugin that does not know the format throws; the next one gets a try.
+        if let Ok(plan) = plan {
+            return unpack(state, &plugin, &archive, plan, None, String::new(), downloads, progress).await;
+        }
+    }
+    Err(AppError::Unsupported("No plugin can read this archive. Install one that supports its format.".into()))
+}
+
 /// Stops the import of `project`, if one is running.
 pub fn cancel(state: &AppState, project: &str) {
     if let Some(h) = state.imports.lock().unwrap().remove(project) {
@@ -208,7 +256,7 @@ pub fn cancel(state: &AppState, project: &str) {
 struct Fetched {
     plugin: Arc<Plugin>,
     picked: Version,
-    bytes: Vec<u8>,
+    archive: Archive,
     plan: PackPlan,
 }
 
@@ -230,9 +278,9 @@ async fn fetch_pack(state: &AppState, source_id: &str, project: &str, pick: &(dy
     if !plugin.may_download(&file.url) {
         return Err(AppError::Invalid(format!("{} is not an allowed download", file.url)));
     }
-    let bytes = http::fetch_bytes(&state.http, &file.url).await?;
-    let plan = source.plan_pack(&root_files(&bytes)?).await?;
-    Ok(Fetched { plugin: plugin.clone(), picked, bytes, plan })
+    let archive = Archive::Bytes(http::fetch_bytes(&state.http, &file.url).await?);
+    let plan = source.plan_pack(&root_files(&archive)?).await?;
+    Ok(Fetched { plugin: plugin.clone(), picked, archive, plan })
 }
 
 /// The files the instance's modpack ships, from the copy kept at import; packs imported before that are fetched once.
@@ -256,22 +304,34 @@ async fn install(
     downloads: Option<&Path>,
     progress: &(dyn Fn(ImportProgress) + Sync),
 ) -> Result<Instance> {
-    let Fetched { plugin, picked, bytes, mut plan } = fetch_pack(state, source_id, project, &|v| version.is_none_or(|id| v.id == id)).await?;
-    let source = plugin.source()?;
+    let Fetched { plugin, picked, archive, plan } = fetch_pack(state, source_id, project, &|v| version.is_none_or(|id| v.id == id)).await?;
+    // Kept locally so the row does not hit the source on every render; a missing icon is not worth failing over.
+    let icon = match plugin.source()?.project(project).await.ok().and_then(|p| p.icon_url) {
+        Some(url) => http::fetch_bytes(&state.http, &url).await.ok().and_then(|b| icon_data_url(&b)),
+        None => None,
+    };
+    let pack = PackRef { source: source_id.into(), project: project.into(), version: picked.number.clone() };
+    unpack(state, &plugin, &archive, plan, Some(pack), icon.unwrap_or_default(), downloads, progress).await
+}
+
+/// Creates the instance `plan` describes: downloads its files (from `plugin`'s download hosts), waits for the
+/// hand-downloaded ones and copies the archive's overrides.
+#[allow(clippy::too_many_arguments)]
+async fn unpack(
+    state: &AppState,
+    plugin: &Plugin,
+    archive: &Archive,
+    mut plan: PackPlan,
+    pack: Option<PackRef>,
+    icon: String,
+    downloads: Option<&Path>,
+    progress: &(dyn Fn(ImportProgress) + Sync),
+) -> Result<Instance> {
     let allowed = |url: &str| plugin.may_download(url);
     let loader = loader_of(&plan)?;
     let listed = serde_json::to_vec(&plan.files)?;
     let (manual, auto) = split_manual(std::mem::take(&mut plan.files));
-    // Kept locally so the row does not hit the source on every render; a missing icon is not worth failing over.
-    let icon = match source.project(project).await.ok().and_then(|p| p.icon_url) {
-        Some(url) => http::fetch_bytes(&state.http, &url).await.ok().and_then(|b| icon_data_url(&b)),
-        None => None,
-    };
-    let instance = Instance {
-        pack: Some(PackRef { source: source_id.into(), project: project.into(), version: picked.number.clone() }),
-        icon: icon.unwrap_or_default(),
-        ..instances::new(&plan.name, &plan.game_version, loader, plan.loader_version.clone())
-    };
+    let instance = Instance { pack, icon, ..instances::new(&plan.name, &plan.game_version, loader, plan.loader_version.clone()) };
     let dir = state.paths.instance_dir(&instance.id)?;
     let mut cleanup = Cleanup(Some(&dir));
 
@@ -293,7 +353,7 @@ async fn install(
     let (downloaded, collected) = futures::join!(http::download_all(&state.http, jobs, http::Check::Size, &ticked), collect_manual(&manual, downloads, &dir, &moved));
     downloaded?;
     collected?;
-    extract_overrides(&bytes, &dir, &plan.overrides)?;
+    extract_overrides(archive, &dir, &plan.overrides)?;
     std::fs::write(dir.join(PACK_FILES), listed)?;
     instances::add(state, &instance)?;
     cleanup.0 = None;
@@ -343,6 +403,49 @@ mod tests {
         assert!(icon_data_url(b"\x89PNG\r\n").unwrap().starts_with("data:image/png;base64,"));
         assert!(icon_data_url(b"RIFF\0\0\0\0WEBPVP8").unwrap().starts_with("data:image/webp;"));
         assert!(icon_data_url(b"<svg/>").is_none());
+    }
+
+    #[tokio::test]
+    async fn imports_archives_through_an_importer_plugin() {
+        use crate::plugins::{js::Bridge, Registry};
+        use std::io::Write;
+        let root = std::env::temp_dir().join(format!("tn-import-file-{}", std::process::id()));
+        let plugins = root.join("plugins");
+        std::fs::create_dir_all(plugins.join("imp")).unwrap();
+        std::fs::write(plugins.join("imp/manifest.json"), r#"{"id":"imp","name":"Imp","version":"1","api":1,"contributes":{"importer":true}}"#).unwrap();
+        std::fs::write(plugins.join("imp/main.js"), "").unwrap();
+        // A MultiMC-style zip: everything inside one folder.
+        let archive = root.join("pack.zip");
+        let mut zip = zip::ZipWriter::new(std::fs::File::create(&archive).unwrap());
+        for (name, body) in [("Old/mmc-pack.json", "{}"), ("Old/.minecraft/options.txt", "fov:1"), ("Old/.minecraft/config/deep/x.toml", "x")] {
+            zip.start_file(name, zip::write::SimpleFileOptions::default()).unwrap();
+            zip.write_all(body.as_bytes()).unwrap();
+        }
+        zip.finish().unwrap();
+
+        let state = AppState::new(root.clone()).unwrap();
+        // The plugin's frame: answers `plan` only for archives whose manifest it sees one folder down.
+        let bridge: Arc<Bridge> = Arc::new_cyclic(|weak: &std::sync::Weak<Bridge>| {
+            let weak = weak.clone();
+            Bridge::new(move |c| {
+                let seen = c.args[0].get("Old/mmc-pack.json").is_some() && c.args[0].get("Old/.minecraft/options.txt").is_none();
+                let plan = serde_json::json!({ "name": "Old", "gameVersion": "1.12.2", "loader": "", "loaderVersion": "", "files": [], "overrides": ["Old/.minecraft"] });
+                weak.upgrade().unwrap().reply(c.id, if seen && c.target == "importer" { Ok(plan) } else { Err("no".into()) });
+            })
+        });
+        bridge.listening();
+        *state.plugins.write().unwrap() = Registry::load(&[(plugins, false)], bridge);
+
+        let inst = import_file(&state, &archive, None, &|_| {}).await.unwrap();
+        assert_eq!((inst.name.as_str(), inst.version.as_str(), inst.pack.is_none()), ("Old", "1.12.2", true));
+        let dir = state.paths.instance_dir(&inst.id).unwrap();
+        assert_eq!(std::fs::read_to_string(dir.join("options.txt")).unwrap(), "fov:1");
+        assert!(dir.join("config/deep/x.toml").is_file());
+        assert_eq!(instances::list(&state).len(), 1);
+
+        std::fs::write(&archive, "not a zip").unwrap();
+        assert!(import_file(&state, &archive, None, &|_| {}).await.is_err());
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

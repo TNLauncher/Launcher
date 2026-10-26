@@ -104,7 +104,7 @@ mod tests {
             }
         }))
         .unwrap();
-        let plugin = Plugin { manifest, dir: root.clone(), bundled: false, source: None, account: None };
+        let plugin = Plugin { manifest, dir: root.clone(), bundled: false, source: None, account: None, importer: None };
 
         assert_eq!(storage_get(&state, &plugin, "k"), Value::Null);
         storage_set(&state, &plugin, "k", json!({ "a": 1 })).unwrap();

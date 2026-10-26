@@ -1,8 +1,8 @@
 use crate::error::Result;
 use crate::minecraft::loader;
-use crate::models::{Instance, InstanceSettings, Loader, Screenshot};
+use crate::models::{Instance, InstanceSettings, Loader, Screenshot, World};
 use crate::services::modpacks::{self, ImportProgress};
-use crate::services::{instances, mods, screenshots};
+use crate::services::{instances, mods, screenshots, worlds};
 use crate::state::AppState;
 use tauri::{ipc::{Channel, Response}, AppHandle, Manager, State};
 use tauri_plugin_opener::OpenerExt;
@@ -43,6 +43,17 @@ pub async fn import_modpack(
     .await
 }
 
+/// Creates an instance from a modpack archive on disk; whichever enabled plugin reads its format plans it.
+/// [`cancel_modpack_import`] with the path stops it.
+#[tauri::command]
+pub async fn import_modpack_file(app: AppHandle, state: State<'_, AppState>, path: String, on_progress: Channel<ImportProgress>) -> Result<Instance> {
+    let downloads = app.path().download_dir().ok();
+    modpacks::import_file(&state, std::path::Path::new(&path), downloads.as_deref(), &|p| {
+        let _ = on_progress.send(p);
+    })
+    .await
+}
+
 #[tauri::command]
 pub fn cancel_modpack_import(state: State<'_, AppState>, project: String) {
     modpacks::cancel(&state, &project)
@@ -62,6 +73,18 @@ pub fn set_instance_icon(state: State<'_, AppState>, id: String, icon: String) -
 #[tauri::command]
 pub fn set_instance_settings(state: State<'_, AppState>, id: String, settings: InstanceSettings) -> Result<()> {
     instances::set_settings(&state, &id, settings)
+}
+
+/// Copying reads every file, so it runs off the main thread.
+#[tauri::command]
+pub async fn copy_instance(app: AppHandle, id: String) -> Result<Instance> {
+    tauri::async_runtime::spawn_blocking(move || instances::copy(&app.state::<AppState>(), &id)).await?
+}
+
+/// "" = ungrouped.
+#[tauri::command]
+pub fn set_instance_group(state: State<'_, AppState>, id: String, group: String) -> Result<()> {
+    instances::set_group(&state, &id, &group)
 }
 
 #[tauri::command]
@@ -102,4 +125,26 @@ pub fn screenshot_bytes(state: State<'_, AppState>, id: String, file: String) ->
 #[tauri::command]
 pub fn mod_icon(state: State<'_, AppState>, id: String, file: String) -> Result<Response> {
     Ok(Response::new(mods::icon(&state, &id, &file)?.0))
+}
+
+#[tauri::command]
+pub fn list_worlds(state: State<'_, AppState>, id: String) -> Result<Vec<World>> {
+    worlds::list(&state, &id)
+}
+
+/// The world's `icon.png` bytes.
+#[tauri::command]
+pub fn world_icon(state: State<'_, AppState>, id: String, folder: String) -> Result<Response> {
+    Ok(Response::new(worlds::icon(&state, &id, &folder)?))
+}
+
+#[tauri::command]
+pub fn delete_world(state: State<'_, AppState>, id: String, folder: String) -> Result<()> {
+    worlds::delete(&state, &id, &folder)
+}
+
+/// Resolves with the copy's folder name.
+#[tauri::command]
+pub async fn copy_world(app: AppHandle, id: String, folder: String) -> Result<String> {
+    tauri::async_runtime::spawn_blocking(move || worlds::copy(&app.state::<AppState>(), &id, &folder)).await?
 }

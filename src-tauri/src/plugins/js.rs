@@ -127,6 +127,20 @@ impl ContentSource for JsSource {
     }
 }
 
+/// A modpack format reader (`tn.importers.register`). Its plan is untrusted like a source's.
+pub struct JsImporter {
+    pub plugin: String,
+    pub bridge: Arc<Bridge>,
+}
+
+impl JsImporter {
+    /// `root`: the archive's text files at the top and one folder down, by path. Throws for formats it does not read.
+    pub async fn plan(&self, root: &HashMap<String, String>) -> Result<PackPlan> {
+        let v = self.bridge.call(&self.plugin, "importer", "plan", vec![arg(root)]).await?;
+        serde_json::from_value(v).map_err(|e| AppError::Plugin(format!("{}.plan returned bad data: {e}", self.plugin)))
+    }
+}
+
 /// An account provider plugin (`tn.accounts.register`). Its answers are untrusted: see `services::account`.
 pub struct JsAccount {
     pub plugin: String,

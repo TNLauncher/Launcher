@@ -4,7 +4,7 @@
   const pending = new Map();
   let next = 1;
   /** What the plugin registered, by call target. */
-  const registered = { source: null, account: null };
+  const registered = { source: null, account: null, importer: null };
   const listeners = new Map();
   const post = (msg) => parent.postMessage({ tn: 1, ...msg }, "*");
   const message = (err) => String((err && err.message) || err);
@@ -75,9 +75,12 @@
       repair: (id) => request("instances.repair", { id }),
       restoreFiles: (id) => request("instances.restoreFiles", { id }),
       change: (id, change) => request("instances.change", { id, change }),
+      /** Asks the user where to save, then zips the instance; resolves with the path, or null when cancelled. */
+      export: (id, spec) => request("instances.export", { id, spec }),
     }),
     content: Object.freeze({
       identify: (instance, source, kind) => request("content.identify", { instance, source, kind }),
+      hashes: (instance, kind) => request("content.hashes", { instance, kind }),
       install: (p) => request("content.install", p),
       setEnabled: (instance, kind, file, enabled) => request("content.setEnabled", { instance, kind, file, enabled }),
       delete: (instance, kind, file) => request("content.delete", { instance, kind, file }),
@@ -113,6 +116,12 @@
       register(impl) {
         if (registered.account) throw new Error("An account provider is already registered");
         registered.account = impl;
+      },
+    }),
+    importers: Object.freeze({
+      register(impl) {
+        if (registered.importer) throw new Error("An importer is already registered");
+        registered.importer = impl;
       },
     }),
     net: Object.freeze({

@@ -46,6 +46,8 @@ export interface Manifest {
     })[];
     /** Makes the plugin an account provider: these fields make up its sign-in form. `activate` must call `tn.accounts.register`. */
     account?: { fields: { key: string; label: string; hint?: string; type: "text" | "secret" }[] };
+    /** Reads modpack archives of some format, which the user imports from a file. `activate` must call `tn.importers.register`. */
+    importer?: boolean;
     /** Options the user fills in Settings; read them with `tn.settings.get()`. */
     settings?: {
       /** `[A-Za-z0-9_-]`. */
@@ -311,8 +313,26 @@ export interface ContentSource {
   versions(project: string, filter: VersionFilter): Promise<Version[]>;
   /** Keyed by the given SHA-1; unknown files are left out. */
   identify(sha1: string[]): Promise<Record<string, Identified>>;
-  /** `root`: the archive's top-level text files by name. */
+  /** `root`: the archive's text files at the top and one folder down, by path. Also called for archives the user imports from a file: throw when the format is not yours. */
   planPack(root: Record<string, string>): Promise<PackPlan>;
+}
+
+/** What `tn.importers.register` takes. */
+export interface Importer {
+  /** `root`: the archive's text files at the top and one folder down, by path. Throw when the format is not yours. */
+  plan(root: Record<string, string>): Promise<PackPlan>;
+}
+
+/** What `tn.instances.export` packs. */
+export interface ExportSpec {
+  /** Suggested in the save dialog; its extension becomes the file filter. */
+  fileName: string;
+  /** Archive folder the instance's files go under, e.g. `overrides`; "" or absent = the archive root. */
+  root?: string;
+  /** Text files to add (manifests), by archive path. */
+  files?: Record<string, string>;
+  /** Instance paths (`saves`, `mods/a.jar`) to leave out, with everything under them. Launcher files are always left out. */
+  skip?: string[];
 }
 
 /** A stored account as `session` receives it. */
@@ -397,11 +417,15 @@ export interface TN {
     restoreFiles(id: string): Promise<number>;
     /** Needs `permissions.content`. Resolves with what changed, for people. */
     change(id: string, change: { kind: "setRam"; mb: number } | { kind: "autoJava" } | { kind: "updateLoader" }): Promise<string>;
+    /** Asks the user where to save, then zips the instance as `spec` says. Resolves with the saved path, or null when the user cancels. */
+    export(id: string, spec: ExportSpec): Promise<string | null>;
   };
   /** Content of an instance. `identify` needs `permissions.instances`, the rest `permissions.content`; changes fail while the game runs. */
   content: {
     /** Files the source recognises, by file name. */
     identify(instance: string, source: string, kind: ContentKind): Promise<Record<string, { project: ProjectSummary; versionNumber: string }>>;
+    /** Hex SHA-1 of every file of the kind, on and off, by file name. Needs `permissions.instances`. */
+    hashes(instance: string, kind: ContentKind): Promise<Record<string, string>>;
     /** Installs a fitting build (newest when no `version`) with its required mods; `replace` swaps that file in place. */
     install(p: { instance: string; source: string; kind: ContentKind; project: string; version?: string; replace?: string }): Promise<void>;
     setEnabled(instance: string, kind: ContentKind, file: string, enabled: boolean): Promise<void>;
@@ -425,6 +449,7 @@ export interface TN {
     versions(source: string, project: string, filter: VersionFilter): Promise<Version[]>;
   };
   accounts: { register(provider: AccountProvider): void };
+  importers: { register(importer: Importer): void };
   net: { fetch(url: string, init?: FetchInit): Promise<FetchResponse> };
   /** Printed to the launcher's log. */
   log(...args: unknown[]): Promise<void>;

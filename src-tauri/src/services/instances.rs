@@ -4,6 +4,10 @@ use crate::models::{Instance, InstanceSettings, Loader};
 use crate::state::AppState;
 use crate::storage;
 use std::collections::HashMap;
+use std::path::Path;
+
+/// Launcher files of a running or past session, not part of the instance itself.
+const SESSION_FILES: [&str; 2] = [".natives", "launcher.log"];
 
 pub fn list(state: &AppState) -> Vec<Instance> {
     storage::load_instances(state)
@@ -68,6 +72,44 @@ pub fn set_icon(state: &AppState, id: &str, icon: &str) -> Result<()> {
 
 pub fn set_settings(state: &AppState, id: &str, settings: InstanceSettings) -> Result<()> {
     update(state, id, |i| i.settings = settings)
+}
+
+pub fn set_group(state: &AppState, id: &str, group: &str) -> Result<()> {
+    update(state, id, |i| i.group = group.trim().into())
+}
+
+/// A copy of the instance with its files, named "<name> (copy)"; play time starts over.
+pub fn copy(state: &AppState, id: &str) -> Result<Instance> {
+    let src = get(state, id)?;
+    let fresh = new(&format!("{} (copy)", src.name), &src.version, src.loader, src.loader_version.clone());
+    let copy = Instance { id: fresh.id, name: fresh.name, created: fresh.created, last_played: 0, play_seconds: 0, ..src };
+    let dir = state.paths.instance_dir(&copy.id)?;
+    if let Err(e) = copy_dir(&state.paths.instance_dir(id)?, &dir, &SESSION_FILES) {
+        let _ = std::fs::remove_dir_all(&dir);
+        return Err(e);
+    }
+    add(state, &copy)?;
+    Ok(copy)
+}
+
+/// Copies `from` into `to` recursively, leaving out top-level entries named in `skip`.
+pub(crate) fn copy_dir(from: &Path, to: &Path, skip: &[&str]) -> Result<()> {
+    std::fs::create_dir_all(to)?;
+    for entry in std::fs::read_dir(from)? {
+        let entry = entry?;
+        let name = entry.file_name();
+        if skip.iter().any(|s| name == *s) {
+            continue;
+        }
+        let (src, dst) = (entry.path(), to.join(&name));
+        // Symlinks are copied as what they point to; a link loop would recurse, which game dirs do not have.
+        if src.is_dir() {
+            copy_dir(&src, &dst, &[])?;
+        } else {
+            std::fs::copy(&src, &dst)?;
+        }
+    }
+    Ok(())
 }
 
 pub fn delete(state: &AppState, id: &str) -> Result<()> {

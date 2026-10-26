@@ -2,12 +2,14 @@
 
 pub mod account;
 pub mod discord;
+pub mod export;
 pub mod repair;
 pub mod instances;
 pub mod launcher;
 pub mod modpacks;
 pub mod mods;
 pub mod screenshots;
+pub mod worlds;
 pub mod skins;
 
 /// Unix time in seconds.

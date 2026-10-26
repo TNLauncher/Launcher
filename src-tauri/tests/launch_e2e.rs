@@ -26,12 +26,12 @@ async fn fabric_reaches_main_menu_init() {
     let java = java::ensure(&c, &root, &base, &progress).await.unwrap();
     let v = version::with_loader(&c, &root, base, Loader::Fabric, &lv, &java, &progress).await.unwrap();
     let natives = game_dir.join(".natives");
-    let cp = install::install(&c, &root, &v, &natives, &progress).await.unwrap();
+    let cp = install::install(&c, &root, &v, &natives, tnlauncher_lib::minecraft::http::Check::Size, &progress).await.unwrap();
 
     let session = auth::Session { name: "Tester".into(), uuid: "00000000000000000000000000000000".into(), token: "0".into(), user_type: "legacy", jvm_args: vec![] };
     let mut cmd = command::build(&v, &command::LaunchOptions {
-        java: &java, root: &root, game_dir: &game_dir, natives: &natives, classpath: &cp,
-        session: &session, ram_mb: 2048, jvm_args: "", width: 854, height: 480, fullscreen: false, wrapper: "",
+        java: &java, root: &root, game_dir: &game_dir, natives: &natives, classpath: &cp.classpath,
+        session: &session, ram_mb: 2048, jvm_args: "", width: 854, height: 480, fullscreen: false, wrapper: "", world: None,
     });
     let child = cmd.stdout(Stdio::piped()).stderr(Stdio::piped()).spawn().unwrap();
     let pid = child.id();

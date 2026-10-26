@@ -32,6 +32,8 @@ pub struct Instance {
     pub pack: Option<PackRef>,
     /// Per-instance launch options; unset fields fall back to the global settings.
     pub settings: InstanceSettings,
+    /// Group the instance is listed under; empty = ungrouped.
+    pub group: String,
     /// Pre-plugin builds stored a Modrinth project here; read once and moved into `pack`.
     #[serde(skip_serializing)]
     pub(crate) modpack_id: String,
@@ -122,6 +124,17 @@ pub struct Screenshot {
     pub size: u64,
     /// Unix seconds of the file's last change.
     pub taken: u64,
+}
+
+/// A folder in the instance's `saves/`.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct World {
+    pub folder: String,
+    /// Unix seconds `level.dat` last changed, i.e. last played.
+    pub played: u64,
+    /// Has an `icon.png`.
+    pub icon: bool,
 }
 
 #[cfg(test)]

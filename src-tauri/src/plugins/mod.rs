@@ -60,6 +60,9 @@ pub struct Contributes {
     pub settings: Vec<SettingSpec>,
     /// Makes the plugin an account provider: the sign-in form's fields. It must `tn.accounts.register` one.
     pub account: Option<AccountSpec>,
+    /// Reads modpack archives of some format (`tn.importers.register`); the user imports them from a file.
+    #[serde(default)]
+    pub importer: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -167,6 +170,7 @@ pub struct Plugin {
     pub bundled: bool,
     pub source: Option<Arc<dyn ContentSource>>,
     pub account: Option<js::JsAccount>,
+    pub importer: Option<js::JsImporter>,
 }
 
 impl Plugin {
@@ -222,7 +226,8 @@ impl Registry {
                             Arc::new(js::JsSource { plugin: manifest.id.clone(), bridge: reg.bridge.clone() }) as Arc<dyn ContentSource>
                         });
                         let account = manifest.contributes.account.as_ref().map(|_| js::JsAccount { plugin: manifest.id.clone(), bridge: reg.bridge.clone() });
-                        reg.plugins.push(Arc::new(Plugin { manifest, dir: folder, bundled: *bundled, source, account }));
+                        let importer = manifest.contributes.importer.then(|| js::JsImporter { plugin: manifest.id.clone(), bridge: reg.bridge.clone() });
+                        reg.plugins.push(Arc::new(Plugin { manifest, dir: folder, bundled: *bundled, source, account, importer }));
                     }
                     Err(e) => reg.failed.push(Failed { name, error: e.to_string() }),
                 }
@@ -368,6 +373,12 @@ pub fn enabled(state: &AppState, id: &str) -> Result<Arc<Plugin>> {
         return Err(AppError::Unsupported(format!("{} is turned off", found.manifest.name)));
     }
     Ok(found)
+}
+
+/// Every plugin the user has not turned off, in load order.
+pub fn all_enabled(state: &AppState) -> Vec<Arc<Plugin>> {
+    let off = storage::load_disabled_plugins(state);
+    state.plugins.read().unwrap().plugins.iter().filter(|p| !off.contains(&p.manifest.id)).cloned().collect()
 }
 
 pub fn set_enabled(state: &AppState, id: &str, enabled: bool) -> Result<()> {

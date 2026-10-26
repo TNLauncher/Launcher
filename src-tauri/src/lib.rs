@@ -22,8 +22,16 @@ use tauri::{Emitter, Manager};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // WebKitGTK's DMABUF renderer shows a stale frame when an opacity/transform/filter animation
+    // or transition ends, so every animation flashes its start state. Keep a user's own setting.
+    #[cfg(target_os = "linux")]
+    if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none() {
+        // SAFETY: runs first in `run`, before Tauri or WebKit start any threads.
+        unsafe { std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1") };
+    }
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         // `plugin://localhost/<id>/<file>`: a plugin's files, with the SDK and a CSP built from its manifest.
         .register_asynchronous_uri_scheme_protocol("plugin", |ctx, req, responder| {
             let app = ctx.app_handle().clone();
@@ -74,16 +82,23 @@ pub fn run() {
             commands::instances::loader_games,
             commands::instances::loader_builds,
             commands::instances::import_modpack,
+            commands::instances::import_modpack_file,
             commands::instances::cancel_modpack_import,
             commands::instances::rename_instance,
             commands::instances::set_instance_icon,
             commands::instances::set_instance_settings,
+            commands::instances::copy_instance,
+            commands::instances::set_instance_group,
             commands::instances::delete_instance,
             commands::instances::open_instance_dir,
             commands::instances::list_screenshots,
             commands::instances::delete_screenshot,
             commands::instances::screenshot_bytes,
             commands::instances::mod_icon,
+            commands::instances::list_worlds,
+            commands::instances::world_icon,
+            commands::instances::delete_world,
+            commands::instances::copy_world,
             commands::game::launch,
             commands::game::stop_game,
             commands::game::read_game_log,
@@ -110,3 +125,4 @@ pub fn run() {
         .run(tauri::generate_context!())
         .expect("error while running TNLauncher");
 }
+

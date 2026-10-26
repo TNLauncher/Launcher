@@ -98,7 +98,8 @@ pub(crate) async fn prepare(state: &AppState, id: &str, check: Check, progress: 
 }
 
 /// Resolves when the game process has started; the guard then moves to the watcher thread.
-pub async fn launch(app: &AppHandle, id: &str, on_event: Channel<LaunchEvent>) -> Result<()> {
+/// `world`: a folder in `saves/` to open straight away.
+pub async fn launch(app: &AppHandle, id: &str, world: Option<&str>, on_event: Channel<LaunchEvent>) -> Result<()> {
     let guard = RunningGuard::acquire(app, id)?;
     let state = app.state::<AppState>();
     let root = &state.paths.root;
@@ -113,6 +114,12 @@ pub async fn launch(app: &AppHandle, id: &str, on_event: Channel<LaunchEvent>) -
     let session = super::account::session(&state).await?;
     let Prepared { inst, settings, version: v, java, installed } = prepare(&state, id, Check::Size, &progress).await?;
     let classpath = installed.classpath;
+    if let Some(w) = world {
+        crate::services::mods::safe_file(w)?;
+        if !command::supports_quick_play(&v) {
+            return Err(AppError::Unsupported("Opening a world from the launcher needs Minecraft 1.20 or newer".into()));
+        }
+    }
 
     progress(Stage::Starting, 0, 0);
     let log = Arc::new(File::create(game_dir.join("launcher.log"))?);
@@ -131,6 +138,7 @@ pub async fn launch(app: &AppHandle, id: &str, on_event: Channel<LaunchEvent>) -
             height: settings.height,
             fullscreen: settings.fullscreen,
             wrapper: &inst.settings.wrapper,
+            world,
         },
     );
     cmd.envs(inst.settings.env_vars()).stdout(Stdio::piped()).stderr(Stdio::piped());

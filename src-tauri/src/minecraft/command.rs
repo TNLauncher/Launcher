@@ -19,6 +19,8 @@ pub struct LaunchOptions<'a> {
     pub fullscreen: bool,
     /// Command line the game runs through (`gamemoderun`...); empty = run Java directly.
     pub wrapper: &'a str,
+    /// World folder in `saves/` to open straight away (1.20+).
+    pub world: Option<&'a str>,
 }
 
 pub fn build(version: &Value, o: &LaunchOptions) -> Command {
@@ -101,5 +103,13 @@ pub fn build(version: &Value, o: &LaunchOptions) -> Command {
     if o.fullscreen {
         cmd.arg("--fullscreen");
     }
+    if let Some(world) = o.world {
+        cmd.args(["--quickPlaySingleplayer", world]);
+    }
     cmd
+}
+
+/// Whether the version takes `--quickPlaySingleplayer` (1.20, snapshot 23w14a, and later).
+pub fn supports_quick_play(version: &Value) -> bool {
+    version["arguments"]["game"].to_string().contains("quickPlaySingleplayer")
 }

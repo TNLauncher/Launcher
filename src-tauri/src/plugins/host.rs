@@ -226,13 +226,36 @@ async fn handle(app: &tauri::AppHandle, state: &AppState, plugin: &str, method: 
             Ok(with_mods(state, one)?.as_array_mut().and_then(|a| a.pop()).unwrap_or(Value::Null))
         }
         "instances.readLog" => Ok(Value::String(crate::services::launcher::read_log(state, &str_param(&params, "id")?)?)),
-        "instances.mods" | "instances.crashReports" | "instances.missingFiles" | "instances.launchSettings" | "content.identify" if !m.permissions.instances => {
+        "instances.mods" | "instances.crashReports" | "instances.missingFiles" | "instances.launchSettings" | "instances.export" | "content.identify" | "content.hashes"
+            if !m.permissions.instances =>
+        {
             Err(AppError::Plugin(format!("{} may not read instances", m.name)))
         }
         "instances.mods" => Ok(serde_json::to_value(repair::scan_mods(state, &str_param(&params, "id")?)?)?),
         "instances.crashReports" => Ok(Value::String(repair::crash_reports(state, &str_param(&params, "id")?)?)),
         "instances.missingFiles" => Ok(serde_json::to_value(repair::missing_files(state, &str_param(&params, "id")?).await?)?),
         "instances.launchSettings" => Ok(serde_json::to_value(repair::launch_facts(state, &str_param(&params, "id")?)?)?),
+        "instances.export" => {
+            use tauri_plugin_dialog::DialogExt;
+            let id = str_param(&params, "id")?;
+            crate::services::instances::get(state, &id)?;
+            let spec: crate::services::export::Spec = serde_json::from_value(params.get("spec").cloned().unwrap_or(Value::Null))?;
+            // The user picks where it goes; the plugin never names a path.
+            let (tx, rx) = tokio::sync::oneshot::channel();
+            let mut dialog = app.dialog().file().set_file_name(&spec.file_name);
+            if let Some((_, ext)) = spec.file_name.rsplit_once('.') {
+                dialog = dialog.add_filter(ext, &[ext]);
+            }
+            dialog.save_file(move |p| drop(tx.send(p)));
+            let Some(dest) = rx.await.ok().flatten().and_then(|p| p.into_path().ok()) else { return Ok(Value::Null) };
+            let (handle, out) = (app.clone(), dest.clone());
+            tauri::async_runtime::spawn_blocking(move || crate::services::export::write(&handle.state::<AppState>(), &id, &spec, &out)).await??;
+            Ok(Value::String(dest.to_string_lossy().into()))
+        }
+        "content.hashes" => {
+            let kind: ContentKind = serde_json::from_value(params.get("kind").cloned().unwrap_or(Value::Null))?;
+            Ok(serde_json::to_value(mods::hashes(state, &str_param(&params, "instance")?, kind, super::HashAlgo::Sha1)?)?)
+        }
         "content.identify" => {
             let (id, source) = (str_param(&params, "instance")?, str_param(&params, "source")?);
             let kind: ContentKind = serde_json::from_value(params.get("kind").cloned().unwrap_or(Value::Null))?;

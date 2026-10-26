@@ -4,8 +4,9 @@ use crate::state::AppState;
 use tauri::{ipc::Channel, AppHandle, State};
 
 #[tauri::command]
-pub async fn launch(app: AppHandle, id: String, on_event: Channel<LaunchEvent>) -> Result<()> {
-    launcher::launch(&app, &id, on_event).await
+/// `world`: a folder in the instance's `saves/` to open straight away; `None` = the title screen.
+pub async fn launch(app: AppHandle, id: String, world: Option<String>, on_event: Channel<LaunchEvent>) -> Result<()> {
+    launcher::launch(&app, &id, world.as_deref(), on_event).await
 }
 
 #[tauri::command]
