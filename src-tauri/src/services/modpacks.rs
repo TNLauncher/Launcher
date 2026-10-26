@@ -1,6 +1,6 @@
 //! Modpack import for any content source: the source reads the archive's manifest into a `PackPlan`,
 //! the launcher downloads its files and copies the archive's override folders over the game directory.
-use crate::error::{AppError, Result};
+use crate::error::{AppError, ManualDownload, Result};
 use crate::minecraft::http::{self, Job};
 use crate::models::{Instance, Loader, PackRef};
 use crate::plugins::{
@@ -54,6 +54,23 @@ fn jobs(dir: &Path, allowed: &dyn Fn(&str) -> bool, files: &[PackFile]) -> Resul
             Ok(Job { url: url.clone(), path: dir.join(safe_rel(&f.path)?), size: f.size })
         })
         .collect()
+}
+
+/// Where each hand-downloaded file sits in `downloads`, by its file name; any missing one fails with what to fetch.
+fn find_manual(files: &[PackFile], downloads: Option<&Path>) -> Result<Vec<PathBuf>> {
+    let found = |f: &PackFile| Some(downloads?.join(Path::new(&f.path).file_name()?)).filter(|p| p.is_file());
+    let missing: Vec<_> = files
+        .iter()
+        .filter(|f| found(f).is_none())
+        .map(|f| ManualDownload {
+            name: Path::new(&f.path).file_name().map_or(f.path.clone(), |n| n.to_string_lossy().into()),
+            page: f.page.clone().unwrap_or_default(),
+        })
+        .collect();
+    if !missing.is_empty() {
+        return Err(AppError::ManualDownloads(missing));
+    }
+    Ok(files.iter().filter_map(found).collect())
 }
 
 /// Top-level text files of the archive, which is where pack formats keep their manifest.
@@ -125,11 +142,12 @@ pub async fn import(
     source_id: &str,
     project: &str,
     version: Option<&str>,
+    downloads: Option<&Path>,
     progress: &(dyn Fn(ImportProgress) + Sync),
 ) -> Result<Instance> {
     let (handle, reg) = AbortHandle::new_pair();
     state.imports.lock().unwrap().insert(project.into(), handle);
-    let result = Abortable::new(install(state, source_id, project, version, progress), reg).await;
+    let result = Abortable::new(install(state, source_id, project, version, downloads, progress), reg).await;
     state.imports.lock().unwrap().remove(project);
     result.unwrap_or(Err(AppError::Cancelled))
 }
@@ -146,6 +164,7 @@ async fn install(
     source_id: &str,
     project: &str,
     version: Option<&str>,
+    downloads: Option<&Path>,
     progress: &(dyn Fn(ImportProgress) + Sync),
 ) -> Result<Instance> {
     let plugin = plugins::enabled(state, source_id)?;
@@ -167,8 +186,11 @@ async fn install(
     }
 
     let bytes = http::fetch_bytes(&state.http, &file.url).await?;
-    let plan = source.plan_pack(&root_files(&bytes)?).await?;
+    let mut plan = source.plan_pack(&root_files(&bytes)?).await?;
     let loader = loader_of(&plan)?;
+    // Checked before any download so the user fetches them first, then retries.
+    let (manual, auto): (Vec<_>, Vec<_>) = std::mem::take(&mut plan.files).into_iter().partition(|f| f.urls.is_empty() && f.page.is_some());
+    let manual_src = find_manual(&manual, downloads)?;
     // Kept locally so the row does not hit the source on every render; a missing icon is not worth failing over.
     let icon = match source.project(project).await.ok().and_then(|p| p.icon_url) {
         Some(url) => http::fetch_bytes(&state.http, &url).await.ok().and_then(|b| icon_data_url(&b)),
@@ -182,9 +204,16 @@ async fn install(
     let dir = state.paths.instance_dir(&instance.id)?;
     let mut cleanup = Cleanup(Some(&dir));
 
-    let jobs = jobs(&dir, &allowed, &plan.files)?;
+    let jobs = jobs(&dir, &allowed, &auto)?;
     progress(ImportProgress { done: 0, total: jobs.len() });
     http::download_all(&state.http, jobs, &|done, total| progress(ImportProgress { done, total })).await?;
+    for (f, src) in manual.iter().zip(&manual_src) {
+        let out = dir.join(safe_rel(&f.path)?);
+        if let Some(parent) = out.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        std::fs::copy(src, out)?;
+    }
     extract_overrides(&bytes, &dir, &plan.overrides)?;
     instances::add(state, &instance)?;
     cleanup.0 = None;
@@ -205,12 +234,27 @@ mod tests {
     #[test]
     fn skips_foreign_hosts() {
         let hosts = |u: &str| u.starts_with("https://cdn.modrinth.com/");
-        let file = |url: &str| PackFile { path: "mods/a.jar".into(), urls: vec!["https://evil.com/a.jar".into(), url.into()], size: None };
+        let file = |url: &str| PackFile { path: "mods/a.jar".into(), urls: vec!["https://evil.com/a.jar".into(), url.into()], size: None, page: None };
         let dir = Path::new("/x");
         assert_eq!(jobs(dir, &hosts, &[file("https://cdn.modrinth.com/a.jar")]).unwrap()[0].url, "https://cdn.modrinth.com/a.jar");
         assert!(jobs(dir, &hosts, &[file("https://evil.com/b.jar")]).is_err());
-        let traversal = PackFile { path: "../a.jar".into(), urls: vec!["https://cdn.modrinth.com/a.jar".into()], size: None };
+        let traversal = PackFile { path: "../a.jar".into(), urls: vec!["https://cdn.modrinth.com/a.jar".into()], size: None, page: None };
         assert!(jobs(dir, &hosts, &[traversal]).is_err());
+    }
+
+    #[test]
+    fn finds_manual_downloads() {
+        let dl = std::env::temp_dir().join(format!("tn-manual-{}", std::process::id()));
+        std::fs::create_dir_all(&dl).unwrap();
+        std::fs::write(dl.join("a.jar"), b"").unwrap();
+        let file = |p: &str| PackFile { path: p.into(), urls: vec![], size: None, page: Some(format!("https://x/{p}")) };
+        assert_eq!(find_manual(&[file("mods/a.jar")], Some(&dl)).unwrap(), vec![dl.join("a.jar")]);
+        match find_manual(&[file("mods/a.jar"), file("mods/b.jar")], Some(&dl)) {
+            Err(AppError::ManualDownloads(m)) => assert_eq!((m.len(), m[0].name.as_str(), m[0].page.as_str()), (1, "b.jar", "https://x/mods/b.jar")),
+            other => panic!("{other:?}"),
+        }
+        assert!(find_manual(&[file("mods/a.jar")], None).is_err());
+        std::fs::remove_dir_all(dl).unwrap();
     }
 
     #[test]

@@ -4,7 +4,7 @@ use crate::models::{Instance, InstanceSettings, Loader, Screenshot};
 use crate::services::modpacks::{self, ImportProgress};
 use crate::services::{instances, mods, screenshots};
 use crate::state::AppState;
-use tauri::{ipc::{Channel, Response}, AppHandle, State};
+use tauri::{ipc::{Channel, Response}, AppHandle, Manager, State};
 use tauri_plugin_opener::OpenerExt;
 
 #[tauri::command]
@@ -28,13 +28,16 @@ pub async fn loader_builds(state: State<'_, AppState>, version: String, loader: 
 /// Creates an instance from a modpack project; `version` is a version id, `None` = newest.
 #[tauri::command]
 pub async fn import_modpack(
+    app: AppHandle,
     state: State<'_, AppState>,
     source: String,
     project: String,
     version: Option<String>,
     on_progress: Channel<ImportProgress>,
 ) -> Result<Instance> {
-    modpacks::import(&state, &source, &project, version.as_deref(), &|p| {
+    // Where hand-downloaded files of a pack are looked for.
+    let downloads = app.path().download_dir().ok();
+    modpacks::import(&state, &source, &project, version.as_deref(), downloads.as_deref(), &|p| {
         let _ = on_progress.send(p);
     })
     .await

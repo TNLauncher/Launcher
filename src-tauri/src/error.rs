@@ -27,6 +27,15 @@ pub enum AppError {
     Plugin(String),
     #[error("Cancelled")]
     Cancelled,
+    /// Files to download by hand into Downloads before retrying.
+    #[error("Their authors don't allow launchers to download {} files; get them from their pages, then retry", .0.len())]
+    ManualDownloads(Vec<ManualDownload>),
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ManualDownload {
+    pub name: String,
+    pub page: String,
 }
 
 impl AppError {
@@ -43,6 +52,7 @@ impl AppError {
             Self::Unsupported(_) => "unsupported",
             Self::Plugin(_) => "plugin",
             Self::Cancelled => "cancelled",
+            Self::ManualDownloads(_) => "manualDownloads",
         }
     }
 }
@@ -50,9 +60,12 @@ impl AppError {
 impl Serialize for AppError {
     fn serialize<S: Serializer>(&self, s: S) -> std::result::Result<S::Ok, S::Error> {
         use serde::ser::SerializeStruct;
-        let mut st = s.serialize_struct("AppError", 2)?;
+        let mut st = s.serialize_struct("AppError", 3)?;
         st.serialize_field("kind", self.kind())?;
         st.serialize_field("message", &self.to_string())?;
+        if let Self::ManualDownloads(files) = self {
+            st.serialize_field("files", files)?;
+        }
         st.end()
     }
 }

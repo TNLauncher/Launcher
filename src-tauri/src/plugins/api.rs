@@ -227,6 +227,9 @@ pub struct PackFile {
     /// Mirrors; the first one on an allowed host is used.
     pub urls: Vec<String>,
     pub size: Option<u64>,
+    /// With no `urls`: the page where the user downloads it by hand (its author does not allow launchers).
+    #[serde(default)]
+    pub page: Option<String>,
 }
 
 /// A catalog of projects to search and install from. Methods return boxed futures so sources are object-safe.
