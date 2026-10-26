@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { listen } from "@tauri-apps/api/event";
 import { lazy, Suspense, useLayoutEffect, useRef } from "react";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Sidebar } from "@/components/layout/Sidebar";
@@ -7,7 +8,7 @@ import { Toaster } from "@/components/ui/Toast";
 import { ManualDownloadsDialog } from "@/features/modpacks/ManualDownloadsDialog";
 import { PluginHost } from "@/plugins/PluginHost";
 import { PluginPage } from "@/plugins/PluginPage";
-import { useLauncherInit } from "@/store/LauncherContext";
+import { useLauncher, useLauncherInit } from "@/store/LauncherContext";
 import { registerScroller, savedScroll, useRouteKey, useUi, useUiInit } from "@/store/UiContext";
 import { viewComponent } from "@/views";
 import s from "@/components/layout/Shell.module.css";
@@ -64,6 +65,12 @@ function Shell() {
 
 // Remote catalog data (content sources): cached for the session, refetched only when stale.
 const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 5 * 60_000, retry: 1, refetchOnWindowFocus: false } } });
+
+// A plugin changed an instance's files or settings: reload what the UI shows of it.
+void listen<string>("instance-changed", (e) => {
+  void queryClient.invalidateQueries({ queryKey: ["content", e.payload] });
+  void useLauncher.getState().refresh();
+});
 
 export function App() {
   return (

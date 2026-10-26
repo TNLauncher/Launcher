@@ -7,9 +7,9 @@ import { InstanceContent } from "@/features/content/InstanceContent";
 import { UpdateDialog } from "@/features/content/UpdateDialog";
 import { useInstanceBulkUpdate } from "@/features/content/useContent";
 import { lastPlayed, LOADER_ICON, loaderLabel, playTime } from "@/lib/format";
-import { useSourceEnabled } from "@/hooks/useSource";
+import { usePluginTabs, useSourceEnabled } from "@/hooks/useSource";
+import { openInstanceTab } from "@/store/instanceTab";
 import { useLauncher } from "@/store/LauncherContext";
-import { repair } from "@/store/repair";
 import { useUi } from "@/store/UiContext";
 import { useBackLabel } from "@/components/layout/Sidebar";
 import type { Instance } from "@/types";
@@ -31,6 +31,7 @@ export function InstancePage({ instance: i, onBack }: { instance: Instance; onBa
   const icon = i.icon || pack.data?.iconUrl;
   const color = pack.data?.color;
   const backLabel = useBackLabel();
+  const headerTabs = usePluginTabs("header");
 
   return (
     <div className={cx(s.packPage, s.instancePage)} style={color != null ? ({ "--pack": `#${color.toString(16).padStart(6, "0")}` } as React.CSSProperties) : undefined}>
@@ -70,9 +71,11 @@ export function InstancePage({ instance: i, onBack }: { instance: Instance; onBa
                 </Button>
               )}
               <UpdateDialog candidates={bulkUpdate.candidates} onClose={bulkUpdate.dismiss} onConfirm={bulkUpdate.apply} />
-              <Button variant="overlay" icon="healing" title="Repair files and find what stops this instance from starting" onClick={() => repair.focus(i.id)}>
-                Repair
-              </Button>
+              {headerTabs.map((t) => (
+                <Button key={t.key} variant="overlay" icon={t.icon} onClick={() => openInstanceTab(i.id, t.key)}>
+                  {t.title}
+                </Button>
+              ))}
               <IconButton icon="folder_open" label="Open instance folder" variant="overlay" onClick={() => launcher.openInstanceDir(i.id)} />
               <Button variant="primary" size="lg" icon="play_arrow" loading={starting} disabled={running || busy} onClick={() => launch(i.id)}>
                 {running ? "Running" : starting ? "Starting" : "Play"}

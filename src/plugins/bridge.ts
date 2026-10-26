@@ -160,5 +160,8 @@ window.addEventListener("message", (e) => {
   }
 });
 
+// Events Rust sends one plugin, such as `repair-progress` for a repair it asked for.
+void listen<{ plugin: string; name: string; payload: unknown }>("plugin-event", (e) => emitToPlugin(e.payload.plugin, e.payload.name, e.payload.payload));
+
 // Started at import, before anything can ask Rust for a plugin call; Rust holds calls until then.
 void listen<PluginCall>("plugin-call", (e) => deliver(e.payload)).then(() => call<void>("plugin_host_ready"));

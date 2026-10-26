@@ -45,6 +45,10 @@ export interface PluginView {
   title: string;
   icon: string;
   entry: string;
+  /** Instance tabs: also a button in the instance header. */
+  header?: boolean;
+  /** Instance tabs: offered next to a crash or launch error. */
+  crash?: boolean;
 }
 
 export interface PluginSetting {

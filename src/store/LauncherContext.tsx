@@ -6,7 +6,6 @@ import { toast } from "@/components/ui/Toast";
 import { broadcast } from "@/plugins/bridge";
 import { gameLogs } from "./gameLogs";
 import { imports, type PackHit } from "./imports";
-import { repair } from "./repair";
 import { sources, type Version } from "@/api/sources";
 import { errorMessage, recency } from "@/lib/format";
 import type { Instance, Settings, Snapshot, Stage } from "@/types";
@@ -143,8 +142,6 @@ export function useLauncherInit() {
       gameLogs.listen(),
       launcher.onGameExit(({ id, code }) => {
         broadcast("game-exited", { instanceId: id, code });
-        // A new session wrote a new log: the last check no longer describes it.
-        repair.invalidate(id);
         if (!gameLogs.exited(id, code) && code) {
           useLauncher.setState({ error: { id, message: `Game crashed with exit code ${code}. Its log is in Console.` } });
         }

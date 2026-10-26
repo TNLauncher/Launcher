@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo, useRef } from "react";
 import { create } from "zustand";
 import { sources, type Hit, type ProjectKind, type SourceInfo } from "@/api/sources";
+import type { PluginTabKey } from "@/store/instanceTab";
 
 export const usePlugins = () => useQuery({ queryKey: ["plugins"], queryFn: sources.listPlugins, staleTime: Infinity });
 
@@ -59,4 +60,16 @@ export function useFavorites(source: string, kind: ProjectKind) {
     [qc, source, kind]
   );
   return { hits, ids, toggle };
+}
+
+/** Instance tabs of enabled plugins that asked for a header button or a place next to crashes. */
+export function usePluginTabs(where: "header" | "crash") {
+  const plugins = usePlugins().data;
+  return useMemo(
+    () =>
+      (plugins ?? [])
+        .filter((p) => p.enabled && !p.error)
+        .flatMap((p) => p.instanceTabs.filter((t) => t[where]).map((t) => ({ key: `plugin:${p.id}:${t.id}` as PluginTabKey, title: t.title, icon: t.icon }))),
+    [plugins, where]
+  );
 }

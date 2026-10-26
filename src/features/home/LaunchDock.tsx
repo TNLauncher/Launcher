@@ -5,7 +5,8 @@ import { cx } from "@/lib/cx";
 import { errorMessage, LOADER_ICON, LOADERS, lastPlayed, STAGE_LABEL } from "@/lib/format";
 import { gameLogs, useGameStopping } from "@/store/gameLogs";
 import { useLauncher, useProgress, useRecentInstances, useSelectedInstance } from "@/store/LauncherContext";
-import { repair } from "@/store/repair";
+import { usePluginTabs } from "@/hooks/useSource";
+import { openInstanceTab } from "@/store/instanceTab";
 import { useUi } from "@/store/UiContext";
 import s from "./home.module.css";
 
@@ -58,6 +59,7 @@ function DockAction() {
   const stopping = useGameStopping(inst?.id);
   const [stopError, setStopError] = useState<string | null>(null);
   const statusId = useId();
+  const crashTabs = usePluginTabs("crash");
   const preparing = !!inst && busyId === inst.id;
   const known = !!progress && progress.total > 0;
   const pct = known ? progress.done / progress.total : 0;
@@ -117,11 +119,11 @@ function DockAction() {
         <div className={s.failure} role="alert">
           <Icon name="error" className={s.failureIcon} />
           <span id={statusId} className={s.failureText} title={failure}>{failure}</span>
-          {!stopError && inst && (
-            <Button size="sm" icon="healing" onClick={() => (repair.focus(inst.id), navigate("instances", { instance: inst.id }))}>
-              Fix
+          {!stopError && inst && crashTabs.map((t) => (
+            <Button key={t.key} size="sm" icon={t.icon} onClick={() => openInstanceTab(inst.id, t.key)}>
+              {t.title}
             </Button>
-          )}
+          ))}
           <IconButton icon="article" label="Open log" onClick={() => navigate("console")} />
           <IconButton icon="close" label="Dismiss" onClick={dismiss} />
         </div>
