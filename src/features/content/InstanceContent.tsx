@@ -1,9 +1,11 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { lazy, memo, Suspense, useCallback, useRef, useState } from "react";
+import { lazy, memo, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { launcher } from "@/api/launcher";
 import { sources, type Hit, type SourceInfo } from "@/api/sources";
 import { Banner, Button, Chip, ConfirmDialog, EmptyState, Icon, IconButton, Pill, PillGroup, SearchInput, Select, Skeleton, Switch, Tab, Tabs, toast } from "@/components/ui";
 import { InstanceSettingsPane } from "@/features/instances/InstanceSettings";
+import { RepairPane } from "@/features/repair/RepairPane";
+import { repair, useRepair, useRepairFocus } from "@/store/repair";
 import { Screenshots } from "@/features/screenshots/Screenshots";
 import { useDebounced } from "@/hooks/useDebounced";
 import { useFavorites, usePlugins, useSource } from "@/hooks/useSource";
@@ -59,8 +61,15 @@ const IRIS = { source: "modrinth", project: "YL57xq9U" };
 export function InstanceContent({ instance }: { instance: Instance }) {
   const modded = instance.loader !== "vanilla";
   // `plugin:<id>:<tab>` = a tab a plugin contributes.
-  const [tab, setTab] = useRouteState<ContentKind | "screenshots" | "settings" | `plugin:${string}`>("instance.tab", modded ? "mod" : "resourcepack");
-  const kind = tab === "screenshots" || tab === "settings" || tab.startsWith("plugin:") ? "mod" : (tab as ContentKind);
+  const [tab, setTab] = useRouteState<ContentKind | "screenshots" | "settings" | "repair" | `plugin:${string}`>("instance.tab", modded ? "mod" : "resourcepack");
+  const kind = tab === "screenshots" || tab === "settings" || tab === "repair" || tab.startsWith("plugin:") ? "mod" : (tab as ContentKind);
+  // "Repair" on the page header or "Fix" after a crash sends the user here.
+  const focused = useRepairFocus(instance.id);
+  useEffect(() => {
+    if (focused && repair.takeFocus(instance.id)) setTab("repair");
+  }, [focused, instance.id, setTab]);
+  const repairState = useRepair(instance.id);
+  const openIssues = repairState.diagnosis?.issues.filter((i) => repairState.fixes[i.key]?.status !== "done").length;
   const pluginTabs = (usePlugins().data ?? []).filter((p) => p.enabled).flatMap((p) => p.instanceTabs.map((t) => ({ plugin: p, tab: t, key: `plugin:${p.id}:${t.id}` as const })));
   const openPluginTab = pluginTabs.find((t) => t.key === tab);
   const content = {
@@ -110,6 +119,9 @@ export function InstanceContent({ instance }: { instance: Instance }) {
           <Tab selected={tab === "screenshots"} onSelect={() => setTab("screenshots")} icon="photo_camera">
             Screenshots
           </Tab>
+          <Tab selected={tab === "repair"} onSelect={() => setTab("repair")} icon="healing" count={openIssues || undefined}>
+            Repair
+          </Tab>
           <Tab selected={tab === "settings"} onSelect={() => setTab("settings")} icon="tune">
             Settings
           </Tab>
@@ -131,6 +143,8 @@ export function InstanceContent({ instance }: { instance: Instance }) {
           />
         ) : tab.startsWith("plugin:") ? (
           <EmptyState icon="extension_off">This plugin tab is not available.</EmptyState>
+        ) : tab === "repair" ? (
+          <RepairPane instance={instance} />
         ) : tab === "settings" ? (
           <InstanceSettingsPane instance={instance} />
         ) : tab === "screenshots" ? (

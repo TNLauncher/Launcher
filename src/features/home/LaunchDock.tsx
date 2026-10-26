@@ -5,6 +5,7 @@ import { cx } from "@/lib/cx";
 import { errorMessage, LOADER_ICON, LOADERS, lastPlayed, STAGE_LABEL } from "@/lib/format";
 import { gameLogs, useGameStopping } from "@/store/gameLogs";
 import { useLauncher, useProgress, useRecentInstances, useSelectedInstance } from "@/store/LauncherContext";
+import { repair } from "@/store/repair";
 import { useUi } from "@/store/UiContext";
 import s from "./home.module.css";
 
@@ -116,6 +117,11 @@ function DockAction() {
         <div className={s.failure} role="alert">
           <Icon name="error" className={s.failureIcon} />
           <span id={statusId} className={s.failureText} title={failure}>{failure}</span>
+          {!stopError && inst && (
+            <Button size="sm" icon="healing" onClick={() => (repair.focus(inst.id), navigate("instances", { instance: inst.id }))}>
+              Fix
+            </Button>
+          )}
           <IconButton icon="article" label="Open log" onClick={() => navigate("console")} />
           <IconButton icon="close" label="Dismiss" onClick={dismiss} />
         </div>

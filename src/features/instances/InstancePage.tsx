@@ -9,6 +9,7 @@ import { useInstanceBulkUpdate } from "@/features/content/useContent";
 import { lastPlayed, LOADER_ICON, loaderLabel, playTime } from "@/lib/format";
 import { useSourceEnabled } from "@/hooks/useSource";
 import { useLauncher } from "@/store/LauncherContext";
+import { repair } from "@/store/repair";
 import { useUi } from "@/store/UiContext";
 import { useBackLabel } from "@/components/layout/Sidebar";
 import type { Instance } from "@/types";
@@ -69,6 +70,9 @@ export function InstancePage({ instance: i, onBack }: { instance: Instance; onBa
                 </Button>
               )}
               <UpdateDialog candidates={bulkUpdate.candidates} onClose={bulkUpdate.dismiss} onConfirm={bulkUpdate.apply} />
+              <Button variant="overlay" icon="healing" title="Repair files and find what stops this instance from starting" onClick={() => repair.focus(i.id)}>
+                Repair
+              </Button>
               <IconButton icon="folder_open" label="Open instance folder" variant="overlay" onClick={() => launcher.openInstanceDir(i.id)} />
               <Button variant="primary" size="lg" icon="play_arrow" loading={starting} disabled={running || busy} onClick={() => launch(i.id)}>
                 {running ? "Running" : starting ? "Starting" : "Play"}

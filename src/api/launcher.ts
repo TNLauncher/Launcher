@@ -2,7 +2,7 @@
 import { Channel } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { call } from "./ipc";
-import type { Account, ContentKind, DeviceCode, GameExit, GameLog, Instance, InstanceSettings, LaunchEvent, Loader, LoaderBuild, ModFile, Screenshot, Settings, Skin, Snapshot } from "@/types";
+import type { Account, ContentKind, DeviceCode, Diagnosis, FixAction, GameExit, GameLog, Instance, InstanceSettings, LaunchEvent, Loader, LoaderBuild, ModFile, RepairProgress, RepairReport, Screenshot, Settings, Skin, Snapshot } from "@/types";
 
 export const launcher = {
   getState: () => call<Snapshot>("get_state"),
@@ -53,6 +53,17 @@ export const launcher = {
   stopGame: (id: string) => call<void>("stop_game", { id }),
   /** The last session's `launcher.log` (its tail if huge); "" if never launched. */
   readGameLog: (id: string) => call<string>("read_game_log", { id }),
+
+  /** Rehashes game and pack files and downloads the damaged ones; never changes which mods are installed. */
+  repairInstance: (id: string, onProgress: (p: RepairProgress) => void) => {
+    const channel = new Channel<RepairProgress>();
+    channel.onmessage = onProgress;
+    return call<RepairReport>("repair_instance", { id, onProgress: channel });
+  },
+  /** Unmet mod requirements, conflicts, missing pack files and the last crash's cause. */
+  diagnoseInstance: (id: string) => call<Diagnosis>("diagnose_instance", { id }),
+  /** Runs one fix; resolves with what changed. `source` is used when the instance is not from a pack. */
+  applyFix: (id: string, source: string | null, action: FixAction) => call<string>("apply_fix", { id, source, action }),
 
   listContent: (id: string, kind: ContentKind) => call<ModFile[]>("list_content", { id, kind }),
   /** Mods are renamed to `.disabled`; packs are switched in `options.txt`, shaders in Iris' config. */
