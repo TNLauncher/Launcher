@@ -124,7 +124,7 @@ export const useLauncher = create<LauncherState>((set, get) => ({
       toast(`${pack.title} is ready to play`);
     } catch (e) {
       if (e instanceof BackendError && e.kind === "cancelled") imports.dismiss(id);
-      else imports.fail(id, errorMessage(e), e instanceof BackendError ? e.files : undefined);
+      else imports.fail(id, errorMessage(e));
     }
   },
 }));

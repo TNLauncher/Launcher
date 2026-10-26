@@ -1,0 +1,23 @@
+.dialog { width: 540px; }
+.count { font: 500 12px var(--mono); font-variant-numeric: tabular-nums; color: var(--muted); }
+
+.list {
+  margin: 0; padding: 4px; list-style: none; max-height: 320px; overflow-y: auto;
+  border-radius: var(--r-md); background: var(--card); border: 1px solid var(--card-border);
+}
+.file { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 6px 6px 6px 10px; border-radius: var(--r-sm); }
+.file + .file { box-shadow: inset 0 1px 0 var(--card-border); }
+.status { width: 18px; display: grid; place-items: center; flex-shrink: 0; }
+.status :global(.icon) { font-size: 18px; color: var(--green); animation: landed var(--slow) var(--spring); }
+.ring { width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid var(--subtle); }
+.name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 12px var(--mono); }
+.done .name { color: var(--muted); }
+.moved { font-size: 12px; color: var(--muted); padding-right: 6px; }
+
+/* The one authored moment: a file lands and its check springs in. */
+@keyframes landed { from { opacity: 0; transform: scale(0.4); } }
+
+.watch { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 12px; color: var(--muted); }
+.pulse { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: pulse 1.6s var(--butter) infinite; }
+@keyframes pulse { 50% { opacity: 0.3; transform: scale(0.7); } }
+@media (prefers-reduced-motion: reduce) { .pulse, .status :global(.icon) { animation: none; } }

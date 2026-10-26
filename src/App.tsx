@@ -4,6 +4,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Titlebar } from "@/components/layout/Titlebar";
 import { Toaster } from "@/components/ui/Toast";
+import { ManualDownloadsDialog } from "@/features/modpacks/ManualDownloadsDialog";
 import { PluginHost } from "@/plugins/PluginHost";
 import { PluginPage } from "@/plugins/PluginPage";
 import { useLauncherInit } from "@/store/LauncherContext";
@@ -56,6 +57,7 @@ function Shell() {
       <PluginHost />
       <Toaster />
       <NewInstanceModal />
+      <ManualDownloadsDialog />
     </>
   );
 }

@@ -1,5 +1,4 @@
 import { lazy, Suspense, useCallback, useMemo } from "react";
-import { openUrl } from "@tauri-apps/plugin-opener";
 import { View } from "@/components/layout/View";
 import { sources } from "@/api/sources";
 import { Banner, Button, Chip, EmptyState, Icon, IconButton, Meta, Pill, PillGroup, ProgressBar, SearchInput, Select } from "@/components/ui";
@@ -127,8 +126,9 @@ export function InstancesView() {
 /** A modpack still downloading; replaced by the real instance row once it lands. */
 function ImportRow({ pending: p }: { pending: PendingImport }) {
   const startImport = useLauncher((st) => st.startImport);
-  const { done, total } = useImportProgress(p.projectId);
+  const { done, total, manual } = useImportProgress(p.projectId);
   const pct = total ? (done / total) * 100 : 0;
+  const waiting = manual.filter((f) => !f.done).length;
   return (
     <div className={cx(s.row, s.importRow)} role="status" aria-busy={!p.error}>
       <div className={s.rowMain}>
@@ -140,23 +140,17 @@ function ImportRow({ pending: p }: { pending: PendingImport }) {
             {p.version && <Chip>{p.version.number}</Chip>}
           </div>
           {p.error ? (
-            <>
-              <Meta small className={s.error} items={[p.error]} />
-              {!!p.manual?.length && (
-                <ul className={s.manual}>
-                  {p.manual.map((m) => (
-                    <li key={m.name}>
-                      <Button variant="link" onClick={() => openUrl(m.page)}>{m.name}</Button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </>
+            <Meta small className={s.error} items={[p.error]} />
           ) : (
             <div className={s.importProgress}>
               <ProgressBar value={total ? pct / 100 : undefined} />
               <Meta small className="mono" items={[total ? `${done} / ${total} files` : "Preparing…"]} />
             </div>
+          )}
+          {!p.error && waiting > 0 && (
+            <Button variant="link" className={s.manualLink} onClick={() => importStore.showManual(p.projectId)}>
+              {waiting === 1 ? "1 file needs" : `${waiting} files need`} downloading by hand
+            </Button>
           )}
         </div>
       </div>

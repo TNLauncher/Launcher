@@ -117,6 +117,14 @@ export type LaunchEvent =
 export interface ImportProgress {
   done: number;
   total: number;
+  /** Files the user downloads by hand; they move into the pack once they land in Downloads. */
+  manual: ManualFile[];
+}
+
+export interface ManualFile {
+  name: string;
+  page: string;
+  done: boolean;
 }
 
 export interface GameExit {
