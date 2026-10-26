@@ -1,6 +1,6 @@
 //! Modpack import for any content source: the source reads the archive's manifest into a `PackPlan`,
 //! the launcher downloads its files and copies the archive's override folders over the game directory.
-use crate::error::{AppError, ManualDownload, Result};
+use crate::error::{AppError, Result};
 use crate::minecraft::http::{self, Job};
 use crate::models::{Instance, Loader, PackRef};
 use crate::plugins::{
@@ -15,15 +15,31 @@ use serde::Serialize;
 use std::collections::HashMap;
 use std::io::{Cursor, Read};
 use std::path::{Component, Path, PathBuf};
+use std::sync::Mutex;
+use std::time::Duration;
 
 /// Top-level archive files bigger than this are not handed to the source.
 const MAX_MANIFEST: u64 = 16 * 1024 * 1024;
+
+/// How often Downloads is checked for hand-downloaded files.
+const MANUAL_POLL: Duration = Duration::from_secs(1);
 
 /// Files downloaded so far; streamed to the UI.
 #[derive(Clone, Serialize)]
 pub struct ImportProgress {
     pub done: usize,
     pub total: usize,
+    /// Files the user downloads by hand; empty for most packs.
+    pub manual: Vec<ManualFile>,
+}
+
+/// A pack file whose author does not allow launchers: the user downloads it from `page` into Downloads.
+#[derive(Clone, Serialize)]
+pub struct ManualFile {
+    pub name: String,
+    pub page: String,
+    /// Found in Downloads and moved into the instance.
+    pub done: bool,
 }
 
 /// Pack paths are untrusted: only plain relative components, so nothing escapes the instance dir.
@@ -56,21 +72,41 @@ fn jobs(dir: &Path, allowed: &dyn Fn(&str) -> bool, files: &[PackFile]) -> Resul
         .collect()
 }
 
-/// Where each hand-downloaded file sits in `downloads`, by its file name; any missing one fails with what to fetch.
-fn find_manual(files: &[PackFile], downloads: Option<&Path>) -> Result<Vec<PathBuf>> {
-    let found = |f: &PackFile| Some(downloads?.join(Path::new(&f.path).file_name()?)).filter(|p| p.is_file());
-    let missing: Vec<_> = files
-        .iter()
-        .filter(|f| found(f).is_none())
-        .map(|f| ManualDownload {
-            name: Path::new(&f.path).file_name().map_or(f.path.clone(), |n| n.to_string_lossy().into()),
-            page: f.page.clone().unwrap_or_default(),
-        })
-        .collect();
-    if !missing.is_empty() {
-        return Err(AppError::ManualDownloads(missing));
+fn file_name(f: &PackFile) -> String {
+    Path::new(&f.path).file_name().map_or(f.path.clone(), |n| n.to_string_lossy().into())
+}
+
+/// Moves each hand-downloaded file from `downloads` into `dir` as it appears, until none is left; `moved` gets its index.
+// ponytail: polls by exact file name; a browser's "name (1).jar" rename is not matched, a file watcher could replace the poll.
+async fn collect_manual(files: &[PackFile], downloads: Option<&Path>, dir: &Path, moved: &(dyn Fn(usize) + Sync)) -> Result<()> {
+    if files.is_empty() {
+        return Ok(());
     }
-    Ok(files.iter().filter_map(found).collect())
+    let downloads = downloads.ok_or_else(|| AppError::NotFound("No Downloads folder to pick hand-downloaded files from".into()))?;
+    let mut left: Vec<usize> = (0..files.len()).collect();
+    loop {
+        let mut still = vec![];
+        for i in left {
+            let src = downloads.join(file_name(&files[i]));
+            // Browsers write to a temporary name and rename when done, so the final name means a whole file.
+            if !src.is_file() {
+                still.push(i);
+                continue;
+            }
+            let out = dir.join(safe_rel(&files[i].path)?);
+            if let Some(parent) = out.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            // Across filesystems a rename fails: copy, then remove the original.
+            std::fs::rename(&src, &out).or_else(|_| std::fs::copy(&src, &out).and_then(|_| std::fs::remove_file(&src)))?;
+            moved(i);
+        }
+        if still.is_empty() {
+            return Ok(());
+        }
+        left = still;
+        tokio::time::sleep(MANUAL_POLL).await;
+    }
 }
 
 /// Top-level text files of the archive, which is where pack formats keep their manifest.
@@ -188,9 +224,7 @@ async fn install(
     let bytes = http::fetch_bytes(&state.http, &file.url).await?;
     let mut plan = source.plan_pack(&root_files(&bytes)?).await?;
     let loader = loader_of(&plan)?;
-    // Checked before any download so the user fetches them first, then retries.
     let (manual, auto): (Vec<_>, Vec<_>) = std::mem::take(&mut plan.files).into_iter().partition(|f| f.urls.is_empty() && f.page.is_some());
-    let manual_src = find_manual(&manual, downloads)?;
     // Kept locally so the row does not hit the source on every render; a missing icon is not worth failing over.
     let icon = match source.project(project).await.ok().and_then(|p| p.icon_url) {
         Some(url) => http::fetch_bytes(&state.http, &url).await.ok().and_then(|b| icon_data_url(&b)),
@@ -205,15 +239,23 @@ async fn install(
     let mut cleanup = Cleanup(Some(&dir));
 
     let jobs = jobs(&dir, &allowed, &auto)?;
-    progress(ImportProgress { done: 0, total: jobs.len() });
-    http::download_all(&state.http, jobs, &|done, total| progress(ImportProgress { done, total })).await?;
-    for (f, src) in manual.iter().zip(&manual_src) {
-        let out = dir.join(safe_rel(&f.path)?);
-        if let Some(parent) = out.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
-        std::fs::copy(src, out)?;
-    }
+    let shown = Mutex::new(ImportProgress {
+        done: 0,
+        total: jobs.len(),
+        manual: manual.iter().map(|f| ManualFile { name: file_name(f), page: f.page.clone().unwrap_or_default(), done: false }).collect(),
+    });
+    let update = |f: &dyn Fn(&mut ImportProgress)| {
+        let mut p = shown.lock().unwrap();
+        f(&mut p);
+        progress(p.clone());
+    };
+    update(&|_| {});
+    let ticked = |done: usize, total: usize| update(&|p| (p.done, p.total) = (done, total));
+    let moved = |i: usize| update(&|p| p.manual[i].done = true);
+    // The user fetches blocked files while the rest downloads.
+    let (downloaded, collected) = futures::join!(http::download_all(&state.http, jobs, &ticked), collect_manual(&manual, downloads, &dir, &moved));
+    downloaded?;
+    collected?;
     extract_overrides(&bytes, &dir, &plan.overrides)?;
     instances::add(state, &instance)?;
     cleanup.0 = None;
@@ -242,19 +284,20 @@ mod tests {
         assert!(jobs(dir, &hosts, &[traversal]).is_err());
     }
 
-    #[test]
-    fn finds_manual_downloads() {
-        let dl = std::env::temp_dir().join(format!("tn-manual-{}", std::process::id()));
+    #[tokio::test]
+    async fn moves_manual_downloads() {
+        let root = std::env::temp_dir().join(format!("tn-manual-{}", std::process::id()));
+        let (dl, dir) = (root.join("dl"), root.join("inst"));
         std::fs::create_dir_all(&dl).unwrap();
-        std::fs::write(dl.join("a.jar"), b"").unwrap();
-        let file = |p: &str| PackFile { path: p.into(), urls: vec![], size: None, page: Some(format!("https://x/{p}")) };
-        assert_eq!(find_manual(&[file("mods/a.jar")], Some(&dl)).unwrap(), vec![dl.join("a.jar")]);
-        match find_manual(&[file("mods/a.jar"), file("mods/b.jar")], Some(&dl)) {
-            Err(AppError::ManualDownloads(m)) => assert_eq!((m.len(), m[0].name.as_str(), m[0].page.as_str()), (1, "b.jar", "https://x/mods/b.jar")),
-            other => panic!("{other:?}"),
-        }
-        assert!(find_manual(&[file("mods/a.jar")], None).is_err());
-        std::fs::remove_dir_all(dl).unwrap();
+        std::fs::write(dl.join("a.jar"), b"a").unwrap();
+        let files = [PackFile { path: "mods/a.jar".into(), urls: vec![], size: None, page: Some("https://x".into()) }];
+        let moved = Mutex::new(vec![]);
+        collect_manual(&files, Some(&dl), &dir, &|i| moved.lock().unwrap().push(i)).await.unwrap();
+        assert_eq!(*moved.lock().unwrap(), [0]);
+        assert_eq!(std::fs::read(dir.join("mods/a.jar")).unwrap(), b"a");
+        assert!(!dl.join("a.jar").exists());
+        assert!(collect_manual(&files, None, &dir, &|_| {}).await.is_err());
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
