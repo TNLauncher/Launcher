@@ -39,6 +39,7 @@
 .import-progress { display: flex; align-items: center; gap: 10px; }
 .import-progress > :first-child { flex: 1; }
 .error { color: var(--critical); }
+.manual { margin: 4px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 2px; }
 .empty-actions { display: flex; gap: 8px; }
 .page[hidden] { display: none; }
 .inline-input { height: 26px; padding: 0 8px; font-weight: 500; font-size: 13px; width: 220px; }

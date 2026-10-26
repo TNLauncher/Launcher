@@ -1,6 +1,7 @@
 // Modpack installs in a Zustand store: a download reports every file, and only the row
 // showing that pack's progress re-renders via its selector.
 import { create } from "zustand";
+import type { ManualDownload } from "@/api/ipc";
 import type { Hit, Version } from "@/api/sources";
 import type { ImportProgress } from "@/types";
 
@@ -15,6 +16,8 @@ export interface PendingImport {
   /** Chosen pack version; undefined = newest. */
   version?: Version;
   error: string;
+  /** Files to download by hand before a retry can succeed. */
+  manual?: ManualDownload[];
 }
 
 const NONE: ImportProgress = { done: 0, total: 0 };
@@ -57,9 +60,9 @@ export const imports = {
     });
   },
 
-  fail: (projectId: string, error: string) =>
+  fail: (projectId: string, error: string, manual?: ManualDownload[]) =>
     useImportsStore.setState((s) => ({
-      list: s.list.map((p) => (p.projectId === projectId ? { ...p, error } : p)),
+      list: s.list.map((p) => (p.projectId === projectId ? { ...p, error, manual } : p)),
     })),
 
   dismiss(projectId: string) {

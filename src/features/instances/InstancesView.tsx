@@ -1,4 +1,5 @@
 import { lazy, Suspense, useCallback, useMemo } from "react";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { View } from "@/components/layout/View";
 import { sources } from "@/api/sources";
 import { Banner, Button, Chip, EmptyState, Icon, IconButton, Meta, Pill, PillGroup, ProgressBar, SearchInput, Select } from "@/components/ui";
@@ -139,7 +140,18 @@ function ImportRow({ pending: p }: { pending: PendingImport }) {
             {p.version && <Chip>{p.version.number}</Chip>}
           </div>
           {p.error ? (
-            <Meta small className={s.error} items={[p.error]} />
+            <>
+              <Meta small className={s.error} items={[p.error]} />
+              {!!p.manual?.length && (
+                <ul className={s.manual}>
+                  {p.manual.map((m) => (
+                    <li key={m.name}>
+                      <Button variant="link" onClick={() => openUrl(m.page)}>{m.name}</Button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
           ) : (
             <div className={s.importProgress}>
               <ProgressBar value={total ? pct / 100 : undefined} />

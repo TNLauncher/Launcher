@@ -3,15 +3,23 @@ import { invoke, type InvokeArgs } from "@tauri-apps/api/core";
 /** Error shape produced by `AppError`'s Serialize impl in src-tauri/src/error.rs. */
 export class BackendError extends Error {
   readonly kind: string;
-  constructor(kind: string, message: string) {
+  /** Kind `manualDownloads`: what to fetch by hand into Downloads before retrying. */
+  readonly files: ManualDownload[];
+  constructor(kind: string, message: string, files: ManualDownload[] = []) {
     super(message);
     this.kind = kind;
+    this.files = files;
   }
+}
+
+export interface ManualDownload {
+  name: string;
+  page: string;
 }
 
 function toError(e: unknown): Error {
   if (e && typeof e === "object" && "kind" in e && "message" in e) {
-    return new BackendError(String(e.kind), String(e.message));
+    return new BackendError(String(e.kind), String(e.message), "files" in e ? (e.files as ManualDownload[]) : []);
   }
   return e instanceof Error ? e : new Error(String(e));
 }
