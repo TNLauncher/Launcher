@@ -230,6 +230,9 @@ pub struct PackFile {
     /// With no `urls`: the page where the user downloads it by hand (its author does not allow launchers).
     #[serde(default)]
     pub page: Option<String>,
+    /// Hex SHA-1, when the pack lists one: downloads are checked against it and repairs rehash with it.
+    #[serde(default)]
+    pub sha1: Option<String>,
 }
 
 /// A catalog of projects to search and install from. Methods return boxed futures so sources are object-safe.

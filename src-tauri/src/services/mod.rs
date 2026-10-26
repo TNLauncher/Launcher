@@ -2,6 +2,7 @@
 
 pub mod account;
 pub mod discord;
+pub mod doctor;
 pub mod instances;
 pub mod launcher;
 pub mod modpacks;

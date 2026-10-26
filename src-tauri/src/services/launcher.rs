@@ -1,8 +1,9 @@
 //! Install → spawn → watch. Progress streams over a Channel; game output and exit are global events.
 use super::{instances, now};
 use crate::error::{AppError, Result};
-use crate::minecraft::{command, install, java, loader, version, Stage};
-use crate::models::{AfterLaunch, Loader};
+use crate::minecraft::http::Check;
+use crate::minecraft::{command, install, java, loader, version, Progress, Stage};
+use crate::models::{AfterLaunch, Instance, Loader, Settings};
 use crate::state::AppState;
 use crate::storage;
 use serde::Serialize;
@@ -42,13 +43,13 @@ pub struct GameLog<'a> {
 }
 
 /// Marks an instance busy for as long as it lives; dropping it frees the instance.
-struct RunningGuard {
+pub(crate) struct RunningGuard {
     app: AppHandle,
     id: String,
 }
 
 impl RunningGuard {
-    fn acquire(app: &AppHandle, id: &str) -> Result<Self> {
+    pub(crate) fn acquire(app: &AppHandle, id: &str) -> Result<Self> {
         if !app.state::<AppState>().running.lock().unwrap().insert(id.to_string()) {
             return Err(AppError::Conflict("This instance is already running".into()));
         }
@@ -64,18 +65,42 @@ impl Drop for RunningGuard {
     }
 }
 
+/// An instance with everything its launch needs on disk.
+pub(crate) struct Prepared {
+    pub inst: Instance,
+    pub settings: Settings,
+    pub version: serde_json::Value,
+    pub java: PathBuf,
+    pub installed: install::Installed,
+}
+
+/// Installs Java, the loader, libraries and assets of an instance; `check` decides how far existing files are trusted.
+pub(crate) async fn prepare(state: &AppState, id: &str, check: Check, progress: Progress<'_>) -> Result<Prepared> {
+    let mut inst = instances::get(state, id)?;
+    let settings = storage::load_settings(state).for_instance(&inst.settings);
+    // Instances saved without a loader version would hit `/loader/{game}//profile/json`.
+    if inst.loader != Loader::Vanilla && inst.loader_version.is_empty() {
+        let v = loader::latest(&state.http, &inst.version, inst.loader).await?;
+        instances::update(state, id, |i| i.loader_version = v.clone())?;
+        inst.loader_version = v;
+    }
+    let root = &state.paths.root;
+    let natives = state.paths.instance_dir(id)?.join(".natives");
+    let base = version::base(&state.http, root, &inst.version).await?;
+    // Java follows the vanilla version; Forge/NeoForge installers need it before their profile exists.
+    let java = match settings.java_path.trim() {
+        "" => java::ensure(&state.http, root, &base, progress).await?,
+        custom => PathBuf::from(custom),
+    };
+    let version = version::with_loader(&state.http, root, base, inst.loader, &inst.loader_version, &java, progress).await?;
+    let installed = install::install(&state.http, root, &version, &natives, check, progress).await?;
+    Ok(Prepared { inst, settings, version, java, installed })
+}
+
 /// Resolves when the game process has started; the guard then moves to the watcher thread.
 pub async fn launch(app: &AppHandle, id: &str, on_event: Channel<LaunchEvent>) -> Result<()> {
     let guard = RunningGuard::acquire(app, id)?;
     let state = app.state::<AppState>();
-    let mut inst = instances::get(&state, id)?;
-    let settings = storage::load_settings(&state).for_instance(&inst.settings);
-    // Instances saved without a loader version would hit `/loader/{game}//profile/json`.
-    if inst.loader != Loader::Vanilla && inst.loader_version.is_empty() {
-        let v = loader::latest(&state.http, &inst.version, inst.loader).await?;
-        instances::update(&state, id, |i| i.loader_version = v.clone())?;
-        inst.loader_version = v;
-    }
     let root = &state.paths.root;
     let game_dir = state.paths.instance_dir(id)?;
     let natives = game_dir.join(".natives");
@@ -86,14 +111,8 @@ pub async fn launch(app: &AppHandle, id: &str, on_event: Channel<LaunchEvent>) -
     progress(Stage::Resolving, 0, 0);
     // Before the downloads, so an expired sign-in fails fast.
     let session = super::account::session(&state).await?;
-    let base = version::base(&state.http, root, &inst.version).await?;
-    // Java follows the vanilla version; Forge/NeoForge installers need it before their profile exists.
-    let java = match settings.java_path.trim() {
-        "" => java::ensure(&state.http, root, &base, &progress).await?,
-        custom => PathBuf::from(custom),
-    };
-    let v = version::with_loader(&state.http, root, base, inst.loader, &inst.loader_version, &java, &progress).await?;
-    let classpath = install::install(&state.http, root, &v, &natives, &progress).await?;
+    let Prepared { inst, settings, version: v, java, installed } = prepare(&state, id, Check::Size, &progress).await?;
+    let classpath = installed.classpath;
 
     progress(Stage::Starting, 0, 0);
     let log = Arc::new(File::create(game_dir.join("launcher.log"))?);

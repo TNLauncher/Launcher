@@ -1,5 +1,5 @@
 //! Client jar, libraries (with pre-1.19 natives unpacked) and assets.
-use super::http::{download, download_all, Job};
+use super::http::{download_all, fetch, Check, Job};
 use super::rules::{self, Features};
 use super::{Progress, Stage};
 use crate::error::{AppError, Result};
@@ -20,8 +20,16 @@ pub fn maven_path(name: &str) -> String {
     format!("{}/{artifact}/{version}/{file}", group.replace('.', "/"))
 }
 
-/// Downloads everything `version` needs. Returns the classpath in launch order.
-pub async fn install(c: &reqwest::Client, root: &Path, version: &Value, natives: &Path, progress: Progress<'_>) -> Result<Vec<PathBuf>> {
+/// What `install` left on disk.
+pub struct Installed {
+    /// In launch order.
+    pub classpath: Vec<PathBuf>,
+    /// Files that were missing or failed `check` and got downloaded again.
+    pub fetched: usize,
+}
+
+/// Downloads everything `version` needs.
+pub async fn install(c: &reqwest::Client, root: &Path, version: &Value, natives: &Path, check: Check, progress: Progress<'_>) -> Result<Installed> {
     let plan = plan_libraries(root, version)?;
     let mut jobs = plan.jobs;
     let mut classpath = plan.classpath;
@@ -30,14 +38,18 @@ pub async fn install(c: &reqwest::Client, root: &Path, version: &Value, natives:
     let client = &version["downloads"]["client"];
     let jar = root.join("versions").join(id).join(format!("{id}.jar"));
     let url = client["url"].as_str().ok_or_else(|| AppError::Invalid("Version has no client jar".into()))?;
-    jobs.push(Job { url: url.into(), path: jar.clone(), size: client["size"].as_u64() });
+    jobs.push(Job { url: url.into(), path: jar.clone(), size: client["size"].as_u64(), sha1: sha1(client) });
     classpath.push(jar);
 
     progress(Stage::Libraries, 0, jobs.len());
-    download_all(c, jobs, &|d, t| progress(Stage::Libraries, d, t)).await?;
+    let mut fetched = download_all(c, jobs, check, &|d, t| progress(Stage::Libraries, d, t)).await?;
     extract_natives(&plan.native_jars, natives)?;
-    install_assets(c, root, version, progress).await?;
-    Ok(classpath)
+    fetched += install_assets(c, root, version, check, progress).await?;
+    Ok(Installed { classpath, fetched })
+}
+
+fn sha1(entry: &Value) -> Option<String> {
+    entry["sha1"].as_str().map(String::from)
 }
 
 struct LibraryPlan {
@@ -67,7 +79,7 @@ fn plan_libraries(root: &Path, version: &Value) -> Result<LibraryPlan> {
             let path = libs.join(art["path"].as_str().map(String::from).unwrap_or_else(|| maven_path(name)));
             // No url = the loader installer already generated the file.
             if let Some(url) = art["url"].as_str().filter(|u| !u.is_empty()) {
-                plan.jobs.push(Job { url: url.into(), path: path.clone(), size: art["size"].as_u64() });
+                plan.jobs.push(Job { url: url.into(), path: path.clone(), size: art["size"].as_u64(), sha1: sha1(art) });
             }
             plan.classpath.push(path);
         } else if lib.get("downloads").is_none() {
@@ -75,7 +87,7 @@ fn plan_libraries(root: &Path, version: &Value) -> Result<LibraryPlan> {
             let rel = maven_path(name);
             let repo = lib["url"].as_str().unwrap_or("https://libraries.minecraft.net/");
             let path = libs.join(&rel);
-            plan.jobs.push(Job { url: format!("{}/{rel}", repo.trim_end_matches('/')), path: path.clone(), size: lib["size"].as_u64() });
+            plan.jobs.push(Job { url: format!("{}/{rel}", repo.trim_end_matches('/')), path: path.clone(), size: lib["size"].as_u64(), sha1: sha1(lib) });
             plan.classpath.push(path);
         }
 
@@ -84,7 +96,7 @@ fn plan_libraries(root: &Path, version: &Value) -> Result<LibraryPlan> {
             let classifier = classifier.replace("${arch}", "64");
             if let Some(art) = lib["downloads"]["classifiers"].get(&classifier) {
                 let path = libs.join(art["path"].as_str().unwrap_or_default());
-                plan.jobs.push(Job { url: art["url"].as_str().unwrap_or_default().into(), path: path.clone(), size: art["size"].as_u64() });
+                plan.jobs.push(Job { url: art["url"].as_str().unwrap_or_default().into(), path: path.clone(), size: art["size"].as_u64(), sha1: sha1(art) });
                 plan.native_jars.push(path);
             }
         }
@@ -109,12 +121,12 @@ fn extract_natives(jars: &[PathBuf], dest: &Path) -> Result<()> {
     Ok(())
 }
 
-async fn install_assets(c: &reqwest::Client, root: &Path, version: &Value, progress: Progress<'_>) -> Result<()> {
+async fn install_assets(c: &reqwest::Client, root: &Path, version: &Value, check: Check, progress: Progress<'_>) -> Result<usize> {
     let index = &version["assetIndex"];
     let id = index["id"].as_str().unwrap_or("legacy");
     let url = index["url"].as_str().ok_or_else(|| AppError::Invalid("Version has no asset index".into()))?;
     let index_path = root.join("assets").join("indexes").join(format!("{id}.json"));
-    download(c, url, &index_path, index["size"].as_u64()).await?;
+    let fetched = fetch(c, &Job { url: url.into(), path: index_path.clone(), size: index["size"].as_u64(), sha1: sha1(index) }, check).await? as usize;
 
     let index: Value = serde_json::from_slice(&std::fs::read(&index_path)?)?;
     let objects = root.join("assets").join("objects");
@@ -125,11 +137,11 @@ async fn install_assets(c: &reqwest::Client, root: &Path, version: &Value, progr
         .filter_map(|(_, o)| {
             let hash = o["hash"].as_str()?;
             let prefix = hash.get(..2)?;
-            Some(Job { url: format!("{RESOURCES_URL}/{prefix}/{hash}"), path: objects.join(prefix).join(hash), size: o["size"].as_u64() })
+            Some(Job { url: format!("{RESOURCES_URL}/{prefix}/{hash}"), path: objects.join(prefix).join(hash), size: o["size"].as_u64(), sha1: Some(hash.into()) })
         })
         .collect();
     progress(Stage::Assets, 0, jobs.len());
-    download_all(c, jobs, &|d, t| progress(Stage::Assets, d, t)).await
+    Ok(fetched + download_all(c, jobs, check, &|d, t| progress(Stage::Assets, d, t)).await?)
 }
 
 #[cfg(test)]

@@ -340,7 +340,7 @@ fn replace_pack_entry(instance: &Path, kind: ContentKind, old_file: &str, new_fi
     }
 }
 
-fn loader_name(l: Loader) -> &'static str {
+pub(crate) fn loader_name(l: Loader) -> &'static str {
     match l {
         Loader::Vanilla => "minecraft",
         Loader::Fabric => "fabric",

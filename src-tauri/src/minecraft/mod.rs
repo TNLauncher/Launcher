@@ -3,11 +3,13 @@
 
 pub mod auth;
 pub mod command;
+pub mod crashlog;
 pub mod http;
 pub mod install;
 pub mod installer;
 pub mod java;
 pub mod loader;
+pub mod modmeta;
 pub mod rules;
 pub mod version;
 

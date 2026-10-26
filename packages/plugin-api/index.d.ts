@@ -233,7 +233,7 @@ export interface PackPlan {
   /** `fabric`, `quilt`, or "" for vanilla. */
   loader: string;
   loaderVersion: string;
-  files: { /** Relative to the instance. */ path: string; /** Mirrors; the first on an allowed download host is used. */ urls: string[]; size: number | null; /** With empty `urls`: the page the user downloads it from by hand (into Downloads). */ page?: string | null }[];
+  files: { /** Relative to the instance. */ path: string; /** Mirrors; the first on an allowed download host is used. */ urls: string[]; size: number | null; /** With empty `urls`: the page the user downloads it from by hand (into Downloads). */ page?: string | null; /** Hex SHA-1: the download is checked against it, and repairs rehash with it. */ sha1?: string | null }[];
   /** Archive folders copied over the instance, later ones win. */
   overrides: string[];
 }

@@ -2,6 +2,7 @@
 
 pub mod account;
 pub mod app;
+pub mod doctor;
 pub mod favorites;
 pub mod game;
 pub mod instances;

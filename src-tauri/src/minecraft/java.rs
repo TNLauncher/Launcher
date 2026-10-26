@@ -1,5 +1,5 @@
 //! Mojang-hosted Java runtimes, so users never install Java themselves.
-use super::http::{download_all, get_json, Job};
+use super::http::{download_all, get_json, Check, Job};
 use super::{Progress, Stage};
 use crate::error::{AppError, Result};
 use serde_json::Value;
@@ -49,13 +49,13 @@ pub async fn ensure(c: &reqwest::Client, root: &Path, version: &Value, progress:
                 if f["executable"].as_bool() == Some(true) {
                     executables.push(path.clone());
                 }
-                jobs.push(Job { url: raw["url"].as_str().unwrap_or_default().into(), path, size: raw["size"].as_u64() });
+                jobs.push(Job { url: raw["url"].as_str().unwrap_or_default().into(), path, size: raw["size"].as_u64(), sha1: raw["sha1"].as_str().map(String::from) });
             }
             Some("link") => links.push((path, f["target"].as_str().unwrap_or_default().to_string())),
             _ => std::fs::create_dir_all(&path)?,
         }
     }
-    download_all(c, jobs, &|d, t| progress(Stage::Java, d, t)).await?;
+    download_all(c, jobs, Check::Size, &|d, t| progress(Stage::Java, d, t)).await?;
 
     #[cfg(unix)]
     {

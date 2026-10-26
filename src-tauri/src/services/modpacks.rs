@@ -5,7 +5,8 @@ use crate::minecraft::http::{self, Job};
 use crate::models::{Instance, Loader, PackRef};
 use crate::plugins::{
     self,
-    api::{PackFile, PackPlan, ProjectKind, VersionFilter},
+    api::{PackFile, PackPlan, ProjectKind, Version, VersionFilter},
+    Plugin,
 };
 use crate::services::instances;
 use crate::state::AppState;
@@ -15,11 +16,14 @@ use serde::Serialize;
 use std::collections::HashMap;
 use std::io::{Cursor, Read};
 use std::path::{Component, Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 /// Top-level archive files bigger than this are not handed to the source.
 const MAX_MANIFEST: u64 = 16 * 1024 * 1024;
+
+/// The pack's file list, kept in the instance so a repair knows what belongs there without the archive.
+const PACK_FILES: &str = ".pack-files.json";
 
 /// How often Downloads is checked for hand-downloaded files.
 const MANUAL_POLL: Duration = Duration::from_secs(1);
@@ -62,17 +66,22 @@ fn loader_of(plan: &PackPlan) -> Result<Loader> {
     }
 }
 
-fn jobs(dir: &Path, allowed: &dyn Fn(&str) -> bool, files: &[PackFile]) -> Result<Vec<Job>> {
+pub(crate) fn jobs(dir: &Path, allowed: &dyn Fn(&str) -> bool, files: &[PackFile]) -> Result<Vec<Job>> {
     files
         .iter()
         .map(|f| {
             let url = f.urls.iter().find(|u| allowed(u)).ok_or_else(|| AppError::Invalid(format!("No allowed download for {}", f.path)))?;
-            Ok(Job { url: url.clone(), path: dir.join(safe_rel(&f.path)?), size: f.size })
+            Ok(Job { url: url.clone(), path: dir.join(safe_rel(&f.path)?), size: f.size, sha1: f.sha1.clone() })
         })
         .collect()
 }
 
-fn file_name(f: &PackFile) -> String {
+/// Splits pack files into the ones the launcher may download and the ones the user fetches by hand.
+pub(crate) fn split_manual(files: Vec<PackFile>) -> (Vec<PackFile>, Vec<PackFile>) {
+    files.into_iter().partition(|f| f.urls.is_empty() && f.page.is_some())
+}
+
+pub(crate) fn file_name(f: &PackFile) -> String {
     Path::new(&f.path).file_name().map_or(f.path.clone(), |n| n.to_string_lossy().into())
 }
 
@@ -195,6 +204,50 @@ pub fn cancel(state: &AppState, project: &str) {
     }
 }
 
+/// A modpack version's archive and the plan its source reads from it.
+struct Fetched {
+    plugin: Arc<Plugin>,
+    picked: Version,
+    bytes: Vec<u8>,
+    plan: PackPlan,
+}
+
+/// Downloads the archive of the first version `pick` accepts (versions come newest first).
+async fn fetch_pack(state: &AppState, source_id: &str, project: &str, pick: &(dyn Fn(&Version) -> bool + Sync)) -> Result<Fetched> {
+    let plugin = plugins::enabled(state, source_id)?;
+    let source = plugin.source()?;
+    let filter = VersionFilter { kind: ProjectKind::Modpack, game_version: None, loader: None };
+    let picked = source
+        .versions(project, &filter)
+        .await?
+        .into_iter()
+        .find(|v| pick(v))
+        .ok_or_else(|| AppError::NotFound("This modpack has no version the launcher can run".into()))?;
+    let file = picked.primary_file().ok_or_else(|| AppError::NotFound("This modpack version has no file".into()))?;
+    if file.url.is_empty() {
+        return Err(AppError::Unsupported("The author of this modpack does not allow launchers to download it.".into()));
+    }
+    if !plugin.may_download(&file.url) {
+        return Err(AppError::Invalid(format!("{} is not an allowed download", file.url)));
+    }
+    let bytes = http::fetch_bytes(&state.http, &file.url).await?;
+    let plan = source.plan_pack(&root_files(&bytes)?).await?;
+    Ok(Fetched { plugin: plugin.clone(), picked, bytes, plan })
+}
+
+/// The files the instance's modpack ships, from the copy kept at import; packs imported before that are fetched once.
+pub async fn pack_files(state: &AppState, inst: &Instance) -> Result<Option<(Arc<Plugin>, Vec<PackFile>)>> {
+    let Some(pack) = &inst.pack else { return Ok(None) };
+    let plugin = plugins::enabled(state, &pack.source)?;
+    let saved = state.paths.instance_dir(&inst.id)?.join(PACK_FILES);
+    if let Some(files) = std::fs::read(&saved).ok().and_then(|b| serde_json::from_slice(&b).ok()) {
+        return Ok(Some((plugin, files)));
+    }
+    let fetched = fetch_pack(state, &pack.source, &pack.project, &|v| v.number == pack.version).await?;
+    std::fs::write(&saved, serde_json::to_vec(&fetched.plan.files)?)?;
+    Ok(Some((plugin, fetched.plan.files)))
+}
+
 async fn install(
     state: &AppState,
     source_id: &str,
@@ -203,28 +256,12 @@ async fn install(
     downloads: Option<&Path>,
     progress: &(dyn Fn(ImportProgress) + Sync),
 ) -> Result<Instance> {
-    let plugin = plugins::enabled(state, source_id)?;
+    let Fetched { plugin, picked, bytes, mut plan } = fetch_pack(state, source_id, project, &|v| version.is_none_or(|id| v.id == id)).await?;
     let source = plugin.source()?;
     let allowed = |url: &str| plugin.may_download(url);
-    let filter = VersionFilter { kind: ProjectKind::Modpack, game_version: None, loader: None };
-    let versions = source.versions(project, &filter).await?;
-    let picked = match version {
-        Some(id) => versions.into_iter().find(|v| v.id == id),
-        None => versions.into_iter().next(),
-    }
-    .ok_or_else(|| AppError::NotFound("This modpack has no version the launcher can run".into()))?;
-    let file = picked.primary_file().ok_or_else(|| AppError::NotFound("This modpack version has no file".into()))?;
-    if file.url.is_empty() {
-        return Err(AppError::Unsupported("The author of this modpack does not allow launchers to download it.".into()));
-    }
-    if !allowed(&file.url) {
-        return Err(AppError::Invalid(format!("{} is not an allowed download", file.url)));
-    }
-
-    let bytes = http::fetch_bytes(&state.http, &file.url).await?;
-    let mut plan = source.plan_pack(&root_files(&bytes)?).await?;
     let loader = loader_of(&plan)?;
-    let (manual, auto): (Vec<_>, Vec<_>) = std::mem::take(&mut plan.files).into_iter().partition(|f| f.urls.is_empty() && f.page.is_some());
+    let listed = serde_json::to_vec(&plan.files)?;
+    let (manual, auto) = split_manual(std::mem::take(&mut plan.files));
     // Kept locally so the row does not hit the source on every render; a missing icon is not worth failing over.
     let icon = match source.project(project).await.ok().and_then(|p| p.icon_url) {
         Some(url) => http::fetch_bytes(&state.http, &url).await.ok().and_then(|b| icon_data_url(&b)),
@@ -253,10 +290,11 @@ async fn install(
     let ticked = |done: usize, total: usize| update(&|p| (p.done, p.total) = (done, total));
     let moved = |i: usize| update(&|p| p.manual[i].done = true);
     // The user fetches blocked files while the rest downloads.
-    let (downloaded, collected) = futures::join!(http::download_all(&state.http, jobs, &ticked), collect_manual(&manual, downloads, &dir, &moved));
+    let (downloaded, collected) = futures::join!(http::download_all(&state.http, jobs, http::Check::Size, &ticked), collect_manual(&manual, downloads, &dir, &moved));
     downloaded?;
     collected?;
     extract_overrides(&bytes, &dir, &plan.overrides)?;
+    std::fs::write(dir.join(PACK_FILES), listed)?;
     instances::add(state, &instance)?;
     cleanup.0 = None;
     Ok(instance)
@@ -276,11 +314,11 @@ mod tests {
     #[test]
     fn skips_foreign_hosts() {
         let hosts = |u: &str| u.starts_with("https://cdn.modrinth.com/");
-        let file = |url: &str| PackFile { path: "mods/a.jar".into(), urls: vec!["https://evil.com/a.jar".into(), url.into()], size: None, page: None };
+        let file = |url: &str| PackFile { path: "mods/a.jar".into(), urls: vec!["https://evil.com/a.jar".into(), url.into()], size: None, page: None, sha1: None };
         let dir = Path::new("/x");
         assert_eq!(jobs(dir, &hosts, &[file("https://cdn.modrinth.com/a.jar")]).unwrap()[0].url, "https://cdn.modrinth.com/a.jar");
         assert!(jobs(dir, &hosts, &[file("https://evil.com/b.jar")]).is_err());
-        let traversal = PackFile { path: "../a.jar".into(), urls: vec!["https://cdn.modrinth.com/a.jar".into()], size: None, page: None };
+        let traversal = PackFile { path: "../a.jar".into(), urls: vec!["https://cdn.modrinth.com/a.jar".into()], size: None, page: None, sha1: None };
         assert!(jobs(dir, &hosts, &[traversal]).is_err());
     }
 
@@ -290,7 +328,7 @@ mod tests {
         let (dl, dir) = (root.join("dl"), root.join("inst"));
         std::fs::create_dir_all(&dl).unwrap();
         std::fs::write(dl.join("a.jar"), b"a").unwrap();
-        let files = [PackFile { path: "mods/a.jar".into(), urls: vec![], size: None, page: Some("https://x".into()) }];
+        let files = [PackFile { path: "mods/a.jar".into(), urls: vec![], size: None, page: Some("https://x".into()), sha1: None }];
         let moved = Mutex::new(vec![]);
         collect_manual(&files, Some(&dl), &dir, &|i| moved.lock().unwrap().push(i)).await.unwrap();
         assert_eq!(*moved.lock().unwrap(), [0]);
