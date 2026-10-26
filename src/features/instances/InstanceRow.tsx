@@ -1,6 +1,6 @@
-import { memo, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import { launcher } from "@/api/launcher";
-import { Button, Chip, ConfirmDialog, Dot, Icon, IconButton, Input, Meta, toast } from "@/components/ui";
+import { Button, Chip, ConfirmDialog, Dialog, Dot, Icon, IconButton, Input, Meta, toast } from "@/components/ui";
 import { cx } from "@/lib/cx";
 import { errorMessage, lastPlayed, LOADER_ICON, loaderLabel, playTime, plural } from "@/lib/format";
 import { useLauncher } from "@/store/LauncherContext";
@@ -23,7 +23,7 @@ async function toIcon(file: File): Promise<string> {
   return canvas.toDataURL("image/webp", 0.9);
 }
 
-export const InstanceRow = memo(function InstanceRow({ instance: i, onOpen }: { instance: Instance; onOpen(id: string): void }) {
+export const InstanceRow = memo(function InstanceRow({ instance: i, groups, onOpen }: { instance: Instance; groups: string[]; onOpen(id: string): void }) {
   const running = useLauncher((st) => st.snapshot?.running.includes(i.id) ?? false);
   const starting = useLauncher((st) => st.busyId === i.id);
   const busy = useLauncher((st) => st.busyId !== null);
@@ -34,6 +34,7 @@ export const InstanceRow = memo(function InstanceRow({ instance: i, onOpen }: { 
   const navigate = useUi((st) => st.navigate);
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [grouping, setGrouping] = useState(false);
   const [rowError, setRowError] = useState("");
   const open = () => onOpen(i.id);
 
@@ -117,9 +118,22 @@ export const InstanceRow = memo(function InstanceRow({ instance: i, onOpen }: { 
           <IconButton icon="folder_open" label="Open folder" onClick={() => run(() => launcher.openInstanceDir(i.id))} />
           {i.icon && <IconButton icon="hide_image" label="Reset icon" onClick={() => run(() => launcher.setInstanceIcon(i.id, ""))} />}
           <IconButton icon="edit" label="Rename" onClick={() => setEditing(true)} />
+          <IconButton icon="content_copy" label="Copy instance" onClick={() => run(() => launcher.copyInstance(i.id).then((c) => toast(`Copied as ${c.name}`, "info", "content_copy")))} />
+          <IconButton icon="folder" label="Move to group" onClick={() => setGrouping(true)} />
           <IconButton icon="delete" label="Delete" variant="danger" disabled={running} onClick={() => setConfirmDelete(true)} />
         </div>
       </div>
+
+      <GroupDialog
+        open={grouping}
+        current={i.group}
+        groups={groups}
+        onClose={() => setGrouping(false)}
+        onSave={(g) => {
+          setGrouping(false);
+          if (g !== i.group) run(() => launcher.setInstanceGroup(i.id, g));
+        }}
+      />
 
       <ConfirmDialog
         open={confirmDelete}
@@ -137,3 +151,38 @@ export const InstanceRow = memo(function InstanceRow({ instance: i, onOpen }: { 
     </div>
   );
 });
+
+/** Picks an existing group or names a new one; empty = ungrouped. */
+function GroupDialog({ open, current, groups, onClose, onSave }: { open: boolean; current: string; groups: string[]; onClose(): void; onSave(group: string): void }) {
+  const [value, setValue] = useState(current);
+  useEffect(() => {
+    if (open) setValue(current);
+  }, [open, current]);
+  return (
+    <Dialog
+      open={open}
+      title="Move to group"
+      onClose={onClose}
+      onSubmit={() => onSave(value.trim())}
+      actions={
+        <>
+          <Button onClick={onClose}>Cancel</Button>
+          <Button type="submit" variant="primary">Move</Button>
+        </>
+      }
+    >
+      <Input
+        list="instance-groups"
+        aria-label="Group"
+        placeholder="No group"
+        maxLength={48}
+        autoFocus
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+      />
+      <datalist id="instance-groups">
+        {groups.map((g) => <option key={g} value={g} />)}
+      </datalist>
+    </Dialog>
+  );
+}

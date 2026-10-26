@@ -2,7 +2,7 @@
 import { Channel } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { call } from "./ipc";
-import type { Account, ContentKind, DeviceCode, GameExit, GameLog, Instance, InstanceSettings, LaunchEvent, Loader, LoaderBuild, ModFile, Screenshot, Settings, Skin, Snapshot } from "@/types";
+import type { Account, ContentKind, DeviceCode, GameExit, GameLog, ImportProgress, Instance, InstanceSettings, LaunchEvent, Loader, LoaderBuild, ModFile, Screenshot, Settings, Skin, Snapshot, World } from "@/types";
 
 export const launcher = {
   getState: () => call<Snapshot>("get_state"),
@@ -34,18 +34,34 @@ export const launcher = {
   setInstanceIcon: (id: string, icon: string) => call<void>("set_instance_icon", { id, icon }),
   setInstanceSettings: (id: string, settings: InstanceSettings) => call<void>("set_instance_settings", { id, settings }),
   deleteInstance: (id: string) => call<void>("delete_instance", { id }),
+  /** A copy with all files, named "<name> (copy)". */
+  copyInstance: (id: string) => call<Instance>("copy_instance", { id }),
+  /** "" = ungrouped. */
+  setInstanceGroup: (id: string, group: string) => call<void>("set_instance_group", { id, group }),
+  /** A modpack archive on disk; whichever plugin reads its format plans it. Cancel with `sources.cancelImport(path)`. */
+  importModpackFile: (path: string, onProgress: (p: ImportProgress) => void) => {
+    const channel = new Channel<ImportProgress>();
+    channel.onmessage = onProgress;
+    return call<Instance>("import_modpack_file", { path, onProgress: channel });
+  },
   /** Opens the instance folder, or a folder inside it (`mods`, `screenshots`...). */
   openInstanceDir: (id: string, folder?: string) => call<void>("open_instance_dir", { id, folder }),
   /** Newest first. */
   listScreenshots: (id: string) => call<Screenshot[]>("list_screenshots", { id }),
   deleteScreenshot: (id: string, file: string) => call<void>("delete_screenshot", { id, file }),
   screenshot: (id: string, file: string) => call<ArrayBuffer>("screenshot_bytes", { id, file }),
+  /** Last played first. */
+  listWorlds: (id: string) => call<World[]>("list_worlds", { id }),
+  worldIcon: (id: string, folder: string) => call<ArrayBuffer>("world_icon", { id, folder }),
+  deleteWorld: (id: string, folder: string) => call<void>("delete_world", { id, folder }),
+  /** Resolves with the copy's folder. */
+  copyWorld: (id: string, folder: string) => call<string>("copy_world", { id, folder }),
 
-  /** Resolves once the game process has started; progress arrives through `onEvent`. */
-  launch: (id: string, onEvent: (e: LaunchEvent) => void) => {
+  /** Resolves once the game process has started; progress arrives through `onEvent`. `world`: a `saves/` folder to open straight away. */
+  launch: (id: string, onEvent: (e: LaunchEvent) => void, world?: string) => {
     const channel = new Channel<LaunchEvent>();
     channel.onmessage = onEvent;
-    return call<void>("launch", { id, onEvent: channel });
+    return call<void>("launch", { id, world, onEvent: channel });
   },
   onGameExit: (cb: (e: GameExit) => void): Promise<UnlistenFn> => listen<GameExit>("game-exit", (e) => cb(e.payload)),
   /** Every line the game prints, from any running instance. */

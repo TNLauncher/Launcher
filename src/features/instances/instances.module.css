@@ -47,3 +47,8 @@
 .row-name:hover { color: var(--link); }
 .row-inline { display: flex; gap: 8px; align-items: center; }
 .grow { flex: 1; }
+.section > summary { display: flex; align-items: center; gap: 6px; padding: 4px 4px 8px; font-size: 12px; font-weight: 600; color: var(--muted); cursor: pointer; list-style: none; user-select: none; }
+.section > summary::-webkit-details-marker { display: none; }
+.section > summary :global(.mono) { font-weight: 400; color: var(--subtle); }
+.section-chevron { font-size: 18px; transition: transform var(--quick) var(--butter); }
+.section[open] .section-chevron { transform: rotate(90deg); }

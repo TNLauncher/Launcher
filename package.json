@@ -12,6 +12,7 @@
   "dependencies": {
     "@tanstack/react-query": "^5.104.5",
     "@tauri-apps/api": "^2.12.4",
+    "@tauri-apps/plugin-dialog": "^2.8.3",
     "@tauri-apps/plugin-opener": "^2.7.2",
     "dompurify": "^3.4.17",
     "marked": "^18.1.1",

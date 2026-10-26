@@ -1,0 +1,22 @@
+.pane {
+  display: flex; flex-direction: column; gap: 10px; padding: 14px; min-height: 440px;
+  border-radius: 18px; background: var(--window); border: 1px solid var(--card-border); box-shadow: var(--highlight);
+}
+.head { display: flex; align-items: center; gap: 8px; min-height: 32px; }
+.head h3 { margin: 0; font-size: 13px; font-weight: 600; }
+.head :global(.mono) { font-size: 11px; color: var(--subtle); }
+.folder { margin-left: auto; }
+
+.list { display: flex; flex-direction: column; gap: 6px; }
+.world {
+  display: flex; align-items: center; gap: 12px; padding: 8px; border-radius: 12px;
+  background: var(--card); border: 1px solid var(--card-border);
+  transition: border-color var(--quick) var(--butter);
+}
+.world:hover { border-color: var(--border); }
+.icon { width: 48px; height: 48px; flex-shrink: 0; display: grid; place-items: center; border-radius: 8px; overflow: hidden; background: rgb(255 255 255 / 0.05); color: var(--muted); }
+/* World icons are 64px pixel art. */
+.icon img { width: 100%; height: 100%; image-rendering: pixelated; }
+.text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--muted); }
+.text strong { color: var(--fg); font-weight: 500; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }

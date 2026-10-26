@@ -34,6 +34,8 @@ export interface Instance {
   /** Modpack it was created from; null = made by hand. */
   pack: PackRef | null;
   settings: InstanceSettings;
+  /** Group it is listed under; "" = ungrouped. */
+  group: string;
 }
 
 /** Overrides of the global Settings; null = use the global value. */
@@ -65,6 +67,15 @@ export interface ModFile {
   file: string;
   enabled: boolean;
   size: number;
+}
+
+/** A folder in the instance's `saves/`. */
+export interface World {
+  folder: string;
+  /** Unix seconds `level.dat` last changed. */
+  played: number;
+  /** Has an `icon.png`. */
+  icon: boolean;
 }
 
 export interface Screenshot {

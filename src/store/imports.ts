@@ -6,7 +6,7 @@ import type { ImportProgress } from "@/types";
 
 export type PackHit = Pick<Hit, "id" | "title" | "iconUrl">;
 
-/** A modpack download that has not become an instance yet. */
+/** A modpack install that has not become an instance yet. */
 export interface PendingImport {
   source: string;
   projectId: string;
@@ -14,6 +14,8 @@ export interface PendingImport {
   iconUrl: string | null;
   /** Chosen pack version; undefined = newest. */
   version?: Version;
+  /** An archive from disk; `projectId` is then its path. */
+  file?: boolean;
   error: string;
 }
 

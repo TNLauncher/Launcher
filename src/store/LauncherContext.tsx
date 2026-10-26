@@ -5,10 +5,10 @@ import { BackendError } from "@/api/ipc";
 import { toast } from "@/components/ui/Toast";
 import { broadcast } from "@/plugins/bridge";
 import { gameLogs } from "./gameLogs";
-import { imports, type PackHit } from "./imports";
+import { imports, type PackHit, type PendingImport } from "./imports";
 import { sources, type Version } from "@/api/sources";
 import { errorMessage, recency } from "@/lib/format";
-import type { Instance, Settings, Snapshot, Stage } from "@/types";
+import type { ImportProgress, Instance, Settings, Snapshot, Stage } from "@/types";
 
 export interface Progress {
   stage: Stage;
@@ -31,12 +31,15 @@ export interface LauncherState {
   error: LaunchError | null;
   select(id: string): void;
   refresh(): Promise<void>;
-  launch(id: string): Promise<void>;
+  /** `world`: a `saves/` folder to open straight away. */
+  launch(id: string, world?: string): Promise<void>;
   clearError(): void;
   saveSettings(settings: Settings): Promise<void>;
   isRunning(id: string): boolean;
   /** Starts a background install (state in `@/store/imports`); a pack already installing is ignored. */
   startImport(source: string, pack: PackHit, version?: Version): void;
+  /** Same for a modpack archive on disk; keyed by its path. */
+  startFileImport(path: string): void;
 }
 
 const STARTING: Progress = { stage: "resolving", done: 0, total: 0 };
@@ -74,7 +77,7 @@ export const useLauncher = create<LauncherState>((set, get) => ({
     }
   },
 
-  launch: async (id: string) => {
+  launch: async (id: string, world?: string) => {
     const { select, refresh } = get();
     select(id);
     set({ error: null, busyId: id, progress: STARTING });
@@ -90,7 +93,7 @@ export const useLauncher = create<LauncherState>((set, get) => ({
           frame = 0;
           set({ progress: latest });
         });
-      });
+      }, world);
       broadcast("game-started", { instanceId: id });
     } catch (e) {
       broadcast("game-exited", { instanceId: id, code: null });
@@ -112,22 +115,34 @@ export const useLauncher = create<LauncherState>((set, get) => ({
 
   isRunning: (id: string) => get().snapshot?.running.includes(id) ?? false,
 
-  startImport: async (source: string, pack: PackHit, version?: Version) => {
-    const id = pack.id;
-    if (imports.has(id)) return;
-    imports.start({ source, projectId: id, title: pack.title, iconUrl: pack.iconUrl, version, error: "" });
-    try {
-      const inst = await sources.importModpack(source, id, version?.id, (p) => imports.progress(id, p));
-      get().select(inst.id);
-      await get().refresh();
-      imports.dismiss(id);
-      toast(`${pack.title} is ready to play`);
-    } catch (e) {
-      if (e instanceof BackendError && e.kind === "cancelled") imports.dismiss(id);
-      else imports.fail(id, errorMessage(e));
-    }
-  },
+  startImport: (source: string, pack: PackHit, version?: Version) =>
+    runImport({ source, projectId: pack.id, title: pack.title, iconUrl: pack.iconUrl, version, error: "" }, (onProgress) =>
+      sources.importModpack(source, pack.id, version?.id, onProgress)
+    ),
+
+  startFileImport: (path: string) =>
+    runImport({ source: "", projectId: path, title: path.split(/[\\/]/).pop() ?? path, iconUrl: null, file: true, error: "" }, (onProgress) =>
+      launcher.importModpackFile(path, onProgress)
+    ),
 }));
+
+/** Runs an install in the background, its state in `@/store/imports`; one already running for the same key is ignored. */
+async function runImport(pending: PendingImport, run: (onProgress: (p: ImportProgress) => void) => Promise<Instance>) {
+  const id = pending.projectId;
+  if (imports.has(id)) return;
+  imports.start(pending);
+  try {
+    const inst = await run((p) => imports.progress(id, p));
+    const { select, refresh } = useLauncher.getState();
+    select(inst.id);
+    await refresh();
+    imports.dismiss(id);
+    toast(`${inst.name} is ready to play`);
+  } catch (e) {
+    if (e instanceof BackendError && e.kind === "cancelled") imports.dismiss(id);
+    else imports.fail(id, errorMessage(e));
+  }
+}
 
 /** Boots the initial snapshot and game listeners once at the app shell level. */
 export function useLauncherInit() {

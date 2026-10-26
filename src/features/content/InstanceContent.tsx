@@ -5,6 +5,7 @@ import { sources, type Hit, type SourceInfo } from "@/api/sources";
 import { Banner, Button, Chip, ConfirmDialog, EmptyState, Icon, IconButton, Pill, PillGroup, SearchInput, Select, Skeleton, Switch, Tab, Tabs, toast } from "@/components/ui";
 import { InstanceSettingsPane } from "@/features/instances/InstanceSettings";
 import { Screenshots } from "@/features/screenshots/Screenshots";
+import { Worlds } from "@/features/worlds/Worlds";
 import { useDebounced } from "@/hooks/useDebounced";
 import { useFavorites, usePlugins, useSource } from "@/hooks/useSource";
 import { cx } from "@/lib/cx";
@@ -60,8 +61,8 @@ const IRIS = { source: "modrinth", project: "YL57xq9U" };
 export function InstanceContent({ instance }: { instance: Instance }) {
   const modded = instance.loader !== "vanilla";
   // `plugin:<id>:<tab>` = a tab a plugin contributes.
-  const [tab, setTab] = useRouteState<ContentKind | "screenshots" | "settings" | `plugin:${string}`>("instance.tab", modded ? "mod" : "resourcepack");
-  const kind = tab === "screenshots" || tab === "settings" || tab.startsWith("plugin:") ? "mod" : (tab as ContentKind);
+  const [tab, setTab] = useRouteState<ContentKind | "worlds" | "screenshots" | "settings" | `plugin:${string}`>("instance.tab", modded ? "mod" : "resourcepack");
+  const kind = tab === "worlds" || tab === "screenshots" || tab === "settings" || tab.startsWith("plugin:") ? "mod" : (tab as ContentKind);
   const pluginTabs = (usePlugins().data ?? []).filter((p) => p.enabled).flatMap((p) => p.instanceTabs.map((t) => ({ plugin: p, tab: t, key: `plugin:${p.id}:${t.id}` as const })));
   const openPluginTab = pluginTabs.find((t) => t.key === tab);
   // A header button or the crash notice asked for a plugin tab.
@@ -115,6 +116,9 @@ export function InstanceContent({ instance }: { instance: Instance }) {
               {KINDS[k].label}
             </Tab>
           ))}
+          <Tab selected={tab === "worlds"} onSelect={() => setTab("worlds")} icon="public">
+            Worlds
+          </Tab>
           <Tab selected={tab === "screenshots"} onSelect={() => setTab("screenshots")} icon="photo_camera">
             Screenshots
           </Tab>
@@ -141,6 +145,8 @@ export function InstanceContent({ instance }: { instance: Instance }) {
           <EmptyState icon="extension_off">This plugin tab is not available.</EmptyState>
         ) : tab === "settings" ? (
           <InstanceSettingsPane instance={instance} />
+        ) : tab === "worlds" ? (
+          <Worlds instance={instance} />
         ) : tab === "screenshots" ? (
           <Screenshots instanceId={instance.id} />
         ) : needsLoader ? (

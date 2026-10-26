@@ -1,3 +1,4 @@
+import { open as pickFile } from "@tauri-apps/plugin-dialog";
 import { lazy, Suspense, useCallback, useMemo } from "react";
 import { View } from "@/components/layout/View";
 import { sources } from "@/api/sources";
@@ -30,6 +31,7 @@ export function InstancesView() {
   const error = useLauncher((st) => st.error);
   const clearError = useLauncher((st) => st.clearError);
   const launch = useLauncher((st) => st.launch);
+  const startFileImport = useLauncher((st) => st.startFileImport);
   const imports = useImports();
   const openedId = useUi((st) => st.route.instance);
   const openNewInstance = useUi((st) => st.openNewInstance);
@@ -53,6 +55,14 @@ export function InstancesView() {
         .sort(SORTERS[sort]),
     [all, loader, q, sort]
   );
+  const groupNames = useMemo(() => [...new Set(all.map((i) => i.group).filter(Boolean))].sort((a, b) => a.localeCompare(b)), [all]);
+  // Ungrouped first, then groups by name; without groups the list stays flat.
+  const sections = useMemo(
+    () => (groupNames.length ? ["", ...groupNames].map((g) => ({ group: g, items: list.filter((i) => i.group === g) })).filter((x) => x.items.length) : []),
+    [groupNames, list]
+  );
+  const importFile = () =>
+    pickFile({ filters: [{ name: "Modpack", extensions: ["mrpack", "zip"] }] }).then((path) => path && startFileImport(path));
 
   const opened = openedId ? all.find((i) => i.id === openedId) : undefined;
   const openInstance = useCallback((id: string) => navigate("instances", { instance: id }), [navigate]);
@@ -85,6 +95,9 @@ export function InstancesView() {
                 { value: "name", label: "Name" },
                 { value: "time", label: "Play time" },
               ]} />
+            <Button icon="upload_file" title="Install a modpack archive from disk (.mrpack, .zip)" onClick={importFile}>
+              Import
+            </Button>
             <Button icon="add" onClick={openNewInstance}>
               Create instance
             </Button>
@@ -109,8 +122,21 @@ export function InstancesView() {
             )
           ) : !list.length ? (
             <EmptyState icon="search_off">Nothing matches this filter.</EmptyState>
+          ) : sections.length ? (
+            sections.map(({ group, items }) => (
+              <details key={group} className={s.section} open>
+                <summary>
+                  <Icon name="chevron_right" className={s.sectionChevron} />
+                  {group || "Ungrouped"}
+                  <span className="mono">{items.length}</span>
+                </summary>
+                <div className={s.rows}>
+                  {items.map((i) => <InstanceRow key={i.id} instance={i} groups={groupNames} onOpen={openInstance} />)}
+                </div>
+              </details>
+            ))
           ) : (
-            list.map((i) => <InstanceRow key={i.id} instance={i} onOpen={openInstance} />)
+            list.map((i) => <InstanceRow key={i.id} instance={i} groups={groupNames} onOpen={openInstance} />)
           )}
         </div>
 
@@ -126,6 +152,7 @@ export function InstancesView() {
 /** A modpack still downloading; replaced by the real instance row once it lands. */
 function ImportRow({ pending: p }: { pending: PendingImport }) {
   const startImport = useLauncher((st) => st.startImport);
+  const startFileImport = useLauncher((st) => st.startFileImport);
   const { done, total, manual } = useImportProgress(p.projectId);
   const pct = total ? (done / total) * 100 : 0;
   const waiting = manual.filter((f) => !f.done).length;
@@ -161,7 +188,7 @@ function ImportRow({ pending: p }: { pending: PendingImport }) {
       )}
       {p.error && (
         <div className={s.rowActions}>
-          <Button icon="refresh" onClick={() => startImport(p.source, { id: p.projectId, title: p.title, iconUrl: p.iconUrl }, p.version)}>
+          <Button icon="refresh" onClick={() => (p.file ? startFileImport(p.projectId) : startImport(p.source, { id: p.projectId, title: p.title, iconUrl: p.iconUrl }, p.version))}>
             Retry
           </Button>
           <IconButton icon="close" label="Dismiss" onClick={() => importStore.dismiss(p.projectId)} />
