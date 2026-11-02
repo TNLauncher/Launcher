@@ -4,6 +4,7 @@
 use std::path::PathBuf;
 use std::process::Stdio;
 use std::time::Duration;
+use tnlauncher_lib::minecraft::http::Check;
 use tnlauncher_lib::minecraft::{auth, command, install, java, loader, version};
 use tnlauncher_lib::models::Loader;
 use tnlauncher_lib::state::http_client;
@@ -23,10 +24,10 @@ async fn fabric_reaches_main_menu_init() {
 
     let lv = loader::latest(&c, "1.21.1", Loader::Fabric).await.unwrap();
     let base = version::base(&c, &root, "1.21.1").await.unwrap();
-    let java = java::ensure(&c, &root, &base, &progress).await.unwrap();
-    let v = version::with_loader(&c, &root, base, Loader::Fabric, &lv, &java, &progress).await.unwrap();
+    let java = java::ensure(&c, &root, &base, Check::Size, &progress).await.unwrap();
+    let v = version::with_loader(&c, &root, base, Loader::Fabric, &lv, &java, Check::Size, &progress).await.unwrap();
     let natives = game_dir.join(".natives");
-    let cp = install::install(&c, &root, &v, &natives, tnlauncher_lib::minecraft::http::Check::Size, &progress).await.unwrap();
+    let cp = install::install(&c, &root, &v, &natives, Check::Size, &progress).await.unwrap();
 
     let session = auth::Session { name: "Tester".into(), uuid: "00000000000000000000000000000000".into(), token: "0".into(), user_type: "legacy", jvm_args: vec![] };
     let mut cmd = command::build(&v, &command::LaunchOptions {

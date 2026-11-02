@@ -1,6 +1,6 @@
 //! Version JSON resolution: vanilla manifest + optional loader profile merged on top.
 use super::loader::{self, Profile};
-use super::{http::{fetch_bytes, get_json}, installer, Progress};
+use super::{http::{fetch_bytes, get_json, Check}, installer, Progress};
 use crate::error::{AppError, Result};
 use crate::models::Loader;
 use serde_json::Value;
@@ -25,12 +25,13 @@ pub async fn base(c: &reqwest::Client, root: &Path, game: &str) -> Result<Value>
 }
 
 /// `base` with the loader's profile merged on top; Forge/NeoForge run their installer with `java` on first use.
-pub async fn with_loader(c: &reqwest::Client, root: &Path, base: Value, loader: Loader, loader_version: &str, java: &Path, progress: Progress<'_>) -> Result<Value> {
+#[allow(clippy::too_many_arguments)]
+pub async fn with_loader(c: &reqwest::Client, root: &Path, base: Value, loader: Loader, loader_version: &str, java: &Path, check: Check, progress: Progress<'_>) -> Result<Value> {
     let game = base["id"].as_str().unwrap_or_default();
     let child = match loader::profile(loader, game, loader_version) {
         Profile::None => return Ok(base),
         Profile::Url(url) => get_json(c, &url).await?,
-        Profile::Installer { url, id } => installer::ensure(c, root, java, &url, &id, progress).await?,
+        Profile::Installer { url, id } => installer::ensure(c, root, java, &url, &id, check, progress).await?,
     };
     Ok(merge(base, &child))
 }

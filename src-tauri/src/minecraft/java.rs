@@ -21,14 +21,15 @@ fn platform() -> &'static str {
 }
 
 /// Returns the java binary for the runtime `version` asks for, downloading it on first use.
-pub async fn ensure(c: &reqwest::Client, root: &Path, version: &Value, progress: Progress<'_>) -> Result<PathBuf> {
+/// `Check::Hash` rechecks an installed runtime too, so a repair can fix it.
+pub async fn ensure(c: &reqwest::Client, root: &Path, version: &Value, check: Check, progress: Progress<'_>) -> Result<PathBuf> {
     let component = version["javaVersion"]["component"].as_str().unwrap_or("jre-legacy");
     let dir = root.join("runtime").join(component);
     // ponytail: Linux/Windows layout; macOS runtimes live under jre.bundle/Contents/Home.
     let java = dir.join("bin").join(if cfg!(windows) { "java.exe" } else { "java" });
     // Written last, so a runtime interrupted mid-install is redone instead of reused.
     let done = dir.join(".installed");
-    if done.exists() {
+    if check == Check::Size && done.exists() {
         return Ok(java);
     }
     progress(Stage::Java, 0, 0);
@@ -55,7 +56,7 @@ pub async fn ensure(c: &reqwest::Client, root: &Path, version: &Value, progress:
             _ => std::fs::create_dir_all(&path)?,
         }
     }
-    download_all(c, jobs, Check::Size, &|d, t| progress(Stage::Java, d, t)).await?;
+    download_all(c, jobs, check, &|d, t| progress(Stage::Java, d, t)).await?;
 
     #[cfg(unix)]
     {

@@ -86,10 +86,10 @@ pub(crate) async fn prepare(state: &AppState, id: &str, check: Check, progress: 
     let base = version::base(&state.http, root, &inst.version).await?;
     // Java follows the vanilla version; Forge/NeoForge installers need it before their profile exists.
     let java = match settings.java_path.trim() {
-        "" => java::ensure(&state.http, root, &base, progress).await?,
+        "" => java::ensure(&state.http, root, &base, check, progress).await?,
         custom => PathBuf::from(custom),
     };
-    let version = version::with_loader(&state.http, root, base, inst.loader, &inst.loader_version, &java, progress).await?;
+    let version = version::with_loader(&state.http, root, base, inst.loader, &inst.loader_version, &java, check, progress).await?;
     let installed = install::install(&state.http, root, &version, &natives, check, progress).await?;
     Ok(Prepared { inst, settings, version, java, installed })
 }

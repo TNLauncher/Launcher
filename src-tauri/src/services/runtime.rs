@@ -64,7 +64,7 @@ pub async fn prepare(state: &AppState, inst: &Instance, r: &RuntimeRef, session:
     let game_dir = state.paths.instance_dir(&inst.id)?;
     let base = version::base(&state.http, root, &inst.version).await?;
     let java = match settings.java_path.trim() {
-        "" => java::ensure(&state.http, root, &base, progress).await?,
+        "" => java::ensure(&state.http, root, &base, Check::Size, progress).await?,
         custom => PathBuf::from(custom),
     };
     install::install(&state.http, root, &base, &game_dir.join(".natives"), Check::Size, progress).await?;
