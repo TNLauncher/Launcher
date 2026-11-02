@@ -4,14 +4,14 @@ import { launcher } from "@/api/launcher";
 import { EmptyState, Icon, Pill, PillGroup } from "@/components/ui";
 import { cx } from "@/lib/cx";
 import { compact, errorMessage } from "@/lib/format";
-import { gameLogs, useGameLog } from "@/store/gameLogs";
+import { gameLogs, useGameLog, type LogLine } from "@/store/gameLogs";
 import { useLauncher } from "@/store/LauncherContext";
 import s from "./logs.module.css";
 
 type Kind = "log" | "crash";
-type Level = "info" | "warn" | "error";
-type Filter = "all" | Exclude<Level, "info">;
-interface Row { n: number; text: string; level: Level }
+type Filter = "all" | "warn" | "error";
+/** Game log lines are used as they are (no copy per frame); `debug` draws like info. */
+type Row = Pick<LogLine, "n" | "raw" | "level">;
 
 const SOURCES: Record<Kind, { label: string; icon: string }> = {
   log: { label: "Game log", icon: "description" },
@@ -27,10 +27,10 @@ const CONTINUES = /^\s+at |^\s*\.\.\. \d+ more|^Caused by: |^\s+Suppressed: /;
 
 /** Crash reports aren't log4j: each line's level, a stack trace taking the level of the line that threw it. */
 export function classify(text: string): Row[] {
-  let last: Level = "info";
+  let last: Row["level"] = "info";
   return text.replace(/\n$/, "").split("\n").map((line, i) => {
     last = CONTINUES.test(line) ? last : ERROR.test(line) ? "error" : WARN.test(line) ? "warn" : "info";
-    return { n: i + 1, text: line, level: last };
+    return { n: i + 1, raw: line, level: last };
   });
 }
 
@@ -50,7 +50,7 @@ export function Logs({ instanceId }: { instanceId: string }) {
   const rev = log?.rev ?? 0;
   const rows = useMemo<Record<Kind, Row[]>>(
     () => ({
-      log: (log?.lines ?? []).map((l) => ({ n: l.n, text: l.raw, level: l.level === "debug" ? "info" : l.level })),
+      log: log?.lines.slice() ?? [],
       crash: crash.data?.trim() ? classify(crash.data) : [],
     }),
     // `log.lines` mutates in place; `rev` is what changes.
@@ -104,10 +104,13 @@ function Preview({ title, rows, rev, error }: { title: string; rows: Row[]; rev:
   const matching = active === "all" ? rows : rows.filter((r) => r.level === active);
   const shown = matching.slice(-SHOWN);
 
-  // The end of a log is where it broke.
+  // The end of a log is where it broke; live output keeps it there only while the reader hasn't scrolled up.
+  const stick = useRef(true);
+  const stuckFilter = useRef(active);
   useLayoutEffect(() => {
     const el = scroller.current;
-    if (el) el.scrollTop = el.scrollHeight;
+    if (stuckFilter.current !== active) (stuckFilter.current = active), (stick.current = true);
+    if (el && stick.current) el.scrollTop = el.scrollHeight;
   }, [rev, active, rows]);
 
   return (
@@ -124,7 +127,8 @@ function Preview({ title, rows, rev, error }: { title: string; rows: Row[]; rev:
       </header>
       {error && <p className={s.loadError}>Could not read the last log: {error}</p>}
       {rows.length ? (
-        <div className={cx(s.lines, "selectable")} ref={scroller} role="log" tabIndex={0}>
+        <div className={cx(s.lines, "selectable")} ref={scroller} role="log" tabIndex={0}
+          onScroll={(e) => (stick.current = e.currentTarget.scrollHeight - e.currentTarget.scrollTop - e.currentTarget.clientHeight < 40)}>
           {shown.length < matching.length && (
             <p className={s.logNote}>Showing the last {shown.length.toLocaleString()} of {matching.length.toLocaleString()} lines.</p>
           )}
@@ -138,11 +142,11 @@ function Preview({ title, rows, rev, error }: { title: string; rows: Row[]; rev:
 }
 
 // Memoized: a log line never changes, so live output renders only the new lines.
-const Line = memo(function Line({ n, text, level }: Row) {
+const Line = memo(function Line({ n, raw, level }: Row) {
   return (
     <div className={cx(s.ln, s[level])}>
       <span>{n}</span>
-      <span>{text || " "}</span>
+      <span>{raw || " "}</span>
     </div>
   );
 });

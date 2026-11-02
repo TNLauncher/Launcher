@@ -28,6 +28,7 @@ export interface Session {
 }
 
 const MAX_LINES = 20_000;
+const TRIM_SLACK = 2_000;
 // [12:34:56] [Render thread/INFO]: msg   ·   [12:34:56] [main/INFO] (FabricLoader) msg
 const HEADER = /^\[(\d\d:\d\d:\d\d)\] \[([^\]]*)\/([A-Z]+)\](?: \(([^)]*)\))?:? ?(.*)$/;
 const LEVELS: Record<string, Level> = { TRACE: "debug", DEBUG: "debug", INFO: "info", WARN: "warn", ERROR: "error", FATAL: "error" };
@@ -53,7 +54,8 @@ export function parse(raw: string, n: number, prev: LogLine | undefined, err: bo
 function push(s: Session, raw: string, err: boolean) {
   const last = s.lines[s.lines.length - 1];
   s.lines.push(parse(raw, (last?.n ?? 0) + 1, last, err));
-  if (s.lines.length > MAX_LINES) s.lines.splice(0, s.lines.length - MAX_LINES);
+  // In batches: trimming one line per push would shift the whole 20k array for every line the game prints.
+  if (s.lines.length > MAX_LINES + TRIM_SLACK) s.lines.splice(0, s.lines.length - MAX_LINES);
 }
 
 function changed(s: Session) {
