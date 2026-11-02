@@ -2,11 +2,10 @@ use crate::error::Result;
 use crate::minecraft::loader;
 use crate::models::{Instance, InstanceSettings, Loader, Screenshot, World};
 use crate::services::modpacks::{self, ImportProgress};
-use crate::plugins::js::RuntimeVersion;
-use crate::services::{instances, mods, runtime, screenshots, worlds};
+use crate::plugins::api::RuntimeVersion;
+use crate::services::{content, instances, runtime, screenshots, worlds};
 use crate::state::AppState;
 use tauri::{ipc::{Channel, Response}, AppHandle, Manager, State};
-use tauri_plugin_opener::OpenerExt;
 
 #[tauri::command]
 /// `loader_version: None` = the loader's newest stable build.
@@ -110,12 +109,9 @@ pub fn delete_instance(state: State<'_, AppState>, id: String) -> Result<()> {
 pub fn open_instance_dir(app: AppHandle, state: State<'_, AppState>, id: String, folder: Option<String>) -> Result<()> {
     let mut dir = state.paths.instance_dir(&id)?;
     if let Some(folder) = folder {
-        dir.push(mods::safe_file(&folder)?);
+        dir.push(crate::paths::safe_file(&folder)?);
     }
-    std::fs::create_dir_all(&dir)?;
-    app.opener()
-        .open_path(dir.to_string_lossy(), None::<&str>)
-        .map_err(|e| crate::error::AppError::Unsupported(e.to_string()))
+    super::open_dir(&app, &dir)
 }
 
 #[tauri::command]
@@ -137,7 +133,7 @@ pub fn screenshot_bytes(state: State<'_, AppState>, id: String, file: String) ->
 /// The icon packed inside a mod jar; errors when the mod has none.
 #[tauri::command]
 pub fn mod_icon(state: State<'_, AppState>, id: String, file: String) -> Result<Response> {
-    Ok(Response::new(mods::icon(&state, &id, &file)?.0))
+    Ok(Response::new(content::icon(&state, &id, &file)?.0))
 }
 
 #[tauri::command]

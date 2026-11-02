@@ -5,7 +5,7 @@ use crate::minecraft::{
     auth::{self, DeviceCode, Session},
     http,
 };
-use crate::plugins::{self, js::PluginSession};
+use crate::plugins::{self, api::PluginSession};
 use crate::state::AppState;
 use crate::storage;
 use serde::{Deserialize, Serialize};
@@ -220,7 +220,7 @@ async fn plugin_session(state: &AppState, plugin: &plugins::Plugin, s: PluginSes
         if !plugin.may_download(&agent.url) {
             return Err(AppError::Invalid(format!("{} is not an allowed download", agent.url)));
         }
-        let jar = state.paths.plugin_data_dir(&plugin.manifest.id).join("files").join(super::mods::safe_file(&agent.filename)?);
+        let jar = state.paths.plugin_data_dir(&plugin.manifest.id).join("files").join(crate::paths::safe_file(&agent.filename)?);
         http::download(&state.http, &agent.url, &jar, None).await?;
         let options = if agent.options.is_empty() { String::new() } else { format!("={}", agent.options) };
         jvm_args.push(format!("-javaagent:{}{options}", jar.display()));

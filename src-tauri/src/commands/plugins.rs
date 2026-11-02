@@ -27,10 +27,7 @@ pub fn set_plugin_enabled(state: State<'_, AppState>, id: String, enabled: bool)
 /// Opens the folder user plugins are loaded from, creating it first.
 #[tauri::command]
 pub fn open_plugins_dir(app: tauri::AppHandle, state: State<'_, AppState>) -> Result<()> {
-    use tauri_plugin_opener::OpenerExt;
-    let dir = state.paths.plugins_dir();
-    std::fs::create_dir_all(&dir)?;
-    app.opener().open_path(dir.to_string_lossy(), None::<&str>).map_err(|e| crate::error::AppError::Unsupported(e.to_string()))
+    super::open_dir(&app, &state.paths.plugins_dir())
 }
 
 /// Current values of a plugin's declared settings.

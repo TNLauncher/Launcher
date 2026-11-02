@@ -1,17 +1,18 @@
 //! Games that plugins run instead of Java Minecraft (`contributes.runtime`). The plugin only describes a build's
 //! files and command lines; the launcher checks, downloads and runs them, and fills in paths and the account, so a
 //! plugin never sees a token and never names a program outside its build's folder.
-use super::{instances, mods::safe_file};
+use super::instances;
+use crate::paths::{safe_file, safe_rel};
 use crate::error::{AppError, Result};
 use crate::minecraft::auth::Session;
 use crate::minecraft::http::{self, Check, Job};
 use crate::minecraft::{install, java, version, Progress, Stage};
 use crate::models::{Instance, Loader, RuntimeRef, Settings};
-use crate::plugins::{self, js::*, Plugin};
+use crate::plugins::{self, api::*, Plugin};
 use crate::state::AppState;
 use serde_json::json;
 use sha2::{Digest, Sha256};
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 /// Written last into a build's folder, so an interrupted install is redone instead of reused.
@@ -161,11 +162,7 @@ fn extract(archive: &Path, dest: &Path) -> Result<()> {
 
 /// A file inside the build's folder; the plugin names it relative to the folder.
 fn build_file(dir: &Path, rel: &str) -> Result<PathBuf> {
-    let p = Path::new(rel);
-    if rel.is_empty() || !p.components().all(|c| matches!(c, Component::Normal(_))) {
-        return Err(AppError::Invalid(format!("Bad program path: {rel}")));
-    }
-    let path = dir.join(p);
+    let path = dir.join(safe_rel(rel)?);
     if !path.is_file() {
         return Err(AppError::NotFound(format!("{rel} is not in the build")));
     }

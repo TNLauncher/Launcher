@@ -3,6 +3,7 @@ use crate::minecraft::loader;
 use crate::models::{Instance, InstanceSettings, Loader};
 use crate::state::AppState;
 use crate::storage;
+use serde::Serialize;
 use std::collections::HashMap;
 use std::path::Path;
 
@@ -139,4 +140,59 @@ pub fn mod_counts(state: &AppState, instances: &[Instance]) -> HashMap<String, u
             (i.id.clone(), n)
         })
         .collect()
+}
+
+/// Launch settings a fix may look at; never the environment, which may hold secrets.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LaunchFacts {
+    pub ram_mb: u32,
+    /// The user set their own Java instead of the one the launcher picks.
+    pub custom_java: bool,
+}
+
+pub fn launch_facts(state: &AppState, id: &str) -> Result<LaunchFacts> {
+    let inst = get(state, id)?;
+    let s = storage::load_settings(state).for_instance(&inst.settings);
+    Ok(LaunchFacts { ram_mb: s.ram_mb, custom_java: !s.java_path.trim().is_empty() })
+}
+
+/// One change to an instance's launch, asked by a plugin. Each is checked here, whatever the plugin sent.
+#[derive(Debug, serde::Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
+pub enum Change {
+    SetRam { mb: u32 },
+    /// Back to the Java the launcher picks.
+    AutoJava,
+    /// The newest loader build for the instance's game version.
+    UpdateLoader,
+}
+
+/// Returns what changed, for people.
+pub async fn change(state: &AppState, id: &str, change: Change) -> Result<String> {
+    if state.is_running(id) {
+        return Err(AppError::Conflict("Close the game first".into()));
+    }
+    let inst = get(state, id)?;
+    match change {
+        Change::SetRam { mb } => {
+            if !(1024..=65536).contains(&mb) {
+                return Err(AppError::Invalid("Memory must be between 1 and 64 GB".into()));
+            }
+            update(state, id, |i| i.settings.ram_mb = Some(mb))?;
+            Ok(format!("Memory set to {} GB", mb as f32 / 1024.0))
+        }
+        Change::AutoJava => {
+            update(state, id, |i| i.settings.java_path = Some(String::new()))?;
+            Ok("Using the Java the launcher picks".into())
+        }
+        Change::UpdateLoader => {
+            let latest = loader::latest(&state.http, &inst.version, inst.loader).await?;
+            if latest == inst.loader_version {
+                return Err(AppError::Conflict(format!("{latest} is already the newest loader for Minecraft {}", inst.version)));
+            }
+            update(state, id, |i| i.loader_version = latest.clone())?;
+            Ok(format!("Loader {} → {latest}", inst.loader_version))
+        }
+    }
 }

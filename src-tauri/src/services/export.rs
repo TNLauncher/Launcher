@@ -1,11 +1,12 @@
 //! Instance archives for export plugins: the plugin says what goes in, the launcher writes the zip
 //! to a place the user picked, so a plugin never writes outside it.
-use crate::error::{AppError, Result};
+use crate::error::Result;
+use crate::paths::safe_rel;
 use crate::state::AppState;
 use serde::Deserialize;
 use std::collections::BTreeMap;
 use std::io::Write;
-use std::path::{Component, Path};
+use std::path::Path;
 use zip::write::SimpleFileOptions;
 
 /// Never part of an export: launcher bookkeeping, not the game's.
@@ -28,23 +29,17 @@ pub struct Spec {
     pub skip: Vec<String>,
 }
 
-/// Plugin paths are untrusted: plain relative components only.
-fn check(path: &str) -> Result<()> {
-    if Path::new(path).components().all(|c| matches!(c, Component::Normal(_))) {
-        Ok(())
-    } else {
-        Err(AppError::Invalid(format!("Bad archive path: {path}")))
-    }
-}
-
 fn skipped(rel: &str, skip: &[String]) -> bool {
     ALWAYS_SKIP.contains(&rel) || skip.iter().any(|s| rel == s || rel.strip_prefix(s.as_str()).is_some_and(|r| r.starts_with('/')))
 }
 
 /// Writes the archive to `dest`; a half-written file is removed on error.
 pub fn write(state: &AppState, id: &str, spec: &Spec, dest: &Path) -> Result<()> {
-    check(&spec.root)?;
-    spec.files.keys().try_for_each(|k| if k.is_empty() { Err(AppError::Invalid("Empty archive path".into())) } else { check(k) })?;
+    // Plugin paths are untrusted; an empty root is the archive root.
+    if !spec.root.is_empty() {
+        safe_rel(&spec.root)?;
+    }
+    spec.files.keys().try_for_each(|k| safe_rel(k).map(drop))?;
     let dir = state.paths.instance_dir(id)?;
     let out = (|| {
         let mut zip = zip::ZipWriter::new(std::io::BufWriter::new(std::fs::File::create(dest)?));

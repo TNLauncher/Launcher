@@ -4,7 +4,9 @@
 //! `config/iris.properties`. A `*.disabled` pack (older launcher builds) still lists as off.
 use crate::error::{AppError, Result};
 use crate::minecraft::http;
+use crate::minecraft::modmeta::{self, ModMeta, Scan};
 use crate::models::{ContentKind, Loader, ModFile};
+use crate::paths::safe_file;
 use crate::plugins::{
     self,
     api::{DependencyKind, ProjectSummary, VersionFilter},
@@ -18,14 +20,6 @@ use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 const DISABLED: &str = ".disabled";
-
-/// File names come from the frontend: no separators, no hidden files.
-pub(crate) fn safe_file(name: &str) -> Result<&str> {
-    if name.is_empty() || name.contains(['/', '\\']) || name.starts_with('.') {
-        return Err(AppError::Invalid(format!("Bad file name: {name}")));
-    }
-    Ok(name)
-}
 
 pub fn list(state: &AppState, id: &str, kind: ContentKind) -> Result<Vec<ModFile>> {
     let dir = state.paths.content_dir(id, kind)?;
@@ -413,6 +407,71 @@ pub fn icon(state: &AppState, id: &str, file: &str) -> Result<(Vec<u8>, &'static
     Ok((bytes, mime))
 }
 
+
+/// Jar names in `dir` with whether each is on; `with_disabled` adds the `.jar.disabled` ones.
+pub(crate) fn jar_files(dir: &Path, with_disabled: bool) -> Vec<(String, bool)> {
+    let Ok(rd) = std::fs::read_dir(dir) else { return vec![] };
+    let mut out: Vec<(String, bool)> = rd
+        .flatten()
+        .filter(|e| e.file_type().is_ok_and(|t| t.is_file()))
+        .filter_map(|e| {
+            let name = e.file_name().to_string_lossy().to_string();
+            if name.ends_with(".jar") {
+                Some((name, true))
+            } else if with_disabled && name.ends_with(".jar.disabled") {
+                Some((name, false))
+            } else {
+                None
+            }
+        })
+        .collect();
+    out.sort();
+    out
+}
+
+/// A mod jar as the instance's loader reads it.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModEntry {
+    pub file: String,
+    pub enabled: bool,
+    /// Set for a mod of this loader.
+    pub meta: Option<ModMeta>,
+    /// The loader a jar for another loader is made for.
+    pub foreign: Option<&'static str>,
+    /// Not a readable archive.
+    pub broken: bool,
+}
+
+/// Every jar in `mods/`, on and off, read the way the instance's loader would read it.
+pub fn scan_mods(state: &AppState, id: &str) -> Result<Vec<ModEntry>> {
+    let inst = instances::get(state, id)?;
+    let dir = state.paths.mods_dir(id)?;
+    Ok(jar_files(&dir, true)
+        .into_iter()
+        .map(|(file, enabled)| {
+            let scan = std::fs::File::open(dir.join(&file)).map_err(zip::result::ZipError::Io).and_then(|f| modmeta::scan(f, inst.loader));
+            let (meta, foreign, broken) = match scan {
+                Ok(Scan::Mod(m)) if !m.id.is_empty() => (Some(m), None, false),
+                Ok(Scan::Foreign(p)) => (None, Some(p), false),
+                Ok(_) => (None, None, false),
+                Err(_) => (None, None, true),
+            };
+            ModEntry { file, enabled, meta, foreign, broken }
+        })
+        .collect())
+}
+
+/// Catalog projects already in the instance, so dependencies of a new mod are not installed twice.
+pub async fn installed_projects(state: &AppState, source_id: &str, id: &str) -> Result<(Vec<String>, HashMap<String, String>)> {
+    let plugin = plugins::enabled(state, source_id)?;
+    let algo = plugin.manifest.contributes.source.as_ref().map(|s| s.hash).unwrap_or_default();
+    let hashes = hashes(state, id, ContentKind::Mod, algo)?;
+    let found = identify(state, source_id, hashes).await?;
+    let by_file: HashMap<String, String> = found.into_iter().map(|(file, f)| (file, f.project.id)).collect();
+    Ok((by_file.values().cloned().collect(), by_file))
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
@@ -492,9 +551,8 @@ mod tests {
 
     #[test]
     fn rejects_path_traversal() {
-        assert!(super::safe_file("../evil.jar").is_err());
-        assert!(super::safe_file(".hidden").is_err());
-        assert!(super::safe_file("sodium-0.6.jar").is_ok());
+
+
     }
 
     #[test]

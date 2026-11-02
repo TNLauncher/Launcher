@@ -1,5 +1,6 @@
 use crate::error::Result;
 use crate::services::launcher::{self, LaunchEvent};
+use crate::services::logs;
 use crate::state::AppState;
 use tauri::{ipc::Channel, AppHandle, State};
 
@@ -17,11 +18,11 @@ pub fn stop_game(state: State<'_, AppState>, id: String) -> Result<()> {
 /// The last session's game output, for instances whose lines were not streamed this run.
 #[tauri::command]
 pub fn read_game_log(state: State<'_, AppState>, id: String) -> Result<String> {
-    launcher::read_log(&state, &id)
+    logs::read_log(&state, &id)
 }
 
 /// The last session's crash report and JVM error file; empty when it wrote none.
 #[tauri::command]
 pub fn read_crash_report(state: State<'_, AppState>, id: String) -> Result<String> {
-    crate::services::repair::crash_reports(&state, &id)
+    logs::crash_reports(&state, &id)
 }

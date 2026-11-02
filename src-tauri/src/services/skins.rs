@@ -3,7 +3,7 @@
 use super::account::{self, Account, MICROSOFT};
 use crate::error::{AppError, Result};
 use crate::minecraft::http;
-use crate::plugins::{self, host::host_allowed, js::Skin};
+use crate::plugins::{self, host::host_allowed, api::Skin};
 use crate::state::AppState;
 use crate::storage;
 use base64::{engine::general_purpose::STANDARD, Engine};

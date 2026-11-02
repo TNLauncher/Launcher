@@ -8,6 +8,7 @@ use crate::plugins::{
     api::{PackFile, PackPlan, ProjectKind, Version, VersionFilter},
     Plugin,
 };
+use crate::paths::safe_rel;
 use crate::services::instances;
 use crate::state::AppState;
 use base64::{engine::general_purpose::STANDARD, Engine};
@@ -15,7 +16,7 @@ use futures::future::{AbortHandle, Abortable};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::io::{Cursor, Read, Seek};
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -44,15 +45,6 @@ pub struct ManualFile {
     pub page: String,
     /// Found in Downloads and moved into the instance.
     pub done: bool,
-}
-
-/// Pack paths are untrusted: only plain relative components, so nothing escapes the instance dir.
-fn safe_rel(path: &str) -> Result<&Path> {
-    let p = Path::new(path);
-    if path.is_empty() || !p.components().all(|c| matches!(c, Component::Normal(_))) {
-        return Err(AppError::Invalid(format!("Bad path in modpack: {path}")));
-    }
-    Ok(p)
 }
 
 fn loader_of(plan: &PackPlan) -> Result<Loader> {
@@ -407,7 +399,7 @@ mod tests {
 
     #[tokio::test]
     async fn imports_archives_through_an_importer_plugin() {
-        use crate::plugins::{js::Bridge, Registry};
+        use crate::plugins::{bridge::Bridge, Registry};
         use std::io::Write;
         let root = std::env::temp_dir().join(format!("tn-import-file-{}", std::process::id()));
         let plugins = root.join("plugins");
@@ -434,7 +426,7 @@ mod tests {
             })
         });
         bridge.listening();
-        *state.plugins.write().unwrap() = Registry::load(&[(plugins, false)], bridge);
+        *state.plugins.write().unwrap() = Registry::load(&[(plugins, false)], vec![], bridge);
 
         let inst = import_file(&state, &archive, None, &|_| {}).await.unwrap();
         assert_eq!((inst.name.as_str(), inst.version.as_str(), inst.pack.is_none()), ("Old", "1.12.2", true));

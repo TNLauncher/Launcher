@@ -1,10 +1,8 @@
-//! The contract between the launcher and a content source (Modrinth, CurseForge...).
-//! Sources are JS plugins (see `js`), so every type here crosses JSON both ways: keep it plain data.
+//! The data a plugin and the launcher exchange: what content sources, account providers, importers and game
+//! runtimes return (see `remote`). Every type here crosses JSON both ways: keep it plain data.
 //! Mirrored for plugin authors in packages/plugin-api/index.d.ts.
-use crate::error::Result;
-use futures::future::BoxFuture;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use serde_json::Value;
 
 /// What a project is; content kinds share `ContentKind`'s names.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -235,17 +233,125 @@ pub struct PackFile {
     pub sha1: Option<String>,
 }
 
-/// A catalog of projects to search and install from. Methods return boxed futures so sources are object-safe.
-pub trait ContentSource: Send + Sync {
-    fn search<'a>(&'a self, q: &'a SearchQuery) -> BoxFuture<'a, Result<Page>>;
-    fn project<'a>(&'a self, id: &'a str) -> BoxFuture<'a, Result<Project>>;
-    /// Any number of ids, in any order.
-    fn projects<'a>(&'a self, ids: &'a [String]) -> BoxFuture<'a, Result<Vec<ProjectSummary>>>;
-    /// Newest first.
-    fn versions<'a>(&'a self, project: &'a str, f: &'a VersionFilter) -> BoxFuture<'a, Result<Vec<Version>>>;
-    // ponytail: SHA-1 only, which is what Modrinth needs; CurseForge identifies by murmur2, add a hash kind to the manifest then.
-    /// Keyed by the given SHA-1; unknown files are missing from the map.
-    fn identify<'a>(&'a self, sha1: &'a [String]) -> BoxFuture<'a, Result<HashMap<String, Identified>>>;
-    /// `root` holds the archive's top-level text files (its manifest), by name.
-    fn plan_pack<'a>(&'a self, root: &'a HashMap<String, String>) -> BoxFuture<'a, Result<PackPlan>>;
+// Account providers (`tn.accounts.register`).
+
+/// What `login` returns: who signed in, and whatever the plugin keeps to start sessions later.
+#[derive(Debug, Deserialize)]
+pub struct Login {
+    pub name: String,
+    pub uuid: String,
+    #[serde(default)]
+    pub data: Value,
+}
+
+/// What `session` returns before each launch.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PluginSession {
+    pub name: String,
+    pub uuid: String,
+    pub token: String,
+    /// `mojang` (Yggdrasil) or `legacy`.
+    pub user_type: String,
+    /// Replaces the stored `data`, e.g. after a token refresh.
+    #[serde(default)]
+    pub data: Value,
+    pub java_agent: Option<JavaAgent>,
+}
+
+/// A jar the launcher downloads (from the plugin's download hosts) and loads with `-javaagent:<jar>=<options>`.
+#[derive(Debug, Deserialize)]
+pub struct JavaAgent {
+    pub url: String,
+    pub filename: String,
+    #[serde(default)]
+    pub options: String,
+}
+
+/// A skin texture: what `skin` returns, and what the UI renders.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct Skin {
+    pub url: String,
+    /// Alex model: 3px arms.
+    #[serde(default)]
+    pub slim: bool,
+}
+
+// Game runtimes (`tn.runtimes.register`).
+
+/// A build a runtime offers.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RuntimeVersion {
+    /// Becomes a folder name: no slashes, no leading dot.
+    pub id: String,
+    /// The Minecraft version whose files the build needs.
+    pub minecraft: String,
+    #[serde(default)]
+    pub stable: bool,
+}
+
+/// What `install` returns: the files of one build, put in its folder once.
+#[derive(Debug, Deserialize)]
+pub struct RuntimeInstall {
+    pub files: Vec<RuntimeFile>,
+}
+
+/// A file from the plugin's download hosts, checked against `sha256`; `extract` unpacks a `.zip` or `.tar.gz` and drops it.
+#[derive(Debug, Deserialize)]
+pub struct RuntimeFile {
+    pub url: String,
+    pub filename: String,
+    pub sha256: String,
+    #[serde(default)]
+    pub extract: bool,
+}
+
+/// What `launch` returns before each start. Arguments may hold `${...}` placeholders (see `services::runtime`).
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeLaunch {
+    /// Download the Minecraft server jar too (`${mc.serverJar}`).
+    #[serde(default)]
+    pub server_jar: bool,
+    /// Run in order before the game, e.g. building its resources from Minecraft's files.
+    #[serde(default)]
+    pub steps: Vec<RuntimeStep>,
+    pub game: RuntimeProgram,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RuntimeStep {
+    /// Shown while it runs.
+    pub title: String,
+    /// Relative to the build's folder.
+    pub program: String,
+    #[serde(default)]
+    pub args: Vec<String>,
+    /// Arguments of a quick run of `program`: exit code 0 skips the step.
+    pub check: Option<Vec<String>>,
+    /// Stdout is JSON lines: `{"fraction"}`, `{"message"}`, `{"error"}`.
+    #[serde(default)]
+    pub progress: Option<ProgressFormat>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ProgressFormat {
+    Json,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RuntimeProgram {
+    /// Relative to the build's folder.
+    pub program: String,
+    #[serde(default)]
+    pub args: Vec<String>,
+    /// How the game gets the account: `stdin` writes `{name, uuid, access_token, user_type}` and closes it.
+    pub session: Option<SessionPass>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SessionPass {
+    Stdin,
 }

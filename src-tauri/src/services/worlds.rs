@@ -1,7 +1,8 @@
 //! The game's `saves/` folder of an instance: one folder per world.
 use crate::error::{AppError, Result};
 use crate::models::World;
-use crate::services::{instances, mods::safe_file};
+use crate::paths::safe_file;
+use crate::services::instances;
 use crate::state::AppState;
 use std::path::PathBuf;
 use std::time::UNIX_EPOCH;

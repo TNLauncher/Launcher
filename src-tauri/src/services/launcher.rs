@@ -15,10 +15,6 @@ use std::sync::Arc;
 use std::thread::JoinHandle;
 use tauri::{ipc::Channel, AppHandle, Emitter, Manager};
 
-pub const GAME_EXIT_EVENT: &str = "game-exit";
-pub const GAME_LOG_EVENT: &str = "game-log";
-/// The console only needs the recent tail of a long session's log.
-const LOG_TAIL_BYTES: u64 = 4 << 20;
 
 #[derive(Clone, Serialize)]
 #[serde(tag = "event", content = "data", rename_all = "camelCase")]
@@ -113,7 +109,7 @@ pub async fn launch(app: &AppHandle, id: &str, world: Option<&str>, on_event: Ch
     // Before the downloads, so an expired sign-in fails fast.
     let session = super::account::session(&state).await?;
     if let Some(w) = world {
-        crate::services::mods::safe_file(w)?;
+        crate::paths::safe_file(w)?;
     }
     let inst = instances::get(&state, id)?;
     let (mut cmd, stdin, settings) = match &inst.runtime {
@@ -190,7 +186,7 @@ pub async fn launch(app: &AppHandle, id: &str, world: Option<&str>, on_event: Ch
         if let Some(w) = app.get_webview_window("main") {
             let _ = w.show();
         }
-        let _ = app.emit(GAME_EXIT_EVENT, GameExit { id, code });
+        let _ = app.emit(crate::events::GAME_EXIT, GameExit { id, code });
     });
     Ok(())
 }
@@ -205,7 +201,7 @@ fn pipe(app: &AppHandle, id: &str, src: impl Read + Send + 'static, log: Arc<Fil
             let _ = (&*log).write_all(&buf);
             let line = String::from_utf8_lossy(&buf);
             let line = line.trim_end_matches(['\r', '\n']);
-            let _ = app.emit(GAME_LOG_EVENT, GameLog { id: &id, line, err });
+            let _ = app.emit(crate::events::GAME_LOG, GameLog { id: &id, line, err });
             buf.clear();
         }
     })
@@ -216,26 +212,6 @@ pub fn stop(state: &AppState, id: &str) -> Result<()> {
     let mut games = state.games.lock().unwrap();
     let child = games.get_mut(id).ok_or_else(|| AppError::NotFound("This instance is not running".into()))?;
     Ok(child.kill()?)
-}
-
-/// Tail of the last session's `launcher.log`; empty if the instance never ran.
-pub fn read_log(state: &AppState, id: &str) -> Result<String> {
-    let mut file = match File::open(state.paths.instance_dir(id)?.join("launcher.log")) {
-        Ok(f) => f,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(String::new()),
-        Err(e) => return Err(e.into()),
-    };
-    let len = file.metadata()?.len();
-    let mut bytes = Vec::new();
-    if len > LOG_TAIL_BYTES {
-        use std::io::Seek;
-        file.seek(std::io::SeekFrom::Start(len - LOG_TAIL_BYTES))?;
-    }
-    file.read_to_end(&mut bytes)?;
-    let text = String::from_utf8_lossy(&bytes);
-    // A cut tail starts mid-line; drop the fragment.
-    let text = if len > LOG_TAIL_BYTES { text.split_once('\n').map_or("", |(_, t)| t) } else { &text };
-    Ok(text.to_string())
 }
 
 fn apply_after_launch(app: &AppHandle, action: AfterLaunch) {

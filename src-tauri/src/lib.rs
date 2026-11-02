@@ -1,18 +1,21 @@
-//! TNLauncher backend.
+//! TNLauncher backend: a small core that installs and runs Minecraft, and a plugin host that lets
+//! sandboxed JS plugins add the rest (content sources, accounts, importers, runtimes, pages).
 //!
 //! Layers, top to bottom:
 //! - `commands`  — thin `#[tauri::command]` adapters: parse IPC input, call a service.
-//! - `services`  — use cases (create instance, launch, manage mods); own all side effects.
-//! - `minecraft` — protocol knowledge: Mojang and mod loader metadata, installs, JVM command.
-//! - `plugins`   — JS plugins in sandboxed frames; Rust serves them and checks what they ask for.
-//! - `storage`   — JSON persistence of settings and instances.
-//! - `models`, `state`, `error` — shared types; `config` — build-time `TN_*` settings from .env.
+//! - `services`  — use cases by domain (instances, content, launcher, logs, modpacks, repair...); own all side effects.
+//! - `plugins`   — the plugin host: manifests and registry, calls into plugin frames (`remote`), requests from them (`host`).
+//! - `minecraft` — protocol knowledge: Mojang and mod loader metadata, installs, JVM command. No Tauri types.
+//! - `storage`   — JSON persistence of settings and instances; `paths` — the on-disk layout and untrusted-path checks.
+//! - `models`, `state`, `error`, `events` — shared types; `config` — build-time `TN_*` settings from .env.
 
 pub mod commands;
 pub mod config;
 pub mod error;
+pub mod events;
 pub mod minecraft;
 pub mod models;
+pub mod paths;
 pub mod plugins;
 pub mod services;
 pub mod state;
@@ -26,35 +29,16 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         // `plugin://localhost/<id>/<file>`: a plugin's files, with the SDK and a CSP built from its manifest.
-        .register_asynchronous_uri_scheme_protocol("plugin", |ctx, req, responder| {
-            let app = ctx.app_handle().clone();
-            tauri::async_runtime::spawn_blocking(move || {
-                let path = percent_encoding::percent_decode_str(req.uri().path()).decode_utf8_lossy().into_owned();
-                let res = match plugins::host::serve(&app.state::<state::AppState>(), &path) {
-                    Ok(f) => {
-                        // Plugin frames are sandboxed (opaque origin), so their module scripts load cross-origin.
-                        let mut b = tauri::http::Response::builder().header("Content-Type", f.mime).header("Access-Control-Allow-Origin", "*")
-                            // Plugin files change on disk between runs; never serve a stale copy.
-                            .header("Cache-Control", "no-store");
-                        if let Some(csp) = f.csp {
-                            b = b.header("Content-Security-Policy", csp);
-                        }
-                        b.body(f.bytes)
-                    }
-                    Err(_) => tauri::http::Response::builder().status(404).body(Vec::new()),
-                };
-                responder.respond(res.expect("static response parts"));
-            });
-        })
+        .register_asynchronous_uri_scheme_protocol("plugin", |ctx, req, responder| plugins::host::protocol(ctx.app_handle().clone(), req.uri().path(), responder))
         .setup(|app| {
             let root = app.path().app_data_dir()?;
             let state = state::AppState::new(root)?;
             let handle = app.handle().clone();
-            let bridge = plugins::js::Bridge::new(move |call| {
-                let _ = handle.emit_to("main", "plugin-call", call);
+            let bridge = plugins::bridge::Bridge::new(move |call| {
+                let _ = handle.emit_to("main", events::PLUGIN_CALL, call);
             });
             let bundled = app.path().resource_dir()?.join("plugins");
-            *state.plugins.write().unwrap() = plugins::Registry::load(&[(bundled, true), (state.paths.plugins_dir(), false)], std::sync::Arc::new(bridge));
+            *state.plugins.write().unwrap() = plugins::Registry::load(&[(bundled, true), (state.paths.plugins_dir(), false)], storage::load_disabled_plugins(&state), std::sync::Arc::new(bridge));
             app.manage(state);
             app.manage(services::discord::Discord::spawn());
             Ok(())
@@ -98,11 +82,11 @@ pub fn run() {
             commands::game::stop_game,
             commands::game::read_game_log,
             commands::game::read_crash_report,
-            commands::mods::list_content,
-            commands::mods::identify_content,
-            commands::mods::toggle_content,
-            commands::mods::delete_content,
-            commands::mods::install_content,
+            commands::content::list_content,
+            commands::content::identify_content,
+            commands::content::toggle_content,
+            commands::content::delete_content,
+            commands::content::install_content,
             commands::plugins::list_plugins,
             commands::plugins::reload_plugins,
             commands::plugins::remove_plugin,

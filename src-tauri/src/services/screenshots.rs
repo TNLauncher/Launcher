@@ -1,7 +1,7 @@
 //! The game's `screenshots/` folder of an instance.
 use crate::error::Result;
 use crate::models::Screenshot;
-use crate::services::mods::safe_file;
+use crate::paths::safe_file;
 use crate::state::AppState;
 use std::time::UNIX_EPOCH;
 
