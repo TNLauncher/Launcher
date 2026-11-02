@@ -1,4 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { getVersion } from "@tauri-apps/api/app";
+import { relaunch } from "@tauri-apps/plugin-process";
+import { check, type Update } from "@tauri-apps/plugin-updater";
 import { View } from "@/components/layout/View";
 import { Button, ConfirmDialog, Icon, Input, Select, Switch, Textarea } from "@/components/ui";
 import { useChanged } from "@/hooks/useChanged";
@@ -109,6 +112,8 @@ export function SettingsView() {
           </Row>
         </Group>
 
+        <UpdatesGroup />
+
         <div className={s.settingsFoot}>
           {/* Keyed so each new save state lands with its own beat. */}
           <div key={status} className={cx(s.saveState, statusChanged && s.saveChanged, saving && s.saving, failed && s.saveFailed)} role="status">
@@ -132,6 +137,64 @@ export function SettingsView() {
         Memory, Java, window and launcher options go back to defaults.
       </ConfirmDialog>
     </View>
+  );
+}
+
+function UpdatesGroup() {
+  const [version, setVersion] = useState("");
+  const [update, setUpdate] = useState<Update | null>(null);
+  const [status, setStatus] = useState("Checking for updates…");
+  const [busy, setBusy] = useState(true);
+
+  async function find() {
+    setBusy(true);
+    setStatus("Checking for updates…");
+    try {
+      const found = await check();
+      setUpdate(found);
+      setStatus(found ? `Version ${found.version} is available.` : "You're on the latest version.");
+    } catch (e) {
+      setStatus(`Could not check for updates: ${errorMessage(e)}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function install() {
+    if (!update) return;
+    setBusy(true);
+    let total = 0;
+    let done = 0;
+    try {
+      await update.downloadAndInstall((ev) => {
+        if (ev.event === "Started") total = ev.data.contentLength ?? 0;
+        else if (ev.event === "Progress") {
+          done += ev.data.chunkLength;
+          setStatus(total ? `Downloading… ${Math.round((done / total) * 100)}%` : "Downloading…");
+        } else setStatus("Installing…");
+      });
+      await relaunch();
+    } catch (e) {
+      setStatus(`Could not install the update: ${errorMessage(e)}`);
+      setBusy(false);
+    }
+  }
+
+  useEffect(() => {
+    getVersion().then(setVersion);
+    find();
+  }, []);
+
+  return (
+    <Group icon="system_update" title="Updates" aside={version && `v${version}`}>
+      <Row label="Launcher version" hint={status}>
+        <div className={cx(s.settingControl, s.end)}>
+          {update
+            ? <Button variant="primary" icon="download" loading={busy} onClick={install}>Install {update.version} and restart</Button>
+            : <Button icon="refresh" loading={busy} onClick={find}>Check for updates</Button>}
+        </div>
+      </Row>
+    </Group>
   );
 }
 
