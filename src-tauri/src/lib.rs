@@ -81,6 +81,7 @@ pub fn run() {
             commands::instances::delete_world,
             commands::instances::copy_world,
             commands::game::launch,
+            commands::game::cancel_launch,
             commands::game::stop_game,
             commands::game::read_game_log,
             commands::game::read_crash_report,

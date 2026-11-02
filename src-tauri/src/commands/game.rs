@@ -10,6 +10,12 @@ pub async fn launch(app: AppHandle, id: String, world: Option<String>, on_event:
     launcher::launch(&app, &id, world.as_deref(), on_event).await
 }
 
+/// Stops a launch still installing; it then rejects with kind `cancelled`.
+#[tauri::command]
+pub fn cancel_launch(state: State<'_, AppState>, id: String) {
+    launcher::cancel(&state, &id)
+}
+
 #[tauri::command]
 pub fn stop_game(state: State<'_, AppState>, id: String) -> Result<()> {
     launcher::stop(&state, &id)

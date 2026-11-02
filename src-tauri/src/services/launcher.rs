@@ -6,6 +6,7 @@ use crate::minecraft::{command, install, java, loader, version, Progress, Stage}
 use crate::models::{AfterLaunch, Instance, Loader, Settings};
 use crate::state::AppState;
 use crate::storage;
+use futures_util::future::{AbortHandle, Abortable};
 use serde::Serialize;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Read, Write};
@@ -95,8 +96,26 @@ pub(crate) async fn prepare(state: &AppState, id: &str, check: Check, progress: 
 
 /// Resolves when the game process has started; the guard then moves to the watcher thread.
 /// `world`: a folder in `saves/` to open straight away.
+/// [`cancel`] with the same id stops it while it installs.
 pub async fn launch(app: &AppHandle, id: &str, world: Option<&str>, on_event: Channel<LaunchEvent>) -> Result<()> {
+    // Before registering, so a second launch of a busy instance can't replace the first one's handle.
     let guard = RunningGuard::acquire(app, id)?;
+    let state = app.state::<AppState>();
+    let (handle, reg) = AbortHandle::new_pair();
+    state.launches.lock().unwrap().insert(id.into(), handle);
+    let result = Abortable::new(run(app, id, world, on_event, guard), reg).await;
+    state.launches.lock().unwrap().remove(id);
+    result.unwrap_or(Err(AppError::Cancelled))
+}
+
+/// Stops the launch of `id` if it is still installing; the game itself is stopped with [`stop`].
+pub fn cancel(state: &AppState, id: &str) {
+    if let Some(h) = state.launches.lock().unwrap().remove(id) {
+        h.abort();
+    }
+}
+
+async fn run(app: &AppHandle, id: &str, world: Option<&str>, on_event: Channel<LaunchEvent>, guard: RunningGuard) -> Result<()> {
     let state = app.state::<AppState>();
     let root = &state.paths.root;
     let game_dir = state.paths.instance_dir(id)?;
