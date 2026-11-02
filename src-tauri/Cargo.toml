@@ -34,3 +34,9 @@ tauri-plugin-dialog = "2"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["fs", "time", "sync", "macros", "rt-multi-thread"] }
+
+# https://v2.tauri.app/concept/size/
+[profile.release]
+codegen-units = 1
+lto = true
+strip = true
