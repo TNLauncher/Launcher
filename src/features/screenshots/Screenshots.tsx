@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { launcher } from "@/api/launcher";
 import { useBlobUrl } from "@/hooks/useBlobUrl";
+import { useInView } from "@/hooks/useInView";
 import { Banner, ConfirmDialog, Dialog, EmptyState, IconButton, Skeleton } from "@/components/ui";
 import { errorMessage, megabytes } from "@/lib/format";
 import type { Screenshot } from "@/types";
@@ -49,10 +50,7 @@ export function Screenshots({ instanceId }: { instanceId: string }) {
       ) : (
         <div className={s.grid}>
           {list.map((sh) => (
-            <button key={sh.file} type="button" className={s.thumb} title={`${sh.file} · ${taken(sh)}`} onClick={() => setOpen(sh.file)}>
-              {/* ponytail: full-size PNGs as thumbnails; generate small ones in Rust if big folders feel slow */}
-              <Shot instanceId={instanceId} file={sh.file} />
-            </button>
+            <Thumb key={sh.file} instanceId={instanceId} shot={sh} onOpen={() => setOpen(sh.file)} />
           ))}
         </div>
       )}
@@ -100,6 +98,17 @@ export function Screenshots({ instanceId }: { instanceId: string }) {
         <span className="mono">{removing}</span> is deleted from the screenshots folder.
       </ConfirmDialog>
     </section>
+  );
+}
+
+// Fetched only near the viewport: each one is a full-size PNG over IPC, a big folder would load them all at once.
+// shortcut: full-size PNGs as thumbnails; generate small ones in Rust if big folders still feel slow.
+function Thumb({ instanceId, shot, onOpen }: { instanceId: string; shot: Screenshot; onOpen(): void }) {
+  const [ref, seen] = useInView<HTMLButtonElement>();
+  return (
+    <button ref={ref} type="button" className={s.thumb} title={`${shot.file} · ${taken(shot)}`} onClick={onOpen}>
+      {seen && <Shot instanceId={instanceId} file={shot.file} />}
+    </button>
   );
 }
 

@@ -82,7 +82,7 @@ function Catalog({ source }: { source: SourceInfo }) {
   useEffect(() => {
     const el = sentinel.current;
     if (!el || !hasNextPage) return;
-    const io = new IntersectionObserver((e) => e[0].isIntersecting && !isFetchingNextPage && fetchNextPage(), { rootMargin: "400px" });
+    const io = new IntersectionObserver((e) => e[0].isIntersecting && !isFetchingNextPage && fetchNextPage(), { root: el.closest("main"), rootMargin: "400px" });
     io.observe(el);
     return () => io.disconnect();
   }, [hasNextPage, isFetchingNextPage, fetchNextPage, favOnly]);

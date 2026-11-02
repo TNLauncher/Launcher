@@ -9,7 +9,7 @@
 
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--space-content); }
 .thumb {
-  aspect-ratio: 16 / 9; padding: 0; border-radius: 12px; overflow: hidden; cursor: zoom-in;
+  aspect-ratio: 16 / 9; content-visibility: auto; padding: 0; border-radius: 12px; overflow: hidden; cursor: zoom-in;
   background: rgb(255 255 255 / 0.05); border: 1px solid var(--card-border);
   transition: transform var(--quick) var(--butter), border-color var(--quick) var(--butter);
 }
