@@ -28,6 +28,7 @@
 .link:hover { background: none; text-decoration: underline; text-underline-offset: 2px; }
 .link:active { transform: none; transition: none; }
 
-.overlay { background: rgb(0 0 0 / 0.35); backdrop-filter: blur(12px); }
-.overlay:hover { background: rgb(0 0 0 / 0.5); }
+/* No backdrop blur: these sit on hero images that scroll, and WebKitGTK re-blurs them every frame. */
+.overlay { background: rgb(0 0 0 / 0.45); }
+.overlay:hover { background: rgb(0 0 0 / 0.6); }
 }

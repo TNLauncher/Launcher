@@ -30,7 +30,7 @@
 .res-input { width: 96px; text-align: right; }
 .settings-foot {
   position: sticky; bottom: 0; margin: auto calc(-1 * var(--pad)) 0; padding: var(--space-content) var(--pad);
-  background: rgb(28 28 30 / 0.95); backdrop-filter: blur(12px);
+  background: rgb(28 28 30 / 0.98); /* no backdrop blur: it would be recomputed on every scroll frame */
   border-top: 1px solid var(--card-border); box-shadow: var(--highlight);
   display: flex; align-items: center; justify-content: space-between;
 }
