@@ -1,15 +1,13 @@
-import { useEffect, useState } from "react";
-import { getPatchNotes, type PatchNote } from "@/api/mojang";
+import { useQuery } from "@tanstack/react-query";
+import { getPatchNotes } from "@/api/mojang";
 import { SectionHead, Skeleton } from "@/components/ui";
 import s from "./home.module.css";
 
 export function PatchNotes() {
-  const [notes, setNotes] = useState<PatchNote[] | null>(null);
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    getPatchNotes(6).then(setNotes, () => setFailed(true));
-  }, []);
+  // Once per session: Home remounts on every visit.
+  const q = useQuery({ queryKey: ["patch-notes"], queryFn: () => getPatchNotes(6), staleTime: Infinity });
+  const notes = q.data;
+  const failed = q.isError;
 
   return (
     <div className={`${s.cell} ${s.pane} ${s.newsPane}`}>
