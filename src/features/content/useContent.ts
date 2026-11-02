@@ -81,32 +81,31 @@ export function useContent(instance: Instance, kind: ContentKind, identify = tru
     return [...new Set(Object.values(known.data).map((k) => k.project.id))].sort();
   }, [known.data]);
 
-  const versionQueries = useQueries({
+  // One lookup per project: combined (and structurally shared), so a fetch flag flipping on one of hundreds
+  // doesn't re-render the list, and each answer rebuilds it once.
+  const combine = useCallback(
+    (results: { data?: Version[]; isFetching: boolean }[]) => ({
+      versionsByProject: Object.fromEntries(projectIds.flatMap((pid, i) => (results[i]?.data ? [[pid, results[i].data]] : []))) as Record<string, Version[]>,
+      checkingVersions: results.some((q) => q.isFetching),
+    }),
+    [projectIds]
+  );
+  const { versionsByProject, checkingVersions } = useQueries({
     queries: projectIds.map((pid) => ({
       queryKey: ["content-versions", source, pid, kind, instance.version, instance.loader],
       queryFn: () => fetchCompatibleVersions(source!, pid, kind, instance.version, instance.loader),
       enabled: identify && !!source,
       staleTime: 5 * 60_000,
     })),
+    combine,
   });
-
-  const versionsByProject = useMemo(() => {
-    const map = new Map<string, Version[]>();
-    projectIds.forEach((pid, idx) => {
-      const data = versionQueries[idx]?.data;
-      if (data) map.set(pid, data);
-    });
-    return map;
-  }, [projectIds, versionQueries]);
-
-  const checkingVersions = versionQueries.some((q) => q.isFetching);
 
   const items = useMemo<ContentItem[] | undefined>(() => {
     if (!files.data) return undefined;
     return files.data
       .map((f) => {
         const k = known.data?.[f.file];
-        const versions = k ? versionsByProject.get(k.project.id) : undefined;
+        const versions = k ? versionsByProject[k.project.id] : undefined;
         const currentVersion = versions ? matchInstalledVersion(f.file, k?.versionNumber, versions) : undefined;
         const latestVersion = versions?.[0];
         const plain = stripDisabled(f.file);

@@ -1,5 +1,6 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { lazy, memo, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { lazy, memo, Suspense, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { shallow } from "zustand/shallow";
 import { launcher } from "@/api/launcher";
 import { sources, type Hit, type SourceInfo } from "@/api/sources";
 import { Banner, Button, Chip, ConfirmDialog, EmptyState, Icon, IconButton, Pill, PillGroup, SearchInput, Select, Skeleton, Switch, Tab, Tabs, toast } from "@/components/ui";
@@ -238,14 +239,34 @@ function InstalledPane({
   const [reviewing, setReviewing] = useState<UpdateCandidate[] | null>(null);
   const { items, updatableCount, updatingAll, busyFiles } = content;
 
-  const act = (action: Promise<unknown>) =>
-    action
-      .then(() => setError(""))
-      .catch((e) => setError(errorMessage(e)))
-      .finally(() => {
-        content.reload();
-        refresh();
-      });
+  const { reload, updateItem, switchVersion } = content;
+  const act = useCallback(
+    (action: Promise<unknown>) =>
+      action
+        .then(() => setError(""))
+        .catch((e) => setError(errorMessage(e)))
+        .finally(() => {
+          reload();
+          refresh();
+        }),
+    [reload, refresh]
+  );
+  // Stable, so memoized rows skip re-rendering while lookups land and the filter is typed.
+  const update = useCallback(
+    (i: ContentItem) =>
+      updateItem(i)
+        .then(() => toast(`Updated ${label(i)} to ${i.latestVersion!.number}`))
+        .catch((e) => setError(errorMessage(e))),
+    [updateItem]
+  );
+  const pickVersion = useCallback(
+    (i: ContentItem, vid: string) =>
+      switchVersion(i, vid)
+        .then(() => toast(`Switched ${label(i)} to ${i.versions?.find((v) => v.id === vid)?.number ?? "selected version"}`))
+        .catch((e) => setError(errorMessage(e))),
+    [switchVersion]
+  );
+  const toggle = useCallback((i: ContentItem) => act(launcher.toggleContent(instance.id, kind, i.file)), [act, instance.id, kind]);
 
   const handleUpdateAll = async (picked: UpdateCandidate[]) => {
     setReviewing(null);
@@ -258,8 +279,8 @@ function InstalledPane({
     }
   };
 
-  const q = filter.trim().toLowerCase();
-  const shown = (items ?? []).filter((i) => !q || `${label(i)} ${i.file}`.toLowerCase().includes(q));
+  const q = useDeferredValue(filter).trim().toLowerCase();
+  const shown = useMemo(() => (items ?? []).filter((i) => !q || `${label(i)} ${i.file}`.toLowerCase().includes(q)), [items, q]);
   const enabled = items?.filter((i) => i.enabled).length ?? 0;
 
   return (
@@ -311,106 +332,23 @@ function InstalledPane({
         ) : !shown.length ? (
           <EmptyState icon="search_off">Nothing matches “{filter}”.</EmptyState>
         ) : (
-          shown.map((i) => {
-            const isBusy = busyFiles.has(i.file);
-            const canOpen = !!i.project && !!source;
-            const openDetail = () => {
-              if (!i.project || !source) return;
-              onOpenProject({
-                source: source.id,
-                kind,
-                instanceId: instance.id,
-                project: {
-                  id: i.project.id,
-                  title: i.project.title,
-                  description: i.project.description,
-                  iconUrl: i.project.iconUrl,
-                },
-              });
-            };
-            return (
-              <div key={i.file} className={cx(s.citem, !i.enabled && s.off)}>
-                {canOpen ? (
-                  <button type="button" className={s.citemMainBtn} onClick={openDetail} title={`Open ${label(i)} page`}>
-                    <ItemIcon item={i} instanceId={instance.id} kind={kind} />
-                    <div className={s.citemText}>
-                      <div className={s.citemName}>
-                        <b>{label(i)}</b>
-                        {!i.enabled && <Chip className={s.smallChip}>Disabled</Chip>}
-                      </div>
-                      <span className={cx(s.citemSub, "mono")} title={i.file}>
-                        {i.versionNumber && <>{i.versionNumber} · </>}
-                        {megabytes(i.size)}
-                      </span>
-                    </div>
-                  </button>
-                ) : (
-                  <div className={s.citemMainStatic}>
-                    <ItemIcon item={i} instanceId={instance.id} kind={kind} />
-                    <div className={s.citemText}>
-                      <div className={s.citemName}>
-                        <b title={i.project?.description}>{label(i)}</b>
-                        {!i.enabled && <Chip className={s.smallChip}>Disabled</Chip>}
-                      </div>
-                      <span className={cx(s.citemSub, "mono")} title={i.file}>
-                        {i.versionNumber && <>{i.versionNumber} · </>}
-                        {megabytes(i.size)}
-                        {!i.project && !content.identifying && sourceName && ` · not on ${sourceName}`}
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                <div className={s.citemActions}>
-                  {i.hasUpdate && i.latestVersion && (
-                    <Button
-                      size="sm"
-                      icon="upgrade"
-                      className={s.updateChipBtn}
-                      loading={isBusy}
-                      title={`Update to ${i.latestVersion.number}`}
-                      aria-label={`Update ${label(i)} to ${i.latestVersion.number}`}
-                      onClick={() =>
-                        content
-                          .updateItem(i)
-                          .then(() => toast(`Updated ${label(i)} to ${i.latestVersion!.number}`))
-                          .catch((e) => setError(errorMessage(e)))
-                      }
-                    >
-                      {i.latestVersion.number}
-                    </Button>
-                  )}
-
-                  {i.versions && i.versions.length > 0 && (
-                    <Select
-                      label={`Version of ${label(i)}`}
-                      className={cx(s.versionSelect, "mono")}
-                      value={i.currentVersion?.id ?? ""}
-                      disabled={isBusy}
-                      placeholder={i.versionNumber ?? "Version"}
-                      onChange={(vid) =>
-                        content
-                          .switchVersion(i, vid)
-                          .then(() => {
-                            const picked = i.versions?.find((v) => v.id === vid);
-                            toast(`Switched ${label(i)} to ${picked?.number ?? "selected version"}`);
-                          })
-                          .catch((e) => setError(errorMessage(e)))
-                      }
-                      options={i.versions.map((v) => ({
-                        value: v.id,
-                        label: v.number,
-                        hint: v.id === i.currentVersion?.id ? "current" : v.channel !== "release" ? v.channel : undefined,
-                      }))}
-                    />
-                  )}
-
-                  <IconButton icon="delete" label={`Remove ${label(i)}`} title="Remove" variant="danger" className={s.reveal} onClick={() => setRemoving(i)} />
-                  <Switch label={`${i.enabled ? "Disable" : "Enable"} ${label(i)}`} checked={i.enabled} onChange={() => act(launcher.toggleContent(instance.id, kind, i.file))} />
-                </div>
-              </div>
-            );
-          })
+          shown.map((i) => (
+            <ContentRow
+              key={i.file}
+              item={i}
+              instanceId={instance.id}
+              kind={kind}
+              sourceId={source?.id}
+              sourceName={sourceName}
+              busy={busyFiles.has(i.file)}
+              identifying={content.identifying}
+              onOpenProject={onOpenProject}
+              onUpdate={update}
+              onSwitch={pickVersion}
+              onRemove={setRemoving}
+              onToggle={toggle}
+            />
+          ))
         )}
       </fieldset>
 
@@ -430,6 +368,111 @@ function InstalledPane({
     </section>
   );
 }
+
+interface RowProps {
+  item: ContentItem;
+  instanceId: string;
+  kind: ContentKind;
+  sourceId?: string;
+  sourceName?: string;
+  busy: boolean;
+  identifying: boolean;
+  onOpenProject(target: ContentTarget): void;
+  onUpdate(i: ContentItem): void;
+  onSwitch(i: ContentItem, versionId: string): void;
+  onRemove(i: ContentItem): void;
+  onToggle(i: ContentItem): void;
+}
+
+// Items are rebuilt whenever any project's versions land; compared field by field, only the changed rows render.
+const sameRow = ({ item: a, ...ra }: RowProps, { item: b, ...rb }: RowProps) => shallow(a, b) && shallow(ra, rb);
+
+const ContentRow = memo(function ContentRow({ item: i, instanceId, kind, sourceId, sourceName, busy, identifying, onOpenProject, onUpdate, onSwitch, onRemove, onToggle }: RowProps) {
+  const canOpen = !!i.project && !!sourceId;
+  const openDetail = () => {
+    if (!i.project || !sourceId) return;
+    onOpenProject({
+      source: sourceId,
+      kind,
+      instanceId,
+      project: {
+        id: i.project.id,
+        title: i.project.title,
+        description: i.project.description,
+        iconUrl: i.project.iconUrl,
+      },
+    });
+  };
+  return (
+    <div className={cx(s.citem, !i.enabled && s.off)}>
+      {canOpen ? (
+        <button type="button" className={s.citemMainBtn} onClick={openDetail} title={`Open ${label(i)} page`}>
+          <ItemIcon item={i} instanceId={instanceId} kind={kind} />
+          <div className={s.citemText}>
+            <div className={s.citemName}>
+              <b>{label(i)}</b>
+              {!i.enabled && <Chip className={s.smallChip}>Disabled</Chip>}
+            </div>
+            <span className={cx(s.citemSub, "mono")} title={i.file}>
+              {i.versionNumber && <>{i.versionNumber} · </>}
+              {megabytes(i.size)}
+            </span>
+          </div>
+        </button>
+      ) : (
+        <div className={s.citemMainStatic}>
+          <ItemIcon item={i} instanceId={instanceId} kind={kind} />
+          <div className={s.citemText}>
+            <div className={s.citemName}>
+              <b title={i.project?.description}>{label(i)}</b>
+              {!i.enabled && <Chip className={s.smallChip}>Disabled</Chip>}
+            </div>
+            <span className={cx(s.citemSub, "mono")} title={i.file}>
+              {i.versionNumber && <>{i.versionNumber} · </>}
+              {megabytes(i.size)}
+              {!i.project && !identifying && sourceName && ` · not on ${sourceName}`}
+            </span>
+          </div>
+        </div>
+      )}
+
+      <div className={s.citemActions}>
+        {i.hasUpdate && i.latestVersion && (
+          <Button
+            size="sm"
+            icon="upgrade"
+            className={s.updateChipBtn}
+            loading={busy}
+            title={`Update to ${i.latestVersion.number}`}
+            aria-label={`Update ${label(i)} to ${i.latestVersion.number}`}
+            onClick={() => onUpdate(i)}
+          >
+            {i.latestVersion.number}
+          </Button>
+        )}
+
+        {i.versions && i.versions.length > 0 && (
+          <Select
+            label={`Version of ${label(i)}`}
+            className={cx(s.versionSelect, "mono")}
+            value={i.currentVersion?.id ?? ""}
+            disabled={busy}
+            placeholder={i.versionNumber ?? "Version"}
+            onChange={(vid) => onSwitch(i, vid)}
+            options={i.versions.map((v) => ({
+              value: v.id,
+              label: v.number,
+              hint: v.id === i.currentVersion?.id ? "current" : v.channel !== "release" ? v.channel : undefined,
+            }))}
+          />
+        )}
+
+        <IconButton icon="delete" label={`Remove ${label(i)}`} title="Remove" variant="danger" className={s.reveal} onClick={() => onRemove(i)} />
+        <Switch label={`${i.enabled ? "Disable" : "Enable"} ${label(i)}`} checked={i.enabled} onChange={() => onToggle(i)} />
+      </div>
+    </div>
+  );
+}, sameRow);
 
 function ItemIcon({ item, instanceId, kind }: { item: ContentItem; instanceId: string; kind: ContentKind }) {
   const jar = useBlobUrl(kind === "mod" && !item.project?.iconUrl ? `${instanceId}/${item.file}` : null, () => launcher.modIcon(instanceId, item.file));
