@@ -1,6 +1,6 @@
 //! Version JSON resolution: vanilla manifest + optional loader profile merged on top.
 use super::loader::{self, Profile};
-use super::{http::get_json, installer, Progress};
+use super::{http::{fetch_bytes, get_json}, installer, Progress};
 use crate::error::{AppError, Result};
 use crate::models::Loader;
 use serde_json::Value;
@@ -16,12 +16,12 @@ pub async fn base(c: &reqwest::Client, root: &Path, game: &str) -> Result<Value>
         .and_then(|v| v.iter().find(|x| x["id"] == game))
         .and_then(|x| x["url"].as_str())
         .ok_or_else(|| AppError::NotFound(format!("Unknown Minecraft version {game}")))?;
-    let base = get_json(c, url).await?;
-
+    // Saved byte for byte: runtimes like Horizon check the file against Mojang's SHA-1.
+    let bytes = fetch_bytes(c, url).await?;
     let dir = root.join("versions").join(game);
     std::fs::create_dir_all(&dir)?;
-    std::fs::write(dir.join(format!("{game}.json")), base.to_string())?;
-    Ok(base)
+    std::fs::write(dir.join(format!("{game}.json")), &bytes)?;
+    Ok(serde_json::from_slice(&bytes)?)
 }
 
 /// `base` with the loader's profile merged on top; Forge/NeoForge run their installer with `java` on first use.
