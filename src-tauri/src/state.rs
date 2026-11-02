@@ -48,5 +48,8 @@ impl AppState {
 pub fn http_client() -> Result<reqwest::Client> {
     Ok(reqwest::Client::builder()
         .user_agent(concat!("thenofis/TNLauncher/", env!("CARGO_PKG_VERSION")))
+        // A stalled connection would hang a download forever; erroring lets `http::fetch` retry it.
+        .connect_timeout(std::time::Duration::from_secs(15))
+        .read_timeout(std::time::Duration::from_secs(30))
         .build()?)
 }

@@ -3,11 +3,12 @@ use futures_util::{stream, StreamExt};
 use serde_json::Value;
 use sha1::{Digest, Sha1};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::collections::HashSet;
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::time::Duration;
 
 const PARALLEL: usize = 32;
-const ATTEMPTS: u64 = 3;
+const ATTEMPTS: u64 = 5;
 
 pub struct Job {
     pub url: String,
@@ -105,14 +106,36 @@ pub async fn fetch(c: &reqwest::Client, job: &Job, check: Check) -> Result<bool>
     if let Some(dir) = job.path.parent() {
         tokio::fs::create_dir_all(dir).await?;
     }
-    let tmp = job.path.with_extension("part");
+    let tmp = part_path(&job.path);
     tokio::fs::write(&tmp, &bytes).await?;
-    tokio::fs::rename(&tmp, &job.path).await?;
+    if let Err(e) = tokio::fs::rename(&tmp, &job.path).await {
+        let _ = tokio::fs::remove_file(&tmp).await;
+        // Another launch put the same file in place first, or holds it open (Windows).
+        if !intact(job, Check::Size).await {
+            return Err(e.into());
+        }
+    }
     Ok(true)
+}
+
+/// Unique temp name for a download in progress: `jimage.dll` and `jimage.exe` download side by side, and two
+/// instances can fetch the same library at once, so a shared `.part` would mix up or lose their bytes.
+fn part_path(path: &Path) -> PathBuf {
+    static NEXT: AtomicU64 = AtomicU64::new(0);
+    let mut name = path.as_os_str().to_owned();
+    name.push(format!(".{}.part", NEXT.fetch_add(1, Ordering::Relaxed)));
+    name.into()
+}
+
+/// Drops jobs aimed at a path already taken: asset indexes list one hash under several names.
+fn dedupe(jobs: Vec<Job>) -> Vec<Job> {
+    let mut seen = HashSet::new();
+    jobs.into_iter().filter(|j| seen.insert(j.path.clone())).collect()
 }
 
 /// Runs jobs `PARALLEL` at a time, calling `tick(done, total)` as they land. Returns how many were downloaded.
 pub async fn download_all(c: &reqwest::Client, jobs: Vec<Job>, check: Check, tick: &(dyn Fn(usize, usize) + Sync)) -> Result<usize> {
+    let jobs = dedupe(jobs);
     let total = jobs.len();
     let done = AtomicUsize::new(0);
     let fetched = AtomicUsize::new(0);
@@ -135,4 +158,24 @@ pub async fn download_all(c: &reqwest::Client, jobs: Vec<Job>, check: Check, tic
         r?;
     }
     Ok(fetched.load(Ordering::Relaxed))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn part_files_never_collide() {
+        let p = Path::new("bin/jimage.dll");
+        assert_ne!(part_path(p), part_path(p));
+        assert_ne!(part_path(p).with_extension(""), part_path(Path::new("bin/jimage.exe")).with_extension(""));
+        assert_eq!(part_path(p).extension().unwrap(), "part");
+    }
+
+    #[test]
+    fn one_job_per_path() {
+        let job = |p: &str| Job { url: String::new(), path: p.into(), size: None, sha1: None };
+        let paths: Vec<PathBuf> = dedupe(vec![job("a/x"), job("a/y"), job("a/x")]).into_iter().map(|j| j.path).collect();
+        assert_eq!(paths, [PathBuf::from("a/x"), PathBuf::from("a/y")]);
+    }
 }
