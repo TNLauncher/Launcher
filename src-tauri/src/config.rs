@@ -6,3 +6,9 @@ pub const MS_CLIENT_ID: Option<&str> = match option_env!("TN_MS_CLIENT_ID") {
     Some(id) => Some(id),
     None => Some("ce3de089-adcd-42e1-ab52-d9f657d86a6c"),
 };
+
+/// The plugin store's catalog, built by TNLauncher/Plugins. Plugin zips are only downloaded from next to it.
+pub const PLUGIN_INDEX_URL: &str = match option_env!("TN_PLUGIN_INDEX_URL") {
+    Some(url) => url,
+    None => "https://github.com/TNLauncher/Plugins/releases/download/registry/index.json",
+};

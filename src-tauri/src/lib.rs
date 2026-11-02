@@ -92,6 +92,8 @@ pub fn run() {
             commands::plugins::list_plugins,
             commands::plugins::reload_plugins,
             commands::plugins::remove_plugin,
+            commands::plugins::plugin_store,
+            commands::plugins::install_plugin,
             commands::plugins::set_plugin_enabled,
             commands::plugins::open_plugins_dir,
             commands::plugins::plugin_host_ready,

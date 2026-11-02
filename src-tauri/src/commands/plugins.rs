@@ -24,6 +24,18 @@ pub fn set_plugin_enabled(state: State<'_, AppState>, id: String, enabled: bool)
     plugins::set_enabled(&state, &id, enabled)
 }
 
+/// What the plugin store offers.
+#[tauri::command]
+pub async fn plugin_store(state: State<'_, AppState>) -> Result<Vec<plugins::store::StoreEntry>> {
+    plugins::store::index(&state).await
+}
+
+/// Installs or updates a plugin from the store; resolves with the reloaded list.
+#[tauri::command]
+pub async fn install_plugin(state: State<'_, AppState>, id: String) -> Result<Vec<PluginEntry>> {
+    plugins::store::install(&state, &id).await
+}
+
 /// Opens the folder user plugins are loaded from, creating it first.
 #[tauri::command]
 pub fn open_plugins_dir(app: tauri::AppHandle, state: State<'_, AppState>) -> Result<()> {

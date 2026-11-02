@@ -6,6 +6,7 @@
 //! - `manifest` — what a plugin declares; `registry` — the loaded plugins and which are on.
 //! - `bridge` + `remote` — calls from Rust into a plugin frame; `host` — requests from a frame into Rust (`tn.*`).
 //! - `api` — the data both sides exchange; `data` — a plugin's own storage and settings.
+//! - `store` — the plugin store's catalog and installing from it.
 
 pub mod api;
 pub mod bridge;
@@ -14,6 +15,7 @@ pub mod host;
 pub mod manifest;
 pub mod registry;
 pub mod remote;
+pub mod store;
 
 pub use manifest::*;
 pub use registry::{Failed, Plugin, Registry};
