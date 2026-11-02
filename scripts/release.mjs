@@ -8,7 +8,7 @@ const sh = (cmd, ...args) => execFileSync(cmd, args, { encoding: "utf8", stdio: 
 const fail = (msg) => { console.error(msg); process.exit(1); };
 
 if (!version || !/^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/.test(version)) fail("usage: npm run release <major.minor.patch>");
-if (sh("git", "status", "--porcelain")) fail("working tree is dirty, commit or stash first");
+if (sh("git", "status", "--porcelain", "--untracked-files=no")) fail("working tree is dirty, commit or stash first");
 if (sh("git", "tag", "-l", `v${version}`)) fail(`tag v${version} already exists`);
 
 const json = (path, edit) => {
