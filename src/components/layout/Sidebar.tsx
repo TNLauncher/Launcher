@@ -2,6 +2,7 @@ import logo from "@/assets/logo.png";
 import { Icon } from "@/components/ui/Icon";
 import { SkinHead, useSkin } from "@/features/profiles/Skin";
 import { usePlugins } from "@/hooks/useSource";
+import { useLauncherUpdate, usePluginUpdateCount } from "@/hooks/useUpdates";
 import { useLauncher } from "@/store/LauncherContext";
 import { useUi, type Route, type View } from "@/store/UiContext";
 import { preloadView } from "@/views";
@@ -61,6 +62,12 @@ export function Sidebar() {
   const skin = useSkin(account);
   const nav = useNav();
   const active = nav.findIndex((n) => n.view === view);
+  const pluginUpdates = usePluginUpdateCount();
+  const launcherUpdate = useLauncherUpdate();
+  const badge: Partial<Record<View, string>> = {
+    ...(pluginUpdates > 0 && { plugins: `${pluginUpdates} ${pluginUpdates === 1 ? "update" : "updates"}` }),
+    ...(launcherUpdate && { settings: "Launcher update" }),
+  };
 
   return (
     <aside className={s.sidebar}>
@@ -73,7 +80,8 @@ export function Sidebar() {
             <button key={n.view} className={s.navBtn} aria-current={view === n.view ? "page" : undefined} onClick={() => navigate(n.view)}
               onPointerEnter={() => preloadView(n.view)} onFocus={() => preloadView(n.view)}>
               <Icon name={n.icon} fill={view === n.view} />
-              <span className={s.tip}>{n.label}</span>
+              {badge[n.view] && view !== n.view && <span className={s.dot} aria-hidden />}
+              <span className={s.tip}>{n.label}{badge[n.view] && ` · ${badge[n.view]}`}</span>
             </button>
           ))}
         </nav>

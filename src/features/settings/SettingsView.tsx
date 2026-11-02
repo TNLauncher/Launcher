@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { getVersion } from "@tauri-apps/api/app";
 import { relaunch } from "@tauri-apps/plugin-process";
-import { check, type Update } from "@tauri-apps/plugin-updater";
 import { View } from "@/components/layout/View";
 import { Button, ConfirmDialog, Icon, Input, Select, Switch, Textarea } from "@/components/ui";
 import { useChanged } from "@/hooks/useChanged";
+import { useLauncherUpdate, useLauncherUpdateQuery } from "@/hooks/useUpdates";
 import { cx } from "@/lib/cx";
 import { errorMessage } from "@/lib/format";
 import { useLauncher } from "@/store/LauncherContext";
@@ -33,6 +33,7 @@ export function SettingsView() {
   const statusChanged = useChanged(status);
   const [confirmReset, setConfirmReset] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const updateWaiting = useLauncherUpdate();
 
   useEffect(() => {
     if (!form && settings) setForm(settings);
@@ -62,6 +63,8 @@ export function SettingsView() {
     <View className={s.view}>
       <form className={s.settings} onSubmit={(e) => e.preventDefault()}>
         <h1>Settings</h1>
+        {/* An update waiting (the sidebar dot) puts its install button first. */}
+        {updateWaiting && <UpdatesGroup />}
 
         <Group icon="memory" title="Java & memory">
           <Row label="RAM allocation" hint="Maximum heap for every instance. 4–6 GB suits most modpacks.">
@@ -112,7 +115,7 @@ export function SettingsView() {
           </Row>
         </Group>
 
-        <UpdatesGroup />
+        {!updateWaiting && <UpdatesGroup />}
 
         <div className={s.settingsFoot}>
           {/* Keyed so each new save state lands with its own beat. */}
@@ -142,27 +145,26 @@ export function SettingsView() {
 
 function UpdatesGroup() {
   const [version, setVersion] = useState("");
-  const [update, setUpdate] = useState<Update | null>(null);
-  const [status, setStatus] = useState("Checking for updates…");
-  const [busy, setBusy] = useState(true);
+  const query = useLauncherUpdateQuery();
+  const update = query.data ?? null;
+  const [installStatus, setInstallStatus] = useState("");
+  const [installing, setInstalling] = useState(false);
+  const busy = installing || query.isFetching;
+  const status =
+    installStatus ||
+    (query.isFetching ? "Checking for updates…"
+      : query.isError ? `Could not check for updates: ${errorMessage(query.error)}`
+      : update ? `Version ${update.version} is available.`
+      : "You're on the latest version.");
 
-  async function find() {
-    setBusy(true);
-    setStatus("Checking for updates…");
-    try {
-      const found = await check();
-      setUpdate(found);
-      setStatus(found ? `Version ${found.version} is available.` : "You're on the latest version.");
-    } catch (e) {
-      setStatus(`Could not check for updates: ${errorMessage(e)}`);
-    } finally {
-      setBusy(false);
-    }
+  function find() {
+    setInstallStatus("");
+    void query.refetch();
   }
 
   async function install() {
     if (!update) return;
-    setBusy(true);
+    setInstalling(true);
     let total = 0;
     let done = 0;
     try {
@@ -170,19 +172,18 @@ function UpdatesGroup() {
         if (ev.event === "Started") total = ev.data.contentLength ?? 0;
         else if (ev.event === "Progress") {
           done += ev.data.chunkLength;
-          setStatus(total ? `Downloading… ${Math.round((done / total) * 100)}%` : "Downloading…");
-        } else setStatus("Installing…");
+          setInstallStatus(total ? `Downloading… ${Math.round((done / total) * 100)}%` : "Downloading…");
+        } else setInstallStatus("Installing…");
       });
       await relaunch();
     } catch (e) {
-      setStatus(`Could not install the update: ${errorMessage(e)}`);
-      setBusy(false);
+      setInstallStatus(`Could not install the update: ${errorMessage(e)}`);
+      setInstalling(false);
     }
   }
 
   useEffect(() => {
     getVersion().then(setVersion);
-    find();
   }, []);
 
   return (

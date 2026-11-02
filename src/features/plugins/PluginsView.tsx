@@ -1,9 +1,10 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { sources, type PluginEntry, type StoreEntry } from "@/api/sources";
 import { View } from "@/components/layout/View";
 import { Button, ConfirmDialog, EmptyState, Icon, IconButton, Input, Select, Switch, Tab, Tabs } from "@/components/ui";
 import { usePlugins } from "@/hooks/useSource";
+import { isNewer, usePluginStore, usePluginUpdateCount } from "@/hooks/useUpdates";
 import { cx } from "@/lib/cx";
 import { errorMessage } from "@/lib/format";
 import { bumpPluginRevision, emitToPlugin, usePluginFailures } from "@/plugins/bridge";
@@ -17,7 +18,10 @@ export function PluginsView() {
   const [error, setError] = useState("");
   const [reloading, setReloading] = useState(false);
   const [removing, setRemoving] = useState<PluginEntry | null>(null);
-  const [tab, setTab] = useState<"installed" | "store">("installed");
+  const updates = usePluginUpdateCount();
+  const store = usePluginStore();
+  // Arriving with updates waiting (the sidebar dot) opens where the Update buttons are.
+  const [tab, setTab] = useState<"installed" | "store">(() => (updates > 0 ? "store" : "installed"));
 
   const replaceList = (list: PluginEntry[]) => {
     qc.setQueryData(["plugins"], list);
@@ -75,7 +79,7 @@ export function PluginsView() {
 
       <Tabs label="Plugins">
         <Tab selected={tab === "installed"} onSelect={() => setTab("installed")} icon="extension" count={list.length || null}>Installed</Tab>
-        <Tab selected={tab === "store"} onSelect={() => setTab("store")} icon="storefront">Store</Tab>
+        <Tab selected={tab === "store"} onSelect={() => setTab("store")} icon="storefront" count={updates || null}>Store</Tab>
       </Tabs>
 
       {tab === "store" ? (
@@ -96,7 +100,9 @@ export function PluginsView() {
                 </div>
               </li>
             ) : (
-              <PluginRow key={p.id} plugin={p} failure={failures[p.id]} onToggle={(v) => toggle(p.id, v)} onRemove={() => setRemoving(p)} onError={setError} />
+              <PluginRow key={p.id} plugin={p} failure={failures[p.id]}
+                update={store.data?.find((e) => e.manifest.id === p.id && !p.bundled && isNewer(e.manifest.version, p.version))?.manifest.version}
+                onUpdate={() => setTab("store")} onToggle={(v) => toggle(p.id, v)} onRemove={() => setRemoving(p)} onError={setError} />
             )
           )}
         </ul>
@@ -139,9 +145,12 @@ function permissions(perms: PluginEntry["permissions"]): { icon: string; text: s
   ].filter((x) => x !== null);
 }
 
-function PluginRow({ plugin: p, failure, onToggle, onRemove, onError }: {
+function PluginRow({ plugin: p, failure, update, onUpdate, onToggle, onRemove, onError }: {
   plugin: PluginEntry;
   failure?: string;
+  /** A newer store version, if any. */
+  update?: string;
+  onUpdate(): void;
   onToggle(on: boolean): void;
   onRemove(): void;
   onError(message: string): void;
@@ -166,6 +175,7 @@ function PluginRow({ plugin: p, failure, onToggle, onRemove, onError }: {
         {p.enabled && p.settings.length > 0 && <PluginSettings plugin={p} onError={onError} />}
       </div>
       <div className={s.controls}>
+        {update && <Button icon="upgrade" onClick={onUpdate}>Update to {update}</Button>}
         {!p.bundled && <IconButton icon="delete" label={`Delete ${p.name}`} variant="danger" onClick={onRemove} />}
         <Switch label={`${p.enabled ? "Turn off" : "Turn on"} ${p.name}`} checked={p.enabled} onChange={onToggle} />
       </div>
@@ -179,7 +189,7 @@ function PluginStore({ installed, onInstalled, onError }: {
   onInstalled(list: PluginEntry[]): void;
   onError(message: string): void;
 }) {
-  const store = useQuery({ queryKey: ["plugin-store"], queryFn: sources.pluginStore, staleTime: 5 * 60_000 });
+  const store = usePluginStore();
   const [asking, setAsking] = useState<StoreEntry | null>(null);
   const [busy, setBusy] = useState("");
 
@@ -226,7 +236,7 @@ function PluginStore({ installed, onInstalled, onError }: {
               <div className={s.controls}>
                 {have?.bundled ? (
                   <span className={s.tag}>Built-in</span>
-                ) : have && have.version === m.version ? (
+                ) : have && !isNewer(m.version, have.version) ? (
                   <Button icon="check" disabled>Installed</Button>
                 ) : (
                   <Button variant="primary" icon={have ? "upgrade" : "download"} loading={busy === m.id} disabled={!!busy} onClick={() => setAsking(e)}>

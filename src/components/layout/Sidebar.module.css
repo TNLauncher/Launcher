@@ -36,7 +36,13 @@
   font-size: 11px; font-weight: 500; color: var(--fg); white-space: nowrap;
   opacity: 0; transform: translateX(-6px) scale(0.96); transform-origin: left center; pointer-events: none; transition: opacity var(--quick) var(--butter), transform var(--soft) var(--spring);
 }
-.nav-btn:hover .tip, .avatar:hover .tip { opacity: 1; transform: none; transition-delay: 150ms; }
+.nav-btn:hover .tip, .avatar:hover .tip, .nav-btn:focus-visible .tip, .avatar:focus-visible .tip { opacity: 1; transform: none; transition-delay: 150ms; }
 .avatar { position: relative; width: 32px; height: 32px; padding: 0; border-radius: 8px; display: grid; place-items: center; }
 .head { border-radius: 8px; transition: box-shadow var(--quick) var(--butter); }
 .avatar:hover .head { box-shadow: 0 0 0 1px rgb(255 255 255 / 0.3); }
+.dot {
+  position: absolute; top: 7px; right: 9px; width: 8px; height: 8px; border-radius: 50%; pointer-events: none;
+  background: var(--accent); box-shadow: 0 0 0 2px var(--sidebar);
+  animation: dot-in var(--slow) var(--spring);
+}
+@keyframes dot-in { from { transform: scale(0); } }
