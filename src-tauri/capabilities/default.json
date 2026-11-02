@@ -7,6 +7,8 @@
     "opener:default",
     "dialog:allow-open",
     "dialog:allow-save",
+    "updater:default",
+    "process:allow-restart",
     "core:window:allow-close",
     "core:window:allow-minimize",
     "core:window:allow-toggle-maximize",

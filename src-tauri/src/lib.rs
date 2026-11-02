@@ -28,6 +28,8 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         // `plugin://localhost/<id>/<file>`: a plugin's files, with the SDK and a CSP built from its manifest.
         .register_asynchronous_uri_scheme_protocol("plugin", |ctx, req, responder| plugins::host::protocol(ctx.app_handle().clone(), req.uri().path(), responder))
         .setup(|app| {
