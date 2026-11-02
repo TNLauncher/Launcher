@@ -105,7 +105,16 @@ pub async fn launch(app: &AppHandle, id: &str, world: Option<&str>, on_event: Ch
     state.launches.lock().unwrap().insert(id.into(), handle);
     let result = Abortable::new(run(app, id, world, on_event, guard), reg).await;
     state.launches.lock().unwrap().remove(id);
-    result.unwrap_or(Err(AppError::Cancelled))
+    let result = result.unwrap_or(Err(AppError::Cancelled));
+    // Kept where `readLog` looks, so the Repair plugin can tell what broke before the game started.
+    if let Err(e) = &result {
+        if !matches!(e, AppError::Cancelled) {
+            if let Ok(dir) = state.paths.instance_dir(id) {
+                let _ = std::fs::write(dir.join("launcher.log"), format!("TNLauncher: launch failed\n{e}\n"));
+            }
+        }
+    }
+    result
 }
 
 /// Stops the launch of `id` if it is still installing; the game itself is stopped with [`stop`].
