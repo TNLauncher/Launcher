@@ -1,4 +1,4 @@
-/* Logs tab: sources and share history on the left, the selected log on the right. */
+/* Logs tab: sources on the left, the selected log on the right. */
 .layout { height: max(440px, calc(100vh - 150px)); display: grid; grid-template-columns: minmax(300px, 380px) minmax(0, 1fr); gap: var(--space-group); padding-bottom: var(--space-group); }
 .pane {
   min-height: 0; padding: var(--pad-panel); display: flex; flex-direction: column; gap: var(--space-group); overflow-y: auto;
@@ -6,16 +6,12 @@
 }
 .head { display: flex; flex-direction: column; gap: var(--space-label); }
 .pane h3 { margin: 0; font-size: 13px; font-weight: 600; line-height: 1.3; }
-.pane h4 { margin: 0; font-size: 11px; font-weight: 500; color: var(--subtle); }
 .head p { margin: 0; font-size: 12px; line-height: 1.5; color: var(--muted); }
-.section { display: flex; flex-direction: column; gap: var(--space-label); }
-.rule { padding-top: var(--space-group); box-shadow: inset 0 1px 0 var(--card-border); }
-.grow { flex: 1; }
 
 /* Sources: the selected one is previewed on the right. */
 .sources { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-unit); }
 .source {
-  display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; align-items: center; gap: var(--space-sibling) var(--space-content); padding: var(--pad-item); margin: 0 calc(-1 * var(--pad-item));
+  display: grid; grid-template-columns: 32px minmax(0, 1fr); align-items: center; gap: var(--space-sibling) var(--space-content); padding: var(--pad-item); margin: 0 calc(-1 * var(--pad-item));
   border-radius: 12px; cursor: pointer; transition: background var(--quick) var(--butter);
 }
 .source:hover { background: var(--card); }
@@ -27,31 +23,7 @@
 .text { min-width: 0; display: flex; flex-direction: column; gap: var(--space-unit); }
 .text b { font-size: 12px; font-weight: 600; }
 .text span { font-size: 12px; color: var(--muted); }
-.extra { grid-column: 2 / -1; display: flex; align-items: center; gap: var(--space-label); min-width: 0; }
-.extra.error { font-size: 12px; color: var(--critical); overflow-wrap: anywhere; }
-.extra.error :global(.icon) { font-size: 15px; }
-.link { flex: 1; min-width: 0; font-size: 11px; color: var(--link); }
-
-/* Shared before. */
-.history { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; }
-.history li { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto auto; align-items: center; gap: var(--space-sibling); padding: var(--space-label) 0; font-size: 12px; }
-.history li + li { box-shadow: inset 0 1px 0 var(--card-border); }
-.history li > :global(.icon) { font-size: 16px; color: var(--subtle); }
-.history li.crash > :global(.icon) { color: var(--critical); }
-.history a { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 11px var(--mono); color: var(--link); text-decoration: none; cursor: pointer; }
-.history a:hover { text-decoration: underline; text-underline-offset: 2px; }
-.history time { font-size: 11px; color: var(--subtle); white-space: nowrap; }
-.empty-note { margin: 0; font-size: 12px; color: var(--subtle); }
-.sm { width: 26px; height: 26px; background: none; border-color: transparent; }
-.sm :global(.icon) { font-size: 15px; }
-.copied { color: var(--green); }
-.copied :global(.icon) { animation: tick var(--slow) var(--spring); }
-@keyframes tick { from { opacity: 0; transform: scale(0.4); } }
-
-.note { display: flex; align-items: flex-start; gap: var(--space-label); margin: 0; padding-top: var(--space-content); box-shadow: inset 0 1px 0 var(--card-border); font-size: 12px; line-height: 1.5; color: var(--subtle); }
-.note :global(.icon) { font-size: 15px; }
-
-/* Preview: what the upload holds. */
+/* Preview. */
 .viewer { padding: 0; gap: 0; overflow: hidden; }
 .viewer > :last-child:not(.lines) { flex: 1; }
 .viewer-head { display: flex; align-items: center; gap: var(--space-sibling); flex-wrap: wrap; padding: var(--pad-card) var(--pad-card) var(--pad-card) var(--pad-panel); box-shadow: inset 0 -1px 0 var(--card-border); }

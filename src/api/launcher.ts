@@ -74,7 +74,6 @@ export const launcher = {
   /** The last session's `launcher.log` (its tail if huge); "" if never launched. */
   readGameLog: (id: string) => call<string>("read_game_log", { id }),
   readCrashReport: (id: string) => call<string>("read_crash_report", { id }),
-  shareLog: (text: string) => call<string>("share_log", { text }),
 
   listContent: (id: string, kind: ContentKind) => call<ModFile[]>("list_content", { id, kind }),
   /** Mods are renamed to `.disabled`; packs are switched in `options.txt`, shaders in Iris' config. */

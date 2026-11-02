@@ -1,8 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import { openUrl } from "@tauri-apps/plugin-opener";
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { launcher } from "@/api/launcher";
-import { Button, EmptyState, Icon, IconButton, Input, Pill, PillGroup } from "@/components/ui";
+import { EmptyState, Icon, Pill, PillGroup } from "@/components/ui";
 import { cx } from "@/lib/cx";
 import { compact, errorMessage } from "@/lib/format";
 import { gameLogs, useGameLog } from "@/store/gameLogs";
@@ -13,15 +12,13 @@ type Kind = "log" | "crash";
 type Level = "info" | "warn" | "error";
 type Filter = "all" | Exclude<Level, "info">;
 interface Row { n: number; text: string; level: Level }
-interface Shared { instance: string; kind: Kind; url: string; at: number }
 
 const SOURCES: Record<Kind, { label: string; icon: string }> = {
   log: { label: "Game log", icon: "description" },
   crash: { label: "Crash report", icon: "heart_broken" },
 };
-/** Lines drawn at once; the upload holds the whole log. */
+/** Lines drawn at once. */
 const SHOWN = 4000;
-const HISTORY = "shared-logs";
 
 const ERROR = /[[/](ERROR|FATAL|SEVERE)\]|^(\S+\.)?\S*(Exception|Error)(:|$)/;
 const WARN = /[[/]WARN(ING)?\]/;
@@ -37,17 +34,7 @@ export function classify(text: string): Row[] {
   });
 }
 
-function readHistory(): Shared[] {
-  try {
-    return JSON.parse(localStorage.getItem(HISTORY) ?? "[]");
-  } catch {
-    return [];
-  }
-}
-
-const when = (at: number) => new Date(at).toLocaleDateString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
-
-/** The game log and crash report of one instance: a preview, and a mclo.gs link to paste where you ask for help. */
+/** The game log and crash report of one instance. Sharing them is left to plugins (mclogs adds a tab). */
 export function Logs({ instanceId }: { instanceId: string }) {
   const log = useGameLog(instanceId);
   const running = useLauncher((st) => st.snapshot?.running.includes(instanceId) ?? false);
@@ -55,7 +42,6 @@ export function Logs({ instanceId }: { instanceId: string }) {
   const crash = useQuery({ queryKey: ["crash-report", instanceId, running], queryFn: () => launcher.readCrashReport(instanceId) });
   const [loadError, setLoadError] = useState("");
   const [picked, setPicked] = useState<Kind | null>(null);
-  const [history, setHistory] = useState(readHistory);
 
   useEffect(() => {
     gameLogs.load(instanceId).catch((e) => setLoadError(errorMessage(e)));
@@ -70,124 +56,44 @@ export function Logs({ instanceId }: { instanceId: string }) {
     // `log.lines` mutates in place; `rev` is what changes.
     [log, rev, crash.data]
   );
-  // A crash is what support asks about first.
+  // A crash is what you look at first.
   const selected: Kind = picked === "log" || !rows.crash.length ? "log" : "crash";
-  const texts: Record<Kind, () => string> = {
-    log: () => rows.log.map((r) => r.text).join("\n"),
-    crash: () => crash.data ?? "",
-  };
-
-  const remember = (kind: Kind, url: string) => {
-    const next = [{ instance: instanceId, kind, url, at: Date.now() }, ...history].slice(0, 50);
-    setHistory(next);
-    try {
-      localStorage.setItem(HISTORY, JSON.stringify(next));
-    } catch {
-      // Unsaved history only costs the list below.
-    }
-  };
-  const mine = history.filter((r) => r.instance === instanceId).slice(0, 12);
 
   return (
     <div className={s.layout}>
       <section className={s.pane} aria-labelledby="logs-title">
         <div className={s.head}>
-          <h3 id="logs-title">Share log</h3>
-          <p>Upload what the game printed and paste the link where you ask for help.</p>
+          <h3 id="logs-title">Logs</h3>
+          <p>What the game printed in its last session.</p>
         </div>
         <ul className={s.sources}>
           {(["log", "crash"] as const).map((kind) =>
             kind === "crash" && !rows.crash.length ? null : (
-              <Source key={kind} kind={kind} lines={rows[kind].length} selected={selected === kind} onSelect={() => setPicked(kind)}
-                read={texts[kind]} onShared={(url) => remember(kind, url)} />
+              <Source key={kind} kind={kind} lines={rows[kind].length} selected={selected === kind} onSelect={() => setPicked(kind)} />
             )
           )}
         </ul>
-        <div className={cx(s.section, s.rule, s.grow)}>
-          <h4>Shared before</h4>
-          {mine.length ? (
-            <ul className={s.history}>
-              {mine.map((r) => (
-                <li key={r.at} className={s[r.kind]}>
-                  <Icon name={SOURCES[r.kind]?.icon ?? "description"} />
-                  <a title={`${SOURCES[r.kind]?.label ?? "Log"} · ${r.url}`} onClick={() => openUrl(r.url)}>{r.url.replace(/^https:\/\//, "")}</a>
-                  <time dateTime={new Date(r.at).toISOString()}>{when(r.at)}</time>
-                  <CopyButton url={r.url} className={s.sm} />
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className={s.emptyNote}>Links you upload are kept here.</p>
-          )}
-        </div>
-        <p className={s.note}>
-          <Icon name="shield" />
-          <span>Uploads go to mclo.gs, which hides IP addresses and access tokens. Anyone with the link can read the log.</span>
-        </p>
       </section>
       <Preview key={selected} title={SOURCES[selected].label} rows={rows[selected]} rev={rev} error={selected === "log" ? loadError : ""} />
     </div>
   );
 }
 
-interface SourceProps { kind: Kind; lines: number; selected: boolean; onSelect(): void; read(): string; onShared(url: string): void }
+interface SourceProps { kind: Kind; lines: number; selected: boolean; onSelect(): void }
 
-function Source({ kind, lines, selected, onSelect, read, onShared }: SourceProps) {
+function Source({ kind, lines, selected, onSelect }: SourceProps) {
   const { label, icon } = SOURCES[kind];
-  const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<{ url: string } | { error: string } | null>(null);
-  const field = useRef<HTMLInputElement>(null);
   const meta = kind === "log" ? (lines ? `Last session · ${lines.toLocaleString()} lines` : "Nothing yet: launch the game first") : `From the last crash · ${lines.toLocaleString()} lines`;
-
-  useEffect(() => field.current?.select(), [result]);
-
-  const upload = () => {
-    setBusy(true);
-    launcher
-      .shareLog(read())
-      .then((url) => (setResult({ url }), onShared(url)), (e) => setResult({ error: errorMessage(e) }))
-      .finally(() => setBusy(false));
-  };
-
   return (
-    <li className={cx(s.source, s[kind])} tabIndex={0} aria-current={selected} title={`Preview the ${label.toLowerCase()}`}
-      onClick={(e) => !(e.target as Element).closest("input, button") && onSelect()}
-      onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && e.target === e.currentTarget && (e.preventDefault(), onSelect())}>
+    <li className={cx(s.source, s[kind])} tabIndex={0} aria-current={selected} title={`Preview the ${label.toLowerCase()}`} onClick={onSelect}
+      onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), onSelect())}>
       <span className={s.mark} aria-hidden="true"><Icon name={icon} /></span>
       <div className={s.text}>
         <b>{label}</b>
         <span>{meta}</span>
       </div>
-      <Button size="sm" icon="cloud_upload" loading={busy} disabled={!lines} onClick={upload}>
-        {busy ? "Uploading" : result ? ("error" in result ? "Try again" : "Upload again") : "Upload"}
-      </Button>
-      {result && "url" in result && (
-        <div className={s.extra}>
-          <Input ref={field} mono readOnly className={cx(s.link, "selectable")} aria-label={`${label} link`} value={result.url} />
-          <CopyButton url={result.url} />
-          <IconButton icon="open_in_new" label="Open in browser" onClick={() => openUrl(result.url)} />
-        </div>
-      )}
-      {result && "error" in result && (
-        <div className={cx(s.extra, s.error)} role="alert">
-          <Icon name="error" />
-          <span>{result.error}</span>
-        </div>
-      )}
     </li>
   );
-}
-
-function CopyButton({ url, className }: { url: string; className?: string }) {
-  const [copied, setCopied] = useState(false);
-  useEffect(() => {
-    if (!copied) return;
-    const t = setTimeout(() => setCopied(false), 1500);
-    return () => clearTimeout(t);
-  }, [copied]);
-  // On failure the link field stays selected for Ctrl+C.
-  const copy = () => navigator.clipboard.writeText(url).then(() => setCopied(true), () => {});
-  return <IconButton icon={copied ? "check" : "content_copy"} label="Copy link" className={cx(className, copied && s.copied)} onClick={copy} />;
 }
 
 function Preview({ title, rows, rev, error }: { title: string; rows: Row[]; rev: number; error: string }) {
@@ -220,7 +126,7 @@ function Preview({ title, rows, rev, error }: { title: string; rows: Row[]; rev:
       {rows.length ? (
         <div className={cx(s.lines, "selectable")} ref={scroller} role="log" tabIndex={0}>
           {shown.length < matching.length && (
-            <p className={s.logNote}>Showing the last {shown.length.toLocaleString()} of {matching.length.toLocaleString()} lines. The upload has all of them.</p>
+            <p className={s.logNote}>Showing the last {shown.length.toLocaleString()} of {matching.length.toLocaleString()} lines.</p>
           )}
           {shown.map((r) => <Line key={r.n} {...r} />)}
         </div>
