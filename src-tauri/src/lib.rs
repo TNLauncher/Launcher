@@ -98,7 +98,6 @@ pub fn run() {
             commands::game::stop_game,
             commands::game::read_game_log,
             commands::game::read_crash_report,
-            commands::game::share_log,
             commands::mods::list_content,
             commands::mods::identify_content,
             commands::mods::toggle_content,

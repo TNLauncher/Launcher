@@ -25,22 +25,3 @@ pub fn read_game_log(state: State<'_, AppState>, id: String) -> Result<String> {
 pub fn read_crash_report(state: State<'_, AppState>, id: String) -> Result<String> {
     crate::services::repair::crash_reports(&state, &id)
 }
-
-/// Uploads a log to mclo.gs, which strips IPs and tokens; returns the page URL.
-#[tauri::command]
-pub async fn share_log(state: State<'_, AppState>, text: String) -> Result<String> {
-    #[derive(serde::Deserialize)]
-    struct Out {
-        success: bool,
-        url: Option<String>,
-        error: Option<String>,
-    }
-    // mclo.gs keeps at most 25k lines; the end of a log is where it broke.
-    let lines: Vec<&str> = text.lines().collect();
-    let content = lines[lines.len().saturating_sub(25_000)..].join("\n");
-    let out: Out = state.http.post("https://api.mclo.gs/1/log").form(&[("content", content)]).send().await?.json().await?;
-    match out {
-        Out { success: true, url: Some(url), .. } => Ok(url),
-        Out { error, .. } => Err(crate::error::AppError::Invalid(error.unwrap_or_else(|| "mclo.gs refused the upload".into()))),
-    }
-}
