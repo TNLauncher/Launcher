@@ -41,6 +41,16 @@ export interface PluginEntry {
   error: string | null;
 }
 
+/** A plugin the store offers. Mirrors `StoreEntry` in src-tauri/src/plugins/store.rs. */
+export interface StoreEntry {
+  manifest: Pick<PluginEntry, "id" | "name" | "version" | "description" | "permissions"> & {
+    contributes: { pages: PluginView[]; instanceTabs: PluginView[]; runtime: { icon: string } | null };
+  };
+  url: string;
+  sha256: string;
+  size: number;
+}
+
 /** A page or instance tab a plugin contributes. */
 export interface PluginView {
   id: string;
@@ -165,6 +175,10 @@ export const sources = {
   /** Values of a plugin's declared settings. */
   settings: (id: string) => call<Record<string, string | boolean>>("plugin_settings", { id }),
   setSetting: (id: string, key: string, value: string | boolean) => call<void>("set_plugin_setting", { id, key, value }),
+  /** What the plugin store offers that this launcher can run. */
+  pluginStore: () => call<StoreEntry[]>("plugin_store"),
+  /** Installs or updates a store plugin; its settings and data are kept. Resolves with the reloaded list. */
+  installPlugin: (id: string) => call<PluginEntry[]>("install_plugin", { id }),
   /** User plugins live there and load on the next start. */
   openPluginsDir: () => call<void>("open_plugins_dir"),
 

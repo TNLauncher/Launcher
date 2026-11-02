@@ -1,15 +1,15 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { sources, type PluginEntry } from "@/api/sources";
+import { sources, type PluginEntry, type StoreEntry } from "@/api/sources";
 import { View } from "@/components/layout/View";
-import { Button, ConfirmDialog, EmptyState, Icon, IconButton, Input, Select, Switch } from "@/components/ui";
+import { Button, ConfirmDialog, EmptyState, Icon, IconButton, Input, Select, Switch, Tab, Tabs } from "@/components/ui";
 import { usePlugins } from "@/hooks/useSource";
 import { cx } from "@/lib/cx";
 import { errorMessage } from "@/lib/format";
 import { bumpPluginRevision, emitToPlugin, usePluginFailures } from "@/plugins/bridge";
 import s from "./plugins.module.css";
 
-/** Bundled and user plugins; a turned-off content source disappears from the catalogs, installed files stay. */
+/** Bundled and user plugins, and the store to get more; a turned-off content source disappears from the catalogs, installed files stay. */
 export function PluginsView() {
   const qc = useQueryClient();
   const plugins = usePlugins();
@@ -17,6 +17,7 @@ export function PluginsView() {
   const [error, setError] = useState("");
   const [reloading, setReloading] = useState(false);
   const [removing, setRemoving] = useState<PluginEntry | null>(null);
+  const [tab, setTab] = useState<"installed" | "store">("installed");
 
   const replaceList = (list: PluginEntry[]) => {
     qc.setQueryData(["plugins"], list);
@@ -72,9 +73,16 @@ export function PluginsView() {
         <p className={s.error} role="alert"><Icon name="error" />{error || errorMessage(plugins.error)}</p>
       )}
 
-      {plugins.isSuccess && !list.length ? (
+      <Tabs label="Plugins">
+        <Tab selected={tab === "installed"} onSelect={() => setTab("installed")} icon="extension" count={list.length || null}>Installed</Tab>
+        <Tab selected={tab === "store"} onSelect={() => setTab("store")} icon="storefront">Store</Tab>
+      </Tabs>
+
+      {tab === "store" ? (
+        <div role="tabpanel"><PluginStore installed={list} onInstalled={replaceList} onError={setError} /></div>
+      ) : plugins.isSuccess && !list.length ? (
         <EmptyState icon="extension_off" action={<Button icon="folder_open" onClick={() => sources.openPluginsDir()}>Open plugin folder</Button>}>
-          No plugins yet. Put a plugin's folder in the plugin folder and press Reload.
+          No plugins yet. Get one from the Store, or put a plugin's folder in the plugin folder and press Reload.
         </EmptyState>
       ) : (
         <ul className={s.list}>
@@ -118,8 +126,8 @@ export function PluginsView() {
 }
 
 /** What a plugin may touch, in plain words. */
-function permissions(p: PluginEntry): { icon: string; text: string; title?: string }[] {
-  const { hosts, instances, presence, jvm, programs } = p.permissions;
+function permissions(perms: PluginEntry["permissions"]): { icon: string; text: string; title?: string }[] {
+  const { hosts, instances, presence, jvm, programs } = perms;
   return [
     hosts.length
       ? { icon: "public", text: hosts.length === 1 ? hosts[0] : `${hosts.length} sites`, title: `Connects to ${hosts.join(", ")}` }
@@ -150,7 +158,7 @@ function PluginRow({ plugin: p, failure, onToggle, onRemove, onError }: {
         </div>
         {p.description && <p className={s.desc}>{p.description}</p>}
         <ul className={s.perms} aria-label="Permissions">
-          {permissions(p).map((x) => (
+          {permissions(p.permissions).map((x) => (
             <li key={x.icon} title={x.title}><Icon name={x.icon} />{x.text}</li>
           ))}
         </ul>
@@ -162,6 +170,89 @@ function PluginRow({ plugin: p, failure, onToggle, onRemove, onError }: {
         <Switch label={`${p.enabled ? "Turn off" : "Turn on"} ${p.name}`} checked={p.enabled} onChange={onToggle} />
       </div>
     </li>
+  );
+}
+
+/** The plugin store's catalog; installing asks first, with what the plugin may touch. */
+function PluginStore({ installed, onInstalled, onError }: {
+  installed: PluginEntry[];
+  onInstalled(list: PluginEntry[]): void;
+  onError(message: string): void;
+}) {
+  const store = useQuery({ queryKey: ["plugin-store"], queryFn: sources.pluginStore, staleTime: 5 * 60_000 });
+  const [asking, setAsking] = useState<StoreEntry | null>(null);
+  const [busy, setBusy] = useState("");
+
+  const install = (e: StoreEntry) => {
+    setBusy(e.manifest.id);
+    sources
+      .installPlugin(e.manifest.id)
+      .then(onInstalled, (err) => onError(errorMessage(err)))
+      .finally(() => setBusy(""));
+  };
+
+  if (store.isPending) return null;
+  if (store.isError)
+    return (
+      <EmptyState icon="cloud_off" action={<Button icon="refresh" loading={store.isFetching} onClick={() => store.refetch()}>Retry</Button>}>
+        Couldn't load the plugin store: {errorMessage(store.error)}
+      </EmptyState>
+    );
+  if (!store.data.length) return <EmptyState icon="storefront">The store has no plugins for this launcher version yet.</EmptyState>;
+
+  return (
+    <>
+      <ul className={s.list}>
+        {store.data.map((e) => {
+          const m = e.manifest;
+          const have = installed.find((p) => p.id === m.id);
+          const icon = m.contributes.pages[0]?.icon ?? m.contributes.instanceTabs[0]?.icon ?? m.contributes.runtime?.icon ?? "extension";
+          return (
+            <li key={m.id} className={s.plugin}>
+              <span className={s.tile}><Icon name={icon} /></span>
+              <div className={s.body}>
+                <div className={s.title}>
+                  <strong>{m.name}</strong>
+                  <span className="mono subtle">{m.version}</span>
+                  {have && have.version !== m.version && <span className={s.tag}>{have.version} installed</span>}
+                </div>
+                {m.description && <p className={s.desc}>{m.description}</p>}
+                <ul className={s.perms} aria-label="Permissions">
+                  {permissions(m.permissions).map((x) => (
+                    <li key={x.icon} title={x.title}><Icon name={x.icon} />{x.text}</li>
+                  ))}
+                </ul>
+              </div>
+              <div className={s.controls}>
+                {have?.bundled ? (
+                  <span className={s.tag}>Built-in</span>
+                ) : have && have.version === m.version ? (
+                  <Button icon="check" disabled>Installed</Button>
+                ) : (
+                  <Button variant="primary" icon={have ? "upgrade" : "download"} loading={busy === m.id} disabled={!!busy} onClick={() => setAsking(e)}>
+                    {have ? "Update" : "Install"}
+                  </Button>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+
+      <ConfirmDialog
+        open={!!asking}
+        title={`Install ${asking?.manifest.name}?`}
+        confirmLabel="Install"
+        onCancel={() => setAsking(null)}
+        onConfirm={() => {
+          const target = asking!;
+          setAsking(null);
+          install(target);
+        }}
+      >
+        {asking && `${permissions(asking.manifest.permissions).map((x) => x.title ?? x.text).join(" · ")}. Downloaded from ${new URL(asking.url).host}.`}
+      </ConfirmDialog>
+    </>
   );
 }
 
