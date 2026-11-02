@@ -23,7 +23,7 @@ const TIMEOUT: Duration = Duration::from_secs(60);
 pub struct Call {
     pub id: u64,
     pub plugin: String,
-    /// What the plugin registered: `source` or `account`.
+    /// What the plugin registered: `source`, `account`, `importer` or `runtime`.
     pub target: &'static str,
     pub method: &'static str,
     /// Positional arguments of the plugin function.
@@ -138,6 +138,112 @@ impl JsImporter {
     pub async fn plan(&self, root: &HashMap<String, String>) -> Result<PackPlan> {
         let v = self.bridge.call(&self.plugin, "importer", "plan", vec![arg(root)]).await?;
         serde_json::from_value(v).map_err(|e| AppError::Plugin(format!("{}.plan returned bad data: {e}", self.plugin)))
+    }
+}
+
+/// A game runtime plugin (`tn.runtimes.register`): a game that runs instead of Java Minecraft.
+/// It only describes files and command lines; `services::runtime` checks, downloads and runs them.
+pub struct JsRuntime {
+    pub plugin: String,
+    pub bridge: Arc<Bridge>,
+}
+
+/// A build a runtime offers.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RuntimeVersion {
+    /// Becomes a folder name: no slashes, no leading dot.
+    pub id: String,
+    /// The Minecraft version whose files the build needs.
+    pub minecraft: String,
+    #[serde(default)]
+    pub stable: bool,
+}
+
+/// What `install` returns: the files of one build, put in its folder once.
+#[derive(Debug, Deserialize)]
+pub struct RuntimeInstall {
+    pub files: Vec<RuntimeFile>,
+}
+
+/// A file from the plugin's download hosts, checked against `sha256`; `extract` unpacks a `.zip` or `.tar.gz` and drops it.
+#[derive(Debug, Deserialize)]
+pub struct RuntimeFile {
+    pub url: String,
+    pub filename: String,
+    pub sha256: String,
+    #[serde(default)]
+    pub extract: bool,
+}
+
+/// What `launch` returns before each start. Arguments may hold `${...}` placeholders (see `services::runtime`).
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeLaunch {
+    /// Download the Minecraft server jar too (`${mc.serverJar}`).
+    #[serde(default)]
+    pub server_jar: bool,
+    /// Run in order before the game, e.g. building its resources from Minecraft's files.
+    #[serde(default)]
+    pub steps: Vec<RuntimeStep>,
+    pub game: RuntimeProgram,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RuntimeStep {
+    /// Shown while it runs.
+    pub title: String,
+    /// Relative to the build's folder.
+    pub program: String,
+    #[serde(default)]
+    pub args: Vec<String>,
+    /// Arguments of a quick run of `program`: exit code 0 skips the step.
+    pub check: Option<Vec<String>>,
+    /// Stdout is JSON lines: `{"fraction"}`, `{"message"}`, `{"error"}`.
+    #[serde(default)]
+    pub progress: Option<ProgressFormat>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ProgressFormat {
+    Json,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RuntimeProgram {
+    /// Relative to the build's folder.
+    pub program: String,
+    #[serde(default)]
+    pub args: Vec<String>,
+    /// How the game gets the account: `stdin` writes `{name, uuid, access_token, user_type}` and closes it.
+    pub session: Option<SessionPass>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SessionPass {
+    Stdin,
+}
+
+impl JsRuntime {
+    async fn call<O: DeserializeOwned>(&self, method: &'static str, args: Vec<Value>) -> Result<O> {
+        let v = self.bridge.call(&self.plugin, "runtime", method, args).await?;
+        serde_json::from_value(v).map_err(|e| AppError::Plugin(format!("{}.{method} returned bad data: {e}", self.plugin)))
+    }
+
+    /// Builds to offer, newest first.
+    pub async fn versions(&self) -> Result<Vec<RuntimeVersion>> {
+        self.call("versions", vec![]).await
+    }
+
+    /// `ctx`: `{ version, os, arch }`.
+    pub async fn install(&self, ctx: Value) -> Result<RuntimeInstall> {
+        self.call("install", vec![ctx]).await
+    }
+
+    /// `ctx`: `{ version, os, arch, width, height, fullscreen, world }`.
+    pub async fn launch(&self, ctx: Value) -> Result<RuntimeLaunch> {
+        self.call("launch", vec![ctx]).await
     }
 }
 

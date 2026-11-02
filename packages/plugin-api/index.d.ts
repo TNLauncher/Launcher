@@ -48,6 +48,15 @@ export interface Manifest {
     account?: { fields: { key: string; label: string; hint?: string; type: "text" | "secret" }[] };
     /** Reads modpack archives of some format, which the user imports from a file. `activate` must call `tn.importers.register`. */
     importer?: boolean;
+    /** Makes the plugin a game runtime: a game that runs instead of Java Minecraft. Needs `permissions.programs`; `activate` must call `tn.runtimes.register`. */
+    runtime?: {
+      /** One line under the name in the new-instance dialog. */
+      hint?: string;
+      /** Material Symbols name; default `rocket_launch`. */
+      icon?: string;
+      /** Start only for a Microsoft account (one that owns Minecraft: Java Edition). */
+      requiresMicrosoft?: boolean;
+    };
     /** Options the user fills in Settings; read them with `tn.settings.get()`. */
     settings?: {
       /** `[A-Za-z0-9_-]`. */
@@ -73,6 +82,8 @@ export interface Manifest {
     presence?: boolean;
     /** Load a Java agent into the game (`AccountSession.javaAgent`); it runs code in the game. */
     jvm?: boolean;
+    /** Run programs the plugin downloads (game runtimes); they run code on the computer. */
+    programs?: boolean;
   };
 }
 
@@ -100,6 +111,8 @@ export interface Instance {
   icon: string;
   /** Modpack it was installed from. */
   pack: { source: string; project: string; version: string } | null;
+  /** A game runtime plugin's build that runs instead of Java Minecraft; null = Java Minecraft. */
+  runtime: { plugin: string; name: string; version: string } | null;
   /** Enabled mod jars. */
   mods: number;
 }
@@ -368,6 +381,62 @@ export interface AccountProvider {
   skin?(account: StoredAccount): Promise<{ url: string; slim?: boolean } | null>;
 }
 
+/** A build a game runtime offers. */
+export interface RuntimeVersion {
+  /** Becomes a folder name: no slashes, no leading dot. */
+  id: string;
+  /** The Minecraft version whose files the build needs. */
+  minecraft: string;
+  stable?: boolean;
+}
+
+export interface RuntimeContext {
+  /** A `RuntimeVersion.id`. */
+  version: string;
+  /** Rust's names: `linux`, `macos`, `windows`. */
+  os: string;
+  /** Rust's names: `x86_64`, `aarch64`. */
+  arch: string;
+}
+
+/**
+ * Arguments of steps and the game may hold placeholders the launcher fills in: `${runtime}` (the build's folder),
+ * `${instance}` (the game folder), `${java}`, `${javaHome}`, `${mc.versionJson}`, `${mc.clientJar}`, `${mc.libraries}`
+ * (Maven layout), `${mc.assets}` (`indexes/`, `objects/`) and, with `serverJar`, `${mc.serverJar}`. Programs are paths
+ * inside the build's folder.
+ */
+export interface RuntimeLaunch {
+  /** Also download Minecraft's server jar. */
+  serverJar?: boolean;
+  /** Run in order before the game. */
+  steps?: {
+    /** Shown in errors. */
+    title: string;
+    program: string;
+    args?: string[];
+    /** Arguments of a quick run of `program`: exit code 0 skips the step. */
+    check?: string[];
+    /** `json`: stdout lines are `{"fraction": 0..1}`, `{"message"}` or `{"error"}` (the failure's reason). */
+    progress?: "json";
+  }[];
+  game: {
+    program: string;
+    args?: string[];
+    /** `stdin`: the launcher writes `{"name","uuid","access_token","user_type"}` to the game's stdin and closes it. */
+    session?: "stdin";
+  };
+}
+
+/** What `tn.runtimes.register` takes. Throw to report an error (shown at creation or launch). */
+export interface Runtime {
+  /** Builds to offer, newest first. */
+  versions(): Promise<RuntimeVersion[]>;
+  /** Once per build: files from `permissions.downloads`, checked against `sha256`; `extract` unpacks a `.zip` or `.tar.gz` into the build's folder. */
+  install(ctx: RuntimeContext): Promise<{ files: { url: string; filename: string; sha256: string; extract?: boolean }[] }>;
+  /** Before each start, after the build and Minecraft's files are on disk. Should work offline. */
+  launch(ctx: RuntimeContext & { width: number; height: number; fullscreen: boolean; /** A `saves/` folder to open, or null. */ world: string | null }): Promise<RuntimeLaunch>;
+}
+
 export interface FetchInit {
   method?: string;
   headers?: Record<string, string>;
@@ -450,6 +519,7 @@ export interface TN {
   };
   accounts: { register(provider: AccountProvider): void };
   importers: { register(importer: Importer): void };
+  runtimes: { register(runtime: Runtime): void };
   net: { fetch(url: string, init?: FetchInit): Promise<FetchResponse> };
   /** Printed to the launcher's log. */
   log(...args: unknown[]): Promise<void>;

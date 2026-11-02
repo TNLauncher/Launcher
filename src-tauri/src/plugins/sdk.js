@@ -4,7 +4,7 @@
   const pending = new Map();
   let next = 1;
   /** What the plugin registered, by call target. */
-  const registered = { source: null, account: null, importer: null };
+  const registered = { source: null, account: null, importer: null, runtime: null };
   const listeners = new Map();
   const post = (msg) => parent.postMessage({ tn: 1, ...msg }, "*");
   const message = (err) => String((err && err.message) || err);
@@ -122,6 +122,12 @@
       register(impl) {
         if (registered.importer) throw new Error("An importer is already registered");
         registered.importer = impl;
+      },
+    }),
+    runtimes: Object.freeze({
+      register(impl) {
+        if (registered.runtime) throw new Error("A game runtime is already registered");
+        registered.runtime = impl;
       },
     }),
     net: Object.freeze({

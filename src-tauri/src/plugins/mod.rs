@@ -63,6 +63,26 @@ pub struct Contributes {
     /// Reads modpack archives of some format (`tn.importers.register`); the user imports them from a file.
     #[serde(default)]
     pub importer: bool,
+    /// Makes the plugin a game runtime: a game that runs instead of Java Minecraft (`tn.runtimes.register`). Needs `programs`.
+    pub runtime: Option<RuntimeSpec>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeSpec {
+    /// One line under the name in the new-instance dialog.
+    #[serde(default)]
+    pub hint: String,
+    /// Material Symbols name.
+    #[serde(default = "default_runtime_icon")]
+    pub icon: String,
+    /// Starts only for a Microsoft account (one that owns Minecraft: Java Edition).
+    #[serde(default)]
+    pub requires_microsoft: bool,
+}
+
+fn default_runtime_icon() -> String {
+    "rocket_launch".into()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -161,6 +181,9 @@ pub struct Permissions {
     /// Load a Java agent into the game (account providers like Ely.by need authlib-injector). Runs code in the game.
     #[serde(default)]
     pub jvm: bool,
+    /// Run programs the plugin downloads (game runtimes). Runs code on the computer.
+    #[serde(default)]
+    pub programs: bool,
 }
 
 pub struct Plugin {
@@ -171,6 +194,7 @@ pub struct Plugin {
     pub source: Option<Arc<dyn ContentSource>>,
     pub account: Option<js::JsAccount>,
     pub importer: Option<js::JsImporter>,
+    pub runtime: Option<js::JsRuntime>,
 }
 
 impl Plugin {
@@ -187,6 +211,11 @@ impl Plugin {
     /// The content source, or an error naming the plugin.
     pub fn source(&self) -> Result<&Arc<dyn ContentSource>> {
         self.source.as_ref().ok_or_else(|| AppError::Unsupported(format!("{} is not a content source", self.manifest.name)))
+    }
+
+    /// The game runtime, or an error naming the plugin.
+    pub fn runtime(&self) -> Result<&js::JsRuntime> {
+        self.runtime.as_ref().ok_or_else(|| AppError::Unsupported(format!("{} is not a game runtime", self.manifest.name)))
     }
 }
 
@@ -227,7 +256,8 @@ impl Registry {
                         });
                         let account = manifest.contributes.account.as_ref().map(|_| js::JsAccount { plugin: manifest.id.clone(), bridge: reg.bridge.clone() });
                         let importer = manifest.contributes.importer.then(|| js::JsImporter { plugin: manifest.id.clone(), bridge: reg.bridge.clone() });
-                        reg.plugins.push(Arc::new(Plugin { manifest, dir: folder, bundled: *bundled, source, account, importer }));
+                        let runtime = manifest.contributes.runtime.as_ref().map(|_| js::JsRuntime { plugin: manifest.id.clone(), bridge: reg.bridge.clone() });
+                        reg.plugins.push(Arc::new(Plugin { manifest, dir: folder, bundled: *bundled, source, account, importer, runtime }));
                     }
                     Err(e) => reg.failed.push(Failed { name, error: e.to_string() }),
                 }
@@ -256,6 +286,9 @@ fn read_manifest(folder: &Path) -> Result<Manifest> {
         if s.kind == SettingKind::Select && s.options.is_empty() {
             return Err(AppError::Plugin(format!("Select setting {} has no options", s.key)));
         }
+    }
+    if m.contributes.runtime.is_some() && !m.permissions.programs {
+        return Err(AppError::Plugin("A game runtime needs the programs permission".into()));
     }
     if !folder.join(&m.main).is_file() {
         return Err(AppError::Plugin(format!("{} is missing", m.main)));
@@ -291,6 +324,8 @@ pub struct PluginEntry {
     pub settings: Vec<SettingSpec>,
     /// Sign-in form fields when the plugin provides accounts.
     pub account: Option<AccountSpec>,
+    /// Set when the plugin is a game runtime.
+    pub runtime: Option<RuntimeSpec>,
     /// Why the plugin did not load; it is then off.
     pub error: Option<String>,
 }
@@ -318,6 +353,7 @@ pub fn list(state: &AppState) -> Vec<PluginEntry> {
             instance_tabs: m.contributes.instance_tabs.clone(),
             settings: m.contributes.settings.clone(),
             account: m.contributes.account.clone(),
+            runtime: m.contributes.runtime.clone(),
             error: None,
         }
     });
@@ -335,6 +371,7 @@ pub fn list(state: &AppState) -> Vec<PluginEntry> {
         instance_tabs: vec![],
         settings: vec![],
         account: None,
+        runtime: None,
         error: Some(f.error.clone()),
     });
     loaded.chain(failed).collect()

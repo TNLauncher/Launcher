@@ -7,6 +7,7 @@ pub mod repair;
 pub mod instances;
 pub mod launcher;
 pub mod modpacks;
+pub mod runtime;
 pub mod mods;
 pub mod screenshots;
 pub mod worlds;

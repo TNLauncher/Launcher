@@ -2,7 +2,8 @@ use crate::error::Result;
 use crate::minecraft::loader;
 use crate::models::{Instance, InstanceSettings, Loader, Screenshot, World};
 use crate::services::modpacks::{self, ImportProgress};
-use crate::services::{instances, mods, screenshots, worlds};
+use crate::plugins::js::RuntimeVersion;
+use crate::services::{instances, mods, runtime, screenshots, worlds};
 use crate::state::AppState;
 use tauri::{ipc::{Channel, Response}, AppHandle, Manager, State};
 use tauri_plugin_opener::OpenerExt;
@@ -11,6 +12,18 @@ use tauri_plugin_opener::OpenerExt;
 /// `loader_version: None` = the loader's newest stable build.
 pub async fn create_instance(state: State<'_, AppState>, name: String, version: String, loader: Loader, loader_version: Option<String>) -> Result<Instance> {
     instances::create(&state, &name, &version, loader, loader_version).await
+}
+
+/// An instance that plays build `version` of the game runtime plugin `plugin`.
+#[tauri::command]
+pub async fn create_runtime_instance(state: State<'_, AppState>, name: String, plugin: String, version: String) -> Result<Instance> {
+    runtime::create(&state, &name, &plugin, &version).await
+}
+
+/// Builds a game runtime plugin offers, newest first.
+#[tauri::command]
+pub async fn runtime_versions(state: State<'_, AppState>, plugin: String) -> Result<Vec<RuntimeVersion>> {
+    runtime::versions(&state, &plugin).await
 }
 
 /// Game versions the loader runs; `None` = all of them (vanilla).

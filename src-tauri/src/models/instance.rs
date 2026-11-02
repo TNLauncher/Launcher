@@ -34,6 +34,8 @@ pub struct Instance {
     pub settings: InstanceSettings,
     /// Group the instance is listed under; empty = ungrouped.
     pub group: String,
+    /// A plugin's game that runs instead of Java Minecraft; `None` = the JVM game. `version` is then that game's Minecraft version.
+    pub runtime: Option<RuntimeRef>,
     /// Pre-plugin builds stored a Modrinth project here; read once and moved into `pack`.
     #[serde(skip_serializing)]
     pub(crate) modpack_id: String,
@@ -80,6 +82,17 @@ pub struct PackRef {
     pub source: String,
     pub project: String,
     /// Version number as shown to the user.
+    pub version: String,
+}
+
+/// The game a runtime plugin installs and starts for an instance.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeRef {
+    pub plugin: String,
+    /// The plugin's name when the instance was made, shown even after the plugin is gone.
+    pub name: String,
+    /// The plugin's build id.
     pub version: String,
 }
 

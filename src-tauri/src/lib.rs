@@ -72,6 +72,8 @@ pub fn run() {
             commands::account::plugin_login,
             commands::account::account_skin,
             commands::instances::create_instance,
+            commands::instances::create_runtime_instance,
+            commands::instances::runtime_versions,
             commands::instances::loader_games,
             commands::instances::loader_builds,
             commands::instances::import_modpack,

@@ -1,5 +1,5 @@
 //! Install → spawn → watch. Progress streams over a Channel; game output and exit are global events.
-use super::{instances, now};
+use super::{instances, now, runtime};
 use crate::error::{AppError, Result};
 use crate::minecraft::http::Check;
 use crate::minecraft::{command, install, java, loader, version, Progress, Stage};
@@ -112,39 +112,59 @@ pub async fn launch(app: &AppHandle, id: &str, world: Option<&str>, on_event: Ch
     progress(Stage::Resolving, 0, 0);
     // Before the downloads, so an expired sign-in fails fast.
     let session = super::account::session(&state).await?;
-    let Prepared { inst, settings, version: v, java, installed } = prepare(&state, id, Check::Size, &progress).await?;
-    let classpath = installed.classpath;
     if let Some(w) = world {
         crate::services::mods::safe_file(w)?;
-        if !command::supports_quick_play(&v) {
-            return Err(AppError::Unsupported("Opening a world from the launcher needs Minecraft 1.20 or newer".into()));
-        }
     }
+    let inst = instances::get(&state, id)?;
+    let (mut cmd, stdin, settings) = match &inst.runtime {
+        Some(r) => {
+            let settings = storage::load_settings(&state).for_instance(&inst.settings);
+            let game = runtime::prepare(&state, &inst, r, &session, &settings, world, &progress).await?;
+            (game.cmd, game.stdin, settings)
+        }
+        None => {
+            let Prepared { inst, settings, version: v, java, installed } = prepare(&state, id, Check::Size, &progress).await?;
+            if world.is_some() && !command::supports_quick_play(&v) {
+                return Err(AppError::Unsupported("Opening a world from the launcher needs Minecraft 1.20 or newer".into()));
+            }
+            let cmd = command::build(
+                &v,
+                &command::LaunchOptions {
+                    java: &java,
+                    root,
+                    game_dir: &game_dir,
+                    natives: &natives,
+                    classpath: &installed.classpath,
+                    session: &session,
+                    ram_mb: settings.ram_mb.max(512),
+                    jvm_args: &settings.jvm_args,
+                    width: settings.width,
+                    height: settings.height,
+                    fullscreen: settings.fullscreen,
+                    wrapper: &inst.settings.wrapper,
+                    world,
+                },
+            );
+            (cmd, None, settings)
+        }
+    };
 
     progress(Stage::Starting, 0, 0);
     let log = Arc::new(File::create(game_dir.join("launcher.log"))?);
-    let mut cmd = command::build(
-        &v,
-        &command::LaunchOptions {
-            java: &java,
-            root,
-            game_dir: &game_dir,
-            natives: &natives,
-            classpath: &classpath,
-            session: &session,
-            ram_mb: settings.ram_mb.max(512),
-            jvm_args: &settings.jvm_args,
-            width: settings.width,
-            height: settings.height,
-            fullscreen: settings.fullscreen,
-            wrapper: &inst.settings.wrapper,
-            world,
-        },
-    );
     cmd.envs(inst.settings.env_vars()).stdout(Stdio::piped()).stderr(Stdio::piped());
+    if stdin.is_some() {
+        cmd.stdin(Stdio::piped());
+    }
     let mut child = cmd
         .spawn()
         .map_err(|e| AppError::Unsupported(format!("Could not start {:?}: {e}", cmd.get_program())))?;
+    // The account goes over a pipe, never the command line; closing it tells the game it has all of it.
+    if let (Some(text), Some(mut pipe)) = (stdin, child.stdin.take()) {
+        if let Err(e) = pipe.write_all(text.as_bytes()) {
+            let _ = child.kill();
+            return Err(AppError::Unsupported(format!("Could not hand the account to the game: {e}")));
+        }
+    }
 
     let readers = [
         pipe(app, id, child.stdout.take().expect("piped"), log.clone(), false),

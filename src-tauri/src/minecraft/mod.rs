@@ -23,6 +23,10 @@ pub enum Stage {
     Loader,
     Libraries,
     Assets,
+    /// Downloading a runtime plugin's game.
+    Runtime,
+    /// A runtime plugin's steps before its game starts.
+    Preparing,
     Starting,
 }
 

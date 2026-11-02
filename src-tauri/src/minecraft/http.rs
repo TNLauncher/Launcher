@@ -62,7 +62,7 @@ pub async fn sha1_file(path: &Path) -> Result<String> {
     .map_err(|e| AppError::Unsupported(format!("Hashing crashed: {e}")))?
 }
 
-fn hex(bytes: &[u8]) -> String {
+pub(crate) fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
