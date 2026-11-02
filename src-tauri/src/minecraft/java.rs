@@ -8,6 +8,9 @@ use std::path::{Path, PathBuf};
 const RUNTIMES_URL: &str =
     "https://launchermeta.mojang.com/v1/products/java-runtime/2ec0cc96c44e5a76b9c8b7c39df7210883d12871/all.json";
 
+/// What `.installed` holds; launchers before it wrote an empty file.
+const INSTALLED: &str = "2";
+
 fn platform() -> &'static str {
     match (std::env::consts::OS, std::env::consts::ARCH) {
         ("linux", "x86") => "linux-i386",
@@ -29,9 +32,12 @@ pub async fn ensure(c: &reqwest::Client, root: &Path, version: &Value, check: Ch
     let java = dir.join("bin").join(if cfg!(windows) { "java.exe" } else { "java" });
     // Written last, so a runtime interrupted mid-install is redone instead of reused.
     let done = dir.join(".installed");
-    if check == Check::Size && done.exists() {
+    let mark = std::fs::read_to_string(&done).ok();
+    if check == Check::Size && mark.as_deref() == Some(INSTALLED) {
         return Ok(java);
     }
+    // Older launchers could mix up files (one shared `.part` for jimage.dll and jimage.exe): rehash those once.
+    let check = if mark.is_some() { Check::Hash } else { check };
     progress(Stage::Java, 0, 0);
 
     let all = get_json(c, RUNTIMES_URL).await?;
@@ -72,6 +78,6 @@ pub async fn ensure(c: &reqwest::Client, root: &Path, version: &Value, check: Ch
     #[cfg(not(unix))]
     let _ = (executables, links);
 
-    std::fs::write(done, "")?;
+    std::fs::write(done, INSTALLED)?;
     Ok(java)
 }
