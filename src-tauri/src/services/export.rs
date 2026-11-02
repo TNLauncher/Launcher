@@ -100,7 +100,7 @@ mod tests {
         let dest = root.join("x.mrpack");
         write(&state, "i", &spec, &dest).unwrap();
         let mut zip = zip::ZipArchive::new(std::fs::File::open(&dest).unwrap()).unwrap();
-        let mut names: Vec<_> = zip.file_names().map(String::from).collect();
+        let mut names: Vec<_> = zip.file_names().map(|n| n.unwrap().into_owned()).collect();
         names.sort();
         assert_eq!(names, ["modrinth.index.json", "overrides/mods/b.jar", "overrides/options.txt"]);
         let mut s = String::new();

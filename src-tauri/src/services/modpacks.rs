@@ -136,13 +136,14 @@ fn root_files(archive: &Archive) -> Result<HashMap<String, String>> {
     let mut out = HashMap::new();
     for i in 0..zip.len() {
         let mut entry = zip.by_index(i)?;
-        if entry.is_dir() || entry.name().matches('/').count() > 1 || entry.size() > MAX_MANIFEST {
+        let Ok(name) = entry.name().map(|n| n.into_owned()) else { continue };
+        if entry.is_dir() || name.matches('/').count() > 1 || entry.size() > MAX_MANIFEST {
             continue;
         }
         let mut buf = String::new();
         // Binary files (icons) are not manifests: skip them.
         if entry.read_to_string(&mut buf).is_ok() {
-            out.insert(entry.name().to_string(), buf);
+            out.insert(name, buf);
         }
     }
     Ok(out)

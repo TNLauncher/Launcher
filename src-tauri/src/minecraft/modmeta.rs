@@ -93,7 +93,7 @@ fn scan_zip<R: Read + Seek>(zip: &mut ZipArchive<R>, loader: Loader, depth: u32)
         }
     }
     meta.mixins = (0..zip.len())
-        .filter_map(|i| zip.name_for_index(i).map(String::from))
+        .filter_map(|i| zip.name_for_index(i)?.ok().map(String::from))
         .filter(|n| !n.contains('/') && n.ends_with(".json") && n.contains("mixins"))
         .collect();
     Scan::Mod(meta)
