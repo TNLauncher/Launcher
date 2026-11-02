@@ -1,4 +1,4 @@
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { sources, type PluginEntry, type StoreEntry } from "@/api/sources";
 import { View } from "@/components/layout/View";

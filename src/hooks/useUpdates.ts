@@ -25,7 +25,7 @@ export function usePluginUpdateCount(): number {
 }
 
 /** The launcher's own update check, shared by Settings and the sidebar dot; data is null when up to date. */
-export const useLauncherUpdateQuery = () => useQuery({ queryKey: ["launcher-update"], queryFn: check, staleTime: 30 * 60_000, retry: false });
+export const useLauncherUpdateQuery = () => useQuery({ queryKey: ["launcher-update"], queryFn: () => check(), staleTime: 30 * 60_000, retry: false });
 
 /** Whether a newer launcher build is out; false while checking or when the check fails. */
 export const useLauncherUpdate = (): boolean => !!useLauncherUpdateQuery().data;
