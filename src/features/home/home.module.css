@@ -181,7 +181,7 @@ button.player-name:hover { background: var(--card); }
 }
 @keyframes live { to { box-shadow: 0 0 0 8px rgb(48 209 88 / 0); } }
 @media (prefers-reduced-motion: reduce) { .live::before { animation: none; } }
-.play-busy:disabled { opacity: 1; background: rgb(0 113 227 / 0.28); }
+.play.play-busy, .play.play-busy:hover { background: rgb(0 113 227 / 0.28); }
 .play-busy::before {
   content: ""; position: absolute; inset: 0; z-index: -1; background: var(--accent-fill);
   transform-origin: left; transform: scaleX(var(--p, 0)); transition: transform var(--slow) var(--butter);
@@ -190,6 +190,26 @@ button.player-name:hover { background: var(--card); }
 .play-pct { color: rgb(255 255 255 / 0.72); font-size: 12px; min-width: 4ch; text-align: right; }
 @keyframes play-sweep { from { translate: -100% 0; } to { translate: 300% 0; } }
 @media (prefers-reduced-motion: reduce) { .play-sweep::before { animation: none; width: 100%; opacity: 0.4; } }
+
+/* Launch progress dialog: one row per stage. */
+.stages-dialog { width: 440px; }
+.stages-pct { font: 500 12px var(--mono); font-variant-numeric: tabular-nums; color: var(--muted); }
+.stages {
+  margin: 0; padding: var(--pad-list); list-style: none;
+  border-radius: var(--r-md); background: var(--card); border: 1px solid var(--card-border);
+}
+.stage { display: flex; align-items: center; gap: var(--space-sibling); min-height: 40px; padding: 0 var(--pad-item); color: var(--muted); }
+.stage + .stage { box-shadow: inset 0 1px 0 var(--card-border); }
+.stage-current { color: var(--fg); font-weight: 500; }
+.stage-mark { width: 18px; display: grid; place-items: center; flex-shrink: 0; }
+.stage-mark :global(.icon) { font-size: 18px; color: var(--green); }
+.stage-ring { width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid var(--subtle); }
+.stage-current .stage-ring { border-color: var(--accent); border-top-color: transparent; animation: stage-spin 0.9s linear infinite; }
+.stage-name { flex: 1; min-width: 0; }
+.stages-error { margin: 0; font-size: 12px; color: var(--critical); }
+.stage-count { font: 12px var(--mono); font-variant-numeric: tabular-nums; color: var(--muted); }
+@keyframes stage-spin { to { rotate: 360deg; } }
+@media (prefers-reduced-motion: reduce) { .stage-current .stage-ring { animation: none; } }
 
 @media (max-width: 1100px) {
   .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }

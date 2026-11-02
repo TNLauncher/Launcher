@@ -8,6 +8,7 @@ import { useLauncher, useProgress, useRecentInstances, useSelectedInstance } fro
 import { usePluginTabs } from "@/hooks/useSource";
 import { openInstanceTab } from "@/store/instanceTab";
 import { useUi } from "@/store/UiContext";
+import { LaunchProgressDialog } from "./LaunchProgressDialog";
 import s from "./home.module.css";
 
 export function LaunchDock() {
@@ -56,11 +57,14 @@ function DockAction() {
   const openNewInstance = useUi((st) => st.openNewInstance);
   const stopping = useGameStopping(inst?.id);
   const [stopError, setStopError] = useState<string | null>(null);
+  const [details, setDetails] = useState(false);
   const statusId = useId();
   const crashTabs = usePluginTabs("crash");
   const preparing = !!inst && busyId === inst.id;
-  const known = !!progress && progress.total > 0;
-  const pct = known ? progress.done / progress.total : 0;
+  // A finished or cancelled launch closes its dialog; the next one starts closed.
+  if (!preparing && details) setDetails(false);
+  const pct = progress?.overall ?? 0;
+  const known = pct > 0;
 
   const failure = stopError ?? (inst && error?.id === inst.id ? error.message : null);
   let status = "";
@@ -96,8 +100,8 @@ function DockAction() {
     );
   } else if (preparing) {
     action = (
-      <Button key="busy" variant="primary" size="lg" className={cx(s.play, swap, s.playBusy, !known && s.playSweep)} disabled aria-busy="true"
-        style={{ "--p": pct } as CSSProperties}>
+      <Button key="busy" variant="primary" size="lg" className={cx(s.play, swap, s.playBusy, !known && s.playSweep)} aria-busy="true"
+        aria-haspopup="dialog" style={{ "--p": pct } as CSSProperties} onClick={() => setDetails(true)}>
         {progress ? STAGE_LABEL[progress.stage] : "Starting"}
         {known && <span className={cx(s.playPct, "mono")}>{Math.floor(pct * 100)}%</span>}
       </Button>
@@ -129,6 +133,7 @@ function DockAction() {
         <span id={statusId} className={cx(s.status, preparing && s.statusSr, running && s.live)} role="status" title={status}>{status}</span>
       )}
       {action}
+      {inst && progress && <LaunchProgressDialog open={preparing && details} onClose={() => setDetails(false)} inst={inst} progress={progress} />}
     </div>
   );
 }

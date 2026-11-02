@@ -70,6 +70,8 @@ export const launcher = {
   onGameExit: (cb: (e: GameExit) => void): Promise<UnlistenFn> => listen<GameExit>("game-exit", (e) => cb(e.payload)),
   /** Every line the game prints, from any running instance. */
   onGameLog: (cb: (e: GameLog) => void): Promise<UnlistenFn> => listen<GameLog>("game-log", (e) => cb(e.payload)),
+  /** Stops `launch` while it installs; it then rejects with kind `cancelled`. */
+  cancelLaunch: (id: string) => call<void>("cancel_launch", { id }),
   stopGame: (id: string) => call<void>("stop_game", { id }),
   /** The last session's `launcher.log` (its tail if huge); "" if never launched. */
   readGameLog: (id: string) => call<string>("read_game_log", { id }),

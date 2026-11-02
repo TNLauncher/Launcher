@@ -13,6 +13,31 @@ export const STAGE_LABEL: Record<Stage, string> = {
   starting: "Starting",
 };
 
+/** The stages a launch downloads through, with each one's share of the whole bar. */
+const GAME_STAGES: [Stage, number][] = [["java", 0.15], ["loader", 0.1], ["libraries", 0.25], ["assets", 0.5]];
+const RUNTIME_STAGES: [Stage, number][] = [["runtime", 0.3], ["java", 0.1], ["libraries", 0.15], ["assets", 0.3], ["preparing", 0.15]];
+export const launchStages = (runtime: boolean) => (runtime ? RUNTIME_STAGES : GAME_STAGES);
+
+export interface LaunchProgress {
+  stage: Stage;
+  done: number;
+  total: number;
+  /** The whole launch in 0..1; never goes back. */
+  overall: number;
+  /** Index in `launchStages` of the furthest stage reached; -1 before the first. */
+  step: number;
+}
+
+/** Folds one backend tick into the launch's overall progress. Stages outside the list (resolving) keep the last value. */
+export function advance(prev: LaunchProgress, tick: { stage: Stage; done: number; total: number }, stages: [Stage, number][]): LaunchProgress {
+  if (tick.stage === "starting") return { ...tick, overall: 1, step: stages.length };
+  const i = stages.findIndex(([st]) => st === tick.stage);
+  if (i < 0) return { ...tick, overall: prev.overall, step: prev.step };
+  const from = stages.slice(0, i).reduce((sum, [, w]) => sum + w, 0);
+  const part = tick.total ? Math.min(tick.done / tick.total, 1) : 0;
+  return { ...tick, overall: Math.max(prev.overall, from + stages[i][1] * part), step: Math.max(prev.step, i) };
+}
+
 export function lastPlayed(ts: number): string {
   if (!ts) return "Never played";
   const s = Date.now() / 1000 - ts;

@@ -7,14 +7,10 @@ import { broadcast } from "@/plugins/bridge";
 import { gameLogs } from "./gameLogs";
 import { imports, type PackHit, type PendingImport } from "./imports";
 import { sources, type Version } from "@/api/sources";
-import { errorMessage, recency } from "@/lib/format";
-import type { ImportProgress, Instance, Settings, Snapshot, Stage } from "@/types";
+import { advance, errorMessage, launchStages, recency, type LaunchProgress } from "@/lib/format";
+import type { ImportProgress, Instance, Settings, Snapshot } from "@/types";
 
-export interface Progress {
-  stage: Stage;
-  done: number;
-  total: number;
-}
+export type Progress = LaunchProgress;
 
 export interface LaunchError {
   id: string;
@@ -42,7 +38,7 @@ export interface LauncherState {
   startFileImport(path: string): void;
 }
 
-const STARTING: Progress = { stage: "resolving", done: 0, total: 0 };
+const STARTING: Progress = { stage: "resolving", done: 0, total: 0, overall: 0, step: -1 };
 const SELECTED_KEY = "selected";
 
 function readSelected(): string {
@@ -85,10 +81,11 @@ export const useLauncher = create<LauncherState>((set, get) => ({
     gameLogs.reset(id);
     // Backend reports every downloaded file (thousands for assets): commit at most once per frame.
     let latest = STARTING;
+    const stages = launchStages(!!get().snapshot?.instances.find((i) => i.id === id)?.runtime);
     try {
       await launcher.launch(id, (e) => {
         if (e.event !== "progress") return;
-        latest = e.data;
+        latest = advance(latest, e.data, stages);
         frame ||= requestAnimationFrame(() => {
           frame = 0;
           set({ progress: latest });
@@ -97,7 +94,7 @@ export const useLauncher = create<LauncherState>((set, get) => ({
       broadcast("game-started", { instanceId: id });
     } catch (e) {
       broadcast("game-exited", { instanceId: id, code: null });
-      set({ error: { id, message: errorMessage(e) } });
+      if (!(e instanceof BackendError && e.kind === "cancelled")) set({ error: { id, message: errorMessage(e) } });
     } finally {
       cancelAnimationFrame(frame);
       frame = 0;
