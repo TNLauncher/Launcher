@@ -17,7 +17,7 @@ pub struct AppState {
     /// Live game processes by instance id; held so the UI can stop them.
     pub games: Mutex<HashMap<String, Child>>,
     /// Modpack imports in flight by project id; aborting one cancels it.
-    pub imports: Mutex<HashMap<String, futures::future::AbortHandle>>,
+    pub imports: Mutex<HashMap<String, futures_util::future::AbortHandle>>,
     pub plugins: RwLock<Registry>,
 }
 

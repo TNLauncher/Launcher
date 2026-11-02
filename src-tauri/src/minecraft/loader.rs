@@ -143,7 +143,7 @@ pub async fn builds(c: &reqwest::Client, game: &str, loader: Loader) -> Result<V
                 .collect()
         }
         Loader::Forge => {
-            let (meta, promos) = futures::try_join!(get_json(c, FORGE_METADATA), get_json(c, FORGE_PROMOS))?;
+            let (meta, promos) = futures_util::try_join!(get_json(c, FORGE_METADATA), get_json(c, FORGE_PROMOS))?;
             let recommended = promos["promos"][format!("{game}-recommended")].as_str().unwrap_or_default().to_string();
             strings(&meta[game])
                 .filter_map(|v| v.strip_prefix(&format!("{game}-")))

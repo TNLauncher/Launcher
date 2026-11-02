@@ -1,5 +1,5 @@
 use crate::error::{AppError, Result};
-use futures::{stream, StreamExt};
+use futures_util::{stream, StreamExt};
 use serde_json::Value;
 use sha1::{Digest, Sha1};
 use std::path::{Path, PathBuf};

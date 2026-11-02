@@ -12,7 +12,7 @@ use crate::paths::safe_rel;
 use crate::services::instances;
 use crate::state::AppState;
 use base64::{engine::general_purpose::STANDARD, Engine};
-use futures::future::{AbortHandle, Abortable};
+use futures_util::future::{AbortHandle, Abortable};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::io::{Cursor, Read, Seek};
@@ -343,7 +343,7 @@ async fn unpack(
     let ticked = |done: usize, total: usize| update(&|p| (p.done, p.total) = (done, total));
     let moved = |i: usize| update(&|p| p.manual[i].done = true);
     // The user fetches blocked files while the rest downloads.
-    let (downloaded, collected) = futures::join!(http::download_all(&state.http, jobs, http::Check::Size, &ticked), collect_manual(&manual, downloads, &dir, &moved));
+    let (downloaded, collected) = futures_util::join!(http::download_all(&state.http, jobs, http::Check::Size, &ticked), collect_manual(&manual, downloads, &dir, &moved));
     downloaded?;
     collected?;
     extract_overrides(archive, &dir, &plan.overrides)?;
