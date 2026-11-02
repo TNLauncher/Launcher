@@ -10,7 +10,7 @@ import { call } from "@/api/ipc";
 interface PluginCall {
   id: number;
   plugin: string;
-  /** What the plugin registered: `source` or `account`. */
+  /** What the plugin registered: `source`, `account`, `importer` or `runtime`. */
   target: string;
   method: string;
   args: unknown[];

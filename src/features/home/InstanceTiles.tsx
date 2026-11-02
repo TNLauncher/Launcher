@@ -1,7 +1,7 @@
 import { Button, Icon, SectionHead } from "@/components/ui";
 import { useChanged } from "@/hooks/useChanged";
 import { cx } from "@/lib/cx";
-import { LOADER_ICON, LOADERS } from "@/lib/format";
+import { loaderIcon, loaderName } from "@/lib/format";
 import { useLauncher, useRecentInstances, useSelectedInstance } from "@/store/LauncherContext";
 import { useUi } from "@/store/UiContext";
 import s from "./home.module.css";
@@ -27,10 +27,10 @@ export function InstanceTiles() {
       <div className={cx(s.tiles, picked && s.picked)}>
         {recent.slice(0, 3).map((i) => (
           <button key={i.id} className={cx(s.tile, "sheen")} aria-pressed={i.id === selected?.id} onClick={() => select(i.id)}>
-            <span className={s.tileIcon}>{i.icon ? <img src={i.icon} alt="" /> : <Icon name={LOADER_ICON[i.loader]} />}</span>
+            <span className={s.tileIcon}>{i.icon ? <img src={i.icon} alt="" /> : <Icon name={loaderIcon(i)} />}</span>
             <span className={s.tileText}>
               <span className={s.tileName}>{i.name}</span>
-              <span className={s.tileSub}>{i.version} · {LOADERS[i.loader]}</span>
+              <span className={s.tileSub}>{i.version} · {loaderName(i)}</span>
             </span>
           </button>
         ))}

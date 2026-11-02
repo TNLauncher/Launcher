@@ -8,6 +8,8 @@ export const STAGE_LABEL: Record<Stage, string> = {
   loader: "Installing mod loader",
   libraries: "Libraries",
   assets: "Assets",
+  runtime: "Installing game",
+  preparing: "Preparing game",
   starting: "Starting",
 };
 
@@ -27,7 +29,11 @@ export const playTime = (sec: number) =>
 /** Sort key for "recent": last launch, or creation for never-played instances. */
 export const recency = (i: Instance) => Math.max(i.lastPlayed, i.created);
 
-export const loaderLabel = (i: Instance) => (i.loader === "vanilla" ? "Vanilla" : `${LOADERS[i.loader]} ${i.loaderVersion}`);
+export const loaderLabel = (i: Instance) => (i.runtime ? `${i.runtime.name} ${i.runtime.version}` : i.loader === "vanilla" ? "Vanilla" : `${LOADERS[i.loader]} ${i.loaderVersion}`);
+/** The loader's name, or the runtime's for instances a plugin's game runs. */
+export const loaderName = (i: Instance) => i.runtime?.name ?? LOADERS[i.loader];
+/** Icon of an instance without its own: its loader's, or a runtime's. */
+export const loaderIcon = (i: Instance) => (i.runtime ? "rocket_launch" : LOADER_ICON[i.loader]);
 
 export const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 

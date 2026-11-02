@@ -36,6 +36,23 @@ export interface Instance {
   settings: InstanceSettings;
   /** Group it is listed under; "" = ungrouped. */
   group: string;
+  /** A game runtime plugin's build that runs instead of Java Minecraft; null = Java Minecraft. */
+  runtime: RuntimeRef | null;
+}
+
+export interface RuntimeRef {
+  plugin: string;
+  /** The plugin's name when the instance was made. */
+  name: string;
+  version: string;
+}
+
+/** A build a game runtime plugin offers. */
+export interface RuntimeVersion {
+  id: string;
+  /** The Minecraft version it plays. */
+  minecraft: string;
+  stable: boolean;
 }
 
 /** Overrides of the global Settings; null = use the global value. */
@@ -119,7 +136,7 @@ export interface DeviceCode {
   verificationUri: string;
 }
 
-export type Stage = "resolving" | "java" | "loader" | "libraries" | "assets" | "starting";
+export type Stage = "resolving" | "java" | "loader" | "libraries" | "assets" | "runtime" | "preparing" | "starting";
 
 export type LaunchEvent =
   | { event: "progress"; data: { stage: Stage; done: number; total: number } }

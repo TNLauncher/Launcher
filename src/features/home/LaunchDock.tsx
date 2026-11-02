@@ -2,7 +2,7 @@ import { useId, useState, type CSSProperties } from "react";
 import { Button, Icon, IconButton, Select } from "@/components/ui";
 import { useChanged } from "@/hooks/useChanged";
 import { cx } from "@/lib/cx";
-import { errorMessage, LOADER_ICON, LOADERS, lastPlayed, STAGE_LABEL } from "@/lib/format";
+import { errorMessage, lastPlayed, loaderIcon, loaderName, STAGE_LABEL } from "@/lib/format";
 import { gameLogs, useGameStopping } from "@/store/gameLogs";
 import { useLauncher, useProgress, useRecentInstances, useSelectedInstance } from "@/store/LauncherContext";
 import { usePluginTabs } from "@/hooks/useSource";
@@ -31,10 +31,10 @@ function DockInstance() {
     <div className={s.dockLeft}>
       <Select label="Instance" variant="pill" className={s.card} value={inst.id} onChange={select}
         options={instances.map((i) => ({ value: i.id, label: i.name, hint: i.version }))}>
-        <span className={s.cardIcon}>{inst.icon ? <img src={inst.icon} alt="" /> : <Icon name={LOADER_ICON[inst.loader]} />}</span>
+        <span className={s.cardIcon}>{inst.icon ? <img src={inst.icon} alt="" /> : <Icon name={loaderIcon(inst)} />}</span>
         <span className={s.cardText}>
           <span className={s.cardName}>{inst.name}</span>
-          <span className={s.cardSub}>{inst.version} · {LOADERS[inst.loader]}{ramGb > 0 && ` · ${ramGb} GB`}</span>
+          <span className={s.cardSub}>{inst.version} · {loaderName(inst)}{ramGb > 0 && ` · ${ramGb} GB`}</span>
         </span>
       </Select>
       <IconButton icon="article" label="Open logs" onClick={() => openInstanceTab(inst.id, "logs")} />

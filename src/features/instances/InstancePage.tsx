@@ -6,7 +6,7 @@ import { cx } from "@/lib/cx";
 import { InstanceContent } from "@/features/content/InstanceContent";
 import { UpdateDialog } from "@/features/content/UpdateDialog";
 import { useInstanceBulkUpdate } from "@/features/content/useContent";
-import { lastPlayed, LOADER_ICON, loaderLabel, playTime } from "@/lib/format";
+import { lastPlayed, loaderIcon, loaderLabel, playTime } from "@/lib/format";
 import { usePluginTabs, useSourceEnabled } from "@/hooks/useSource";
 import { openInstanceTab } from "@/store/instanceTab";
 import { useLauncher } from "@/store/LauncherContext";
@@ -42,7 +42,7 @@ export function InstancePage({ instance: i, onBack }: { instance: Instance; onBa
             {backLabel}
           </Button>
           <div className={s.packHeroMain}>
-            <span className={cx(s.packIcon, s.big)}>{icon ? <img src={icon} alt="" /> : <Icon name={LOADER_ICON[i.loader]} />}</span>
+            <span className={cx(s.packIcon, s.big)}>{icon ? <img src={icon} alt="" /> : <Icon name={loaderIcon(i)} />}</span>
             <div className={s.packHeroText}>
               <h1>{i.name}</h1>
               <div className={s.packMeta}>

@@ -2,7 +2,7 @@ import { memo, useEffect, useState } from "react";
 import { launcher } from "@/api/launcher";
 import { Button, Chip, ConfirmDialog, Dialog, Dot, Icon, IconButton, Input, Menu, Meta, toast } from "@/components/ui";
 import { cx } from "@/lib/cx";
-import { errorMessage, lastPlayed, LOADER_ICON, loaderLabel, playTime, plural } from "@/lib/format";
+import { errorMessage, lastPlayed, loaderIcon, loaderLabel, playTime, plural } from "@/lib/format";
 import { useLauncher } from "@/store/LauncherContext";
 import { openInstanceTab } from "@/store/instanceTab";
 import type { Instance } from "@/types";
@@ -55,7 +55,7 @@ export const InstanceRow = memo(function InstanceRow({ instance: i, groups, onOp
     >
       <div className={s.rowMain}>
         <label className={s.rowIcon} title="Change icon">
-          {i.icon ? <img src={i.icon} alt="" /> : <Icon name={LOADER_ICON[i.loader]} />}
+          {i.icon ? <img src={i.icon} alt="" /> : <Icon name={loaderIcon(i)} />}
           {running && <Dot tone="blue" className={s.runningDot} />}
           <input
             type="file"

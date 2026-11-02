@@ -3,7 +3,7 @@ import { launcher } from "@/api/launcher";
 import hero from "@/assets/hero.jpg";
 import { Button, Icon, Meta } from "@/components/ui";
 import { useBlobUrl } from "@/hooks/useBlobUrl";
-import { loaderLabel, LOADER_ICON } from "@/lib/format";
+import { loaderIcon, loaderLabel } from "@/lib/format";
 import { useLauncher, useSelectedInstance } from "@/store/LauncherContext";
 import { useUi } from "@/store/UiContext";
 import type { Instance } from "@/types";
@@ -55,7 +55,7 @@ function Stage({ inst }: { inst: Instance }) {
         </Button>
       </div>
       <div className={s.stageBody}>
-        <span className={s.stageIcon}>{inst.icon ? <img src={inst.icon} alt="" /> : <Icon name={LOADER_ICON[inst.loader]} />}</span>
+        <span className={s.stageIcon}>{inst.icon ? <img src={inst.icon} alt="" /> : <Icon name={loaderIcon(inst)} />}</span>
         <h1>{inst.name}</h1>
         <Meta items={[<span>Minecraft {inst.version}</span>, <span>{loaderLabel(inst)}</span>]} />
       </div>

@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { launcher } from "@/api/launcher";
 import { SectionHead } from "@/components/ui";
-import { LOADERS } from "@/lib/format";
+import { loaderLabel } from "@/lib/format";
 import { useLauncher } from "@/store/LauncherContext";
 import type { ContentKind, Instance } from "@/types";
 import s from "./home.module.css";
@@ -18,11 +18,12 @@ export function InstanceSpec({ inst }: { inst: Instance }) {
   const modded = inst.loader !== "vanilla";
 
   const rows: (false | [string, ReactNode])[] = [
-    ["Loader", modded ? `${LOADERS[inst.loader]} ${inst.loaderVersion}` : "Vanilla"],
+    [inst.runtime ? "Game" : "Loader", loaderLabel(inst)],
     modded && ["Mods", <Count id={inst.id} kind="mod" />],
     ["Resource packs", <Count id={inst.id} kind="resourcepack" />],
     ["Shaders", <Count id={inst.id} kind="shader" />],
-    ["Memory", ramMb ? `${+(ramMb / 1024).toFixed(1)} GB` : "Default"],
+    // A runtime's game is not a JVM: the memory setting does not reach it.
+    !inst.runtime && ["Memory", ramMb ? `${+(ramMb / 1024).toFixed(1)} GB` : "Default"],
     ["Java", java ? <span title={java}>{java.split(/[\\/]/).slice(-3).join("/")}</span> : "Bundled runtime"],
     ["Play time", inst.playSeconds ? hours(inst.playSeconds) : "None yet"],
     ["Source", inst.pack ? `Modpack ${inst.pack.version}` : "Made by hand"],

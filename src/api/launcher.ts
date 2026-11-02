@@ -2,7 +2,7 @@
 import { Channel } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { call } from "./ipc";
-import type { Account, ContentKind, DeviceCode, GameExit, GameLog, ImportProgress, Instance, InstanceSettings, LaunchEvent, Loader, LoaderBuild, ModFile, Screenshot, Settings, Skin, Snapshot, World } from "@/types";
+import type { Account, ContentKind, DeviceCode, GameExit, GameLog, ImportProgress, Instance, InstanceSettings, LaunchEvent, Loader, LoaderBuild, ModFile, RuntimeVersion, Screenshot, Settings, Skin, Snapshot, World } from "@/types";
 
 export const launcher = {
   getState: () => call<Snapshot>("get_state"),
@@ -25,6 +25,10 @@ export const launcher = {
   /** `loaderVersion: null` = the loader's newest stable build. */
   createInstance: (name: string, version: string, loader: Loader, loaderVersion: string | null) =>
     call<Instance>("create_instance", { name, version, loader, loaderVersion }),
+  /** An instance that plays build `version` of the game runtime plugin `plugin`. */
+  createRuntimeInstance: (name: string, plugin: string, version: string) => call<Instance>("create_runtime_instance", { name, plugin, version }),
+  /** Builds a game runtime plugin offers, newest first. */
+  runtimeVersions: (plugin: string) => call<RuntimeVersion[]>("runtime_versions", { plugin }),
   /** Game versions the loader runs; null = all (vanilla). */
   loaderGames: (loader: Loader) => call<string[] | null>("loader_games", { loader }),
   /** Loader builds for a game version, newest first. */
