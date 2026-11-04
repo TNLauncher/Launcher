@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { sources, type PluginEntry, type StoreEntry } from "@/api/sources";
 import { View } from "@/components/layout/View";
-import { Button, ConfirmDialog, EmptyState, Icon, IconButton, Input, Select, Switch, Tab, Tabs } from "@/components/ui";
+import { Banner, Button, ConfirmDialog, EmptyState, Icon, IconButton, Input, Select, Switch, Tab, Tabs } from "@/components/ui";
 import { usePlugins } from "@/hooks/useSource";
 import { isNewer, usePluginStore, usePluginUpdateCount } from "@/hooks/useUpdates";
 import { cx } from "@/lib/cx";
@@ -73,9 +73,7 @@ export function PluginsView() {
         </div>
       </header>
 
-      {(error || plugins.error) && (
-        <p className={s.error} role="alert"><Icon name="error" />{error || errorMessage(plugins.error)}</p>
-      )}
+      {(error || plugins.error) && <Banner message={error || errorMessage(plugins.error)} onDismiss={() => setError("")} />}
 
       <Tabs label="Plugins">
         <Tab selected={tab === "installed"} onSelect={() => setTab("installed")} icon="extension" count={list.length || null}>Installed</Tab>

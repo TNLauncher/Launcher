@@ -1,16 +1,9 @@
 import { useRef, useState } from "react";
 import { Button, Dialog, Icon } from "@/components/ui";
 import { cx } from "@/lib/cx";
-import { plural } from "@/lib/format";
-import type { ContentKind } from "@/types";
+import { CONTENT_KINDS, plural } from "@/lib/format";
 import { candidateKey, type UpdateCandidate } from "./useContent";
 import s from "./UpdateDialog.module.css";
-
-const GROUPS: Record<ContentKind, { label: string; icon: string }> = {
-  mod: { label: "Mods", icon: "extension" },
-  resourcepack: { label: "Resource packs", icon: "texture" },
-  shader: { label: "Shaders", icon: "wb_twilight" },
-};
 
 /** Prism-style review before updating: every outdated file with its version jump, all picked by default. */
 export function UpdateDialog({ candidates, onClose, onConfirm }: { candidates: UpdateCandidate[] | null; onClose(): void; onConfirm(picked: UpdateCandidate[]): void }) {
@@ -70,11 +63,11 @@ export function UpdateDialog({ candidates, onClose, onConfirm }: { candidates: U
         {kinds.map((kind) => {
           const group = list.filter((c) => c.kind === kind);
           return (
-            <section key={kind} className={s.group} aria-label={GROUPS[kind].label}>
+            <section key={kind} className={s.group} aria-label={CONTENT_KINDS[kind].label}>
               {kinds.length > 1 && (
                 <h3 className={s.groupHead}>
-                  <Icon name={GROUPS[kind].icon} />
-                  {GROUPS[kind].label}
+                  <Icon name={CONTENT_KINDS[kind].icon} />
+                  {CONTENT_KINDS[kind].label}
                   <span className={s.groupCount}>{group.length}</span>
                 </h3>
               )}
@@ -84,7 +77,7 @@ export function UpdateDialog({ candidates, onClose, onConfirm }: { candidates: U
                 return (
                   <label key={key} className={cx(s.row, !on && s.off)}>
                     <input type="checkbox" className={s.box} checked={on} onChange={() => toggle(key)} />
-                    <span className={s.icon}>{c.project.iconUrl ? <img src={c.project.iconUrl} alt="" loading="lazy" /> : <Icon name={GROUPS[kind].icon} />}</span>
+                    <span className={s.icon}>{c.project.iconUrl ? <img src={c.project.iconUrl} alt="" loading="lazy" /> : <Icon name={CONTENT_KINDS[kind].icon} />}</span>
                     <span className={s.text}>
                       <span className={s.title}>{c.project.title}</span>
                       <span className={s.file} title={c.file}>{c.file}</span>

@@ -11,7 +11,7 @@ import { Worlds } from "@/features/worlds/Worlds";
 import { useDebounced } from "@/hooks/useDebounced";
 import { useFavorites, usePlugins, useSource } from "@/hooks/useSource";
 import { cx } from "@/lib/cx";
-import { compact, errorMessage, megabytes, plural } from "@/lib/format";
+import { compact, CONTENT_KINDS as KINDS, errorMessage, megabytes, plural } from "@/lib/format";
 import { pluginBase } from "@/plugins/bridge";
 import { useBlobUrl } from "@/hooks/useBlobUrl";
 import { PluginFrame } from "@/plugins/PluginHost";
@@ -27,34 +27,6 @@ import { label, useContent, type ContentItem, type UpdateCandidate } from "./use
 const loadContentDetail = () => import("./ContentDetail");
 const ContentDetail = lazy(() => loadContentDetail().then((m) => ({ default: m.ContentDetail })));
 
-interface KindInfo {
-  label: string;
-  /** Lower-case noun for sentences. */
-  noun: string;
-  icon: string;
-  folder: string;
-}
-
-const KINDS: Record<ContentKind, KindInfo> = {
-  mod: {
-    label: "Mods",
-    noun: "mods",
-    icon: "extension",
-    folder: "mods",
-  },
-  resourcepack: {
-    label: "Resource packs",
-    noun: "resource packs",
-    icon: "texture",
-    folder: "resourcepacks",
-  },
-  shader: {
-    label: "Shaders",
-    noun: "shaders",
-    icon: "wb_twilight",
-    folder: "shaderpacks",
-  },
-};
 const ORDER: ContentKind[] = ["mod", "resourcepack", "shader"];
 /** Iris, the Fabric/Quilt shader loader, on Modrinth. */
 const IRIS = { source: "modrinth", project: "YL57xq9U" };

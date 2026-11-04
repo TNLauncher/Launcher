@@ -1,6 +1,8 @@
-import type { Instance, Loader, Stage } from "@/types";
+import type { ContentKind, Instance, Loader, Stage } from "@/types";
 
 export const LOADERS: Record<Loader, string> = { vanilla: "Vanilla", fabric: "Fabric", quilt: "Quilt", forge: "Forge", neoforge: "NeoForge", liteloader: "LiteLoader" };
+/** Loader ids from a content source, which may name ones the launcher does not know. */
+export const loaderList = (ids: string[]) => ids.map((l) => (LOADERS as Record<string, string>)[l] ?? l).join(", ");
 export const LOADER_ICON: Record<Loader, string> = { vanilla: "deployed_code", fabric: "texture", quilt: "grid_view", forge: "construction", neoforge: "hardware", liteloader: "lightbulb" };
 export const STAGE_LABEL: Record<Stage, string> = {
   resolving: "Resolving version",
@@ -60,6 +62,12 @@ export const loaderName = (i: Instance) => i.runtime?.name ?? LOADERS[i.loader];
 /** Icon of an instance without its own: its loader's, or a runtime's. */
 export const loaderIcon = (i: Instance) => (i.runtime ? "rocket_launch" : LOADER_ICON[i.loader]);
 
+export const CONTENT_KINDS: Record<ContentKind, { label: string; one: string; noun: string; icon: string; folder: string }> = {
+  mod: { label: "Mods", one: "mod", noun: "mods", icon: "extension", folder: "mods" },
+  resourcepack: { label: "Resource packs", one: "resource pack", noun: "resource packs", icon: "texture", folder: "resourcepacks" },
+  shader: { label: "Shaders", one: "shader", noun: "shaders", icon: "wb_twilight", folder: "shaderpacks" },
+};
+
 export const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 export const compact = (n: number) => new Intl.NumberFormat("en", { notation: "compact" }).format(n);
@@ -68,6 +76,8 @@ export const megabytes = (bytes: number) => `${(bytes / 1048576).toFixed(1)} MB`
 
 const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
 const STEPS: [Intl.RelativeTimeFormatUnit, number][] = [["year", 31536000], ["month", 2592000], ["week", 604800], ["day", 86400], ["hour", 3600], ["minute", 60]];
+
+export const dateLabel = (iso: string) => new Date(iso).toLocaleDateString("en", { year: "numeric", month: "short", day: "numeric" });
 
 /** "3 days ago" for an ISO date. */
 export function ago(iso: string): string {

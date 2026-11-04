@@ -2,15 +2,16 @@ import { useQuery } from "@tanstack/react-query";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { launcher } from "@/api/launcher";
-import { primaryFile, sources, type GalleryImage, type Hit, type Project, type SourceInfo, type Version } from "@/api/sources";
+import { primaryFile, sources, type Hit, type SourceInfo, type Version } from "@/api/sources";
 import { useBackLabel } from "@/components/layout/Sidebar";
-import { Banner, Button, Chip, ConfirmDialog, Dialog, EmptyState, Field, Icon, IconButton, Select, Skeleton, Switch, Tab, Tabs, toast } from "@/components/ui";
+import { Banner, Button, Chip, ConfirmDialog, Field, Icon, IconButton, Select, Switch, Tab, Tabs, toast } from "@/components/ui";
 import { Markdown } from "@/components/ui/Markdown";
+import { About, Gallery, TextSkeleton, VersionList } from "@/features/modpacks/detail";
 import { packColor } from "@/features/modpacks/ModpacksView";
 import s from "@/features/modpacks/modpacks.module.css";
 import { useFavorites } from "@/hooks/useSource";
 import { cx } from "@/lib/cx";
-import { ago, compact, errorMessage, LOADERS, loaderLabel, megabytes } from "@/lib/format";
+import { ago, compact, CONTENT_KINDS, dateLabel, errorMessage, loaderLabel, loaderList, megabytes } from "@/lib/format";
 import { useLauncher } from "@/store/LauncherContext";
 import { useRouteState, type ContentTarget } from "@/store/UiContext";
 import type { ContentKind, Instance } from "@/types";
@@ -18,11 +19,6 @@ import cs from "./content.module.css";
 import { fetchCompatibleVersions, label, useContent, type ContentItem } from "./useContent";
 
 type Section = "description" | "gallery" | "versions";
-const LOADER_NAME: Record<string, string> = LOADERS;
-const KIND_ICON: Record<ContentKind, string> = { mod: "extension", resourcepack: "texture", shader: "wb_twilight" };
-const KIND_NOUN: Record<ContentKind, string> = { mod: "mod", resourcepack: "resource pack", shader: "shader" };
-
-const dateLabel = (iso: string) => new Date(iso).toLocaleDateString("en", { year: "numeric", month: "short", day: "numeric" });
 
 /** Full in-app page for a mod, resource pack, or shader inside an instance. */
 export function ContentDetail({
@@ -111,7 +107,7 @@ export function ContentDetail({
           </div>
           <div className={s.packHeroMain}>
             <span className={cx(s.packIcon, s.big)}>
-              {iconUrl ? <img src={iconUrl} alt="" /> : <Icon name={KIND_ICON[kind]} />}
+              {iconUrl ? <img src={iconUrl} alt="" /> : <Icon name={CONTENT_KINDS[kind].icon} />}
             </span>
             <div className={s.packHeroText}>
               <h1>{title}</h1>
@@ -165,7 +161,7 @@ export function ContentDetail({
           </Tabs>
           <div role="tabpanel">
             {project.isError ? (
-              <Banner message={`Could not load this ${KIND_NOUN[kind]}: ${errorMessage(project.error)}`} onRetry={() => project.refetch()} />
+              <Banner message={`Could not load this ${CONTENT_KINDS[kind].one}: ${errorMessage(project.error)}`} onRetry={() => project.refetch()} />
             ) : tab === "description" ? (
               project.data ? <Markdown source={project.data.body} /> : <TextSkeleton />
             ) : tab === "gallery" ? (
@@ -174,6 +170,7 @@ export function ContentDetail({
               <VersionList
                 versions={all}
                 loading={versions.isPending}
+                empty="No compatible versions found."
                 installedVersionId={installedItem?.currentVersion?.id}
                 selected={selectedVersion}
                 onSelect={(v) => setVersionId(v.id)}
@@ -369,7 +366,7 @@ function ManageCard(p: {
               {selectedVersion.loaders.length > 0 && (
                 <>
                   <dt>Loaders</dt>
-                  <dd>{selectedVersion.loaders.map((l) => LOADER_NAME[l] ?? l).join(", ")}</dd>
+                  <dd>{loaderList(selectedVersion.loaders)}</dd>
                 </>
               )}
               <dt>Released</dt>
@@ -516,145 +513,6 @@ function DependenciesCard({
           );
         })}
       </div>
-    </div>
-  );
-}
-
-function About({ project: p }: { project: Project }) {
-  return (
-    <div className={s.sideCard}>
-      <h2>About</h2>
-      <dl className={s.installFacts}>
-        {p.published && (
-          <>
-            <dt>Published</dt>
-            <dd>{dateLabel(p.published)}</dd>
-          </>
-        )}
-        {p.license && (
-          <>
-            <dt>License</dt>
-            <dd>{p.license}</dd>
-          </>
-        )}
-      </dl>
-      <div className={s.sideLinks}>
-        {p.links.map((l) => (
-          <button key={l.label} className={s.sideLink} onClick={() => openUrl(l.url)}>
-            <Icon name={l.icon} />
-            {l.label}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function Gallery({ images }: { images: GalleryImage[] }) {
-  const [index, setIndex] = useState<number | null>(null);
-  const close = () => setIndex(null);
-  const shown = index == null ? null : images[index];
-  const step = (d: number) => setIndex((i) => (i == null ? i : (i + d + images.length) % images.length));
-
-  return (
-    <>
-      <div className={s.gallery}>
-        {images.map((img, i) => (
-          <button key={img.url} className={s.galleryItem} onClick={() => setIndex(i)}>
-            <img src={img.url} alt={img.title ?? ""} loading="lazy" />
-            {img.title && <span>{img.title}</span>}
-          </button>
-        ))}
-      </div>
-      <Dialog
-        open={index != null}
-        className={s.lightbox}
-        aria-label="Screenshot"
-        onClose={close}
-        onKeyDown={(e) => {
-          if (e.key === "ArrowRight") step(1);
-          if (e.key === "ArrowLeft") step(-1);
-        }}
-        onClick={(e) => e.target === e.currentTarget && close()}
-      >
-        {shown && (
-          <figure>
-            <img src={shown.rawUrl} alt={shown.title ?? ""} />
-            <figcaption>
-              <div>
-                {shown.title && <b>{shown.title}</b>}
-                {shown.description && <span>{shown.description}</span>}
-              </div>
-              <div className={s.lightboxNav}>
-                <span className={cx(s.lightboxCount, "mono")}>
-                  {(index ?? 0) + 1} / {images.length}
-                </span>
-                <IconButton icon="chevron_left" label="Previous" onClick={() => step(-1)} />
-                <IconButton icon="chevron_right" label="Next" onClick={() => step(1)} />
-                <IconButton icon="close" label="Close" onClick={close} />
-              </div>
-            </figcaption>
-          </figure>
-        )}
-      </Dialog>
-    </>
-  );
-}
-
-function VersionList({
-  versions,
-  loading,
-  installedVersionId,
-  selected,
-  onSelect,
-}: {
-  versions: Version[];
-  loading: boolean;
-  installedVersionId?: string;
-  selected?: Version;
-  onSelect(v: Version): void;
-}) {
-  if (loading) return <TextSkeleton />;
-  if (!versions.length) return <EmptyState icon="history">No compatible versions found.</EmptyState>;
-  return (
-    <div className={s.versions}>
-      {versions.map((v) => {
-        const on = v.id === selected?.id;
-        const isInstalled = v.id === installedVersionId;
-        return (
-          <div key={v.id} className={cx(s.version, on && s.on)}>
-            <button className={s.versionHead} aria-expanded={on} onClick={() => onSelect(v)}>
-              <span className={cx(s.vtype, s[v.channel])} title={v.channel}>
-                {v.channel[0].toUpperCase()}
-              </span>
-              <span className={s.versionName}>
-                <b>{v.number}</b>
-                <span>{v.name}</span>
-              </span>
-              {isInstalled && <Chip variant="accent">Installed</Chip>}
-              <Chip variant="tag" className={s.versionTag}>
-                {v.gameVersions.join(", ")}
-              </Chip>
-              {v.loaders.length > 0 && <Chip>{v.loaders.map((l) => LOADER_NAME[l] ?? l).join(", ")}</Chip>}
-              <span className={s.versionDate}>{dateLabel(v.published)}</span>
-              {on && <Icon name="check_circle" fill className={s.versionCheck} />}
-            </button>
-            {on && (
-              <div className={s.versionBody}>
-                {v.changelog?.trim() ? <Markdown source={v.changelog} /> : <p className={s.note}>No changelog for this version.</p>}
-              </div>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function TextSkeleton() {
-  return (
-    <div className={s.textSkeleton}>
-      {[92, 100, 76, 0, 100, 88, 64].map((w, i) => (w ? <Skeleton key={i} className={s.line} height={12} width={`${w}%`} /> : <span key={i} />))}
     </div>
   );
 }
