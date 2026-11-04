@@ -1,15 +1,17 @@
 import { useQuery } from "@tanstack/react-query";
 import { launcher } from "@/api/launcher";
+import { sources } from "@/api/sources";
 import hero from "@/assets/hero.jpg";
 import { Button, Icon, Meta } from "@/components/ui";
 import { useBlobUrl } from "@/hooks/useBlobUrl";
+import { useSourceEnabled } from "@/hooks/useSource";
 import { loaderIcon, loaderLabel } from "@/lib/format";
 import { useLauncher, useSelectedInstance } from "@/store/LauncherContext";
 import { useUi } from "@/store/UiContext";
 import type { Instance } from "@/types";
 import s from "./home.module.css";
 
-/** The armed instance, staged on its newest screenshot (the bundled scene when it has none). */
+/** The armed instance, staged on its newest screenshot, else its modpack's cover, else the bundled scene. */
 export function Hero() {
   const inst = useSelectedInstance();
   const loaded = useLauncher((st) => st.snapshot !== null);
@@ -42,8 +44,14 @@ function Stage({ inst }: { inst: Instance }) {
   const shots = useQuery({ queryKey: ["screenshots", inst.id], queryFn: () => launcher.listScreenshots(inst.id) });
   const newest = shots.data?.[0];
   const shot = useBlobUrl(newest ? `${inst.id}/${newest.file}` : null, () => launcher.screenshot(inst.id, newest!.file));
-  // Hold the frame empty until we know whether there is a screenshot, so the bundled scene never flashes first.
-  const bg = shot ?? (shots.isPending || (newest && !shots.isError) ? null : hero);
+  const ref = inst.pack;
+  const sourceOn = useSourceEnabled(ref?.source);
+  // Same key as the instance page, so the cover is shared from cache.
+  const pack = useQuery({ queryKey: ["project", ref?.source, ref?.project], queryFn: () => sources.project(ref!.source, ref!.project), enabled: !!ref && sourceOn });
+  const cover = pack.data?.gallery.find((g) => g.featured)?.url ?? pack.data?.gallery[0]?.url;
+  // Hold the frame empty until we know what is there, so the bundled scene never flashes first.
+  const waiting = shots.isPending || (newest && !shots.isError) || pack.isLoading;
+  const bg = shot ?? (waiting ? null : (cover ?? hero));
 
   return (
     <div className={`${s.cell} ${s.stage}`}>
