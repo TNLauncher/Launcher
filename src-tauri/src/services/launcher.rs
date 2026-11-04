@@ -179,6 +179,8 @@ async fn run(app: &AppHandle, id: &str, world: Option<&str>, on_event: Channel<L
     if stdin.is_some() {
         cmd.stdin(Stdio::piped());
     }
+    #[cfg(windows)]
+    std::os::windows::process::CommandExt::creation_flags(&mut cmd, 0x0800_0000); // CREATE_NO_WINDOW: output is piped to the launcher log
     let mut child = cmd
         .spawn()
         .map_err(|e| AppError::Unsupported(format!("Could not start {:?}: {e}", cmd.get_program())))?;

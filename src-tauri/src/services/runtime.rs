@@ -197,6 +197,8 @@ async fn run_step(dir: &Path, step: &RuntimeStep, vars: &[(&str, PathBuf)], prog
     let command = |args: Vec<String>| {
         let mut c = tokio::process::Command::new(&program);
         c.current_dir(dir).args(args).stdin(Stdio::null()).kill_on_drop(true);
+        #[cfg(windows)]
+        c.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
         c
     };
     if let Some(check) = &step.check {
