@@ -21,6 +21,8 @@ pub struct Settings {
     pub height: u32,
     pub fullscreen: bool,
     pub after_launch: AfterLaunch,
+    /// Home widgets and sidebar order, owned by the frontend; null = the default layout.
+    pub layout: serde_json::Value,
 }
 
 pub const DEFAULT_JVM_ARGS: &str =
@@ -36,6 +38,7 @@ impl Default for Settings {
             height: 720,
             fullscreen: false,
             after_launch: AfterLaunch::Hide,
+            layout: serde_json::Value::Null,
         }
     }
 }

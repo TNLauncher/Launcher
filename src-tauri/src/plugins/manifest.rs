@@ -43,6 +43,9 @@ pub struct Contributes {
     /// Tabs added to every instance page; the frame gets `tn.context.instance`.
     #[serde(default)]
     pub instance_tabs: Vec<PageSpec>,
+    /// Widgets the user can put on Home; the frame gets `tn.context.instance` (the selected one, may be empty).
+    #[serde(default)]
+    pub widgets: Vec<WidgetSpec>,
     /// Options the user sets in Settings; the plugin reads them with `tn.settings.get()`.
     #[serde(default)]
     pub settings: Vec<SettingSpec>,
@@ -147,6 +150,27 @@ pub struct PageSpec {
     pub crash: bool,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WidgetSpec {
+    pub id: String,
+    pub title: String,
+    /// Material Symbols name.
+    pub icon: String,
+    /// HTML file in the plugin folder.
+    pub entry: String,
+    /// Default width in Home's 12-column grid: 3, 4, 6, 8 or 12.
+    #[serde(default = "default_widget_span")]
+    pub span: u8,
+}
+
+fn default_widget_span() -> u8 {
+    4
+}
+
+/// Widths Home's layout editor offers.
+const WIDGET_SPANS: [u8; 5] = [3, 4, 6, 8, 12];
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Permissions {
@@ -191,6 +215,11 @@ pub(super) fn read(folder: &Path) -> Result<Manifest> {
             return Err(AppError::Plugin(format!("Select setting {} has no options", s.key)));
         }
     }
+    for w in &m.contributes.widgets {
+        if !WIDGET_SPANS.contains(&w.span) {
+            return Err(AppError::Plugin(format!("Widget {} has width {}, expected one of {WIDGET_SPANS:?}", w.id, w.span)));
+        }
+    }
     if m.contributes.runtime.is_some() && !m.permissions.programs {
         return Err(AppError::Plugin("A game runtime needs the programs permission".into()));
     }
@@ -198,4 +227,27 @@ pub(super) fn read(folder: &Path) -> Result<Manifest> {
         return Err(AppError::Plugin(format!("{} is missing", m.main)));
     }
     Ok(m)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn read_with(widgets: serde_json::Value) -> Result<Manifest> {
+        let folder = std::env::temp_dir().join(format!("tn-manifest-{}-{}", std::process::id(), widgets.to_string().len()));
+        std::fs::create_dir_all(&folder).unwrap();
+        let m = serde_json::json!({ "id": "w", "name": "w", "version": "1", "api": API_VERSION, "contributes": { "widgets": widgets } });
+        std::fs::write(folder.join("manifest.json"), m.to_string()).unwrap();
+        std::fs::write(folder.join("main.js"), "").unwrap();
+        let r = read(&folder);
+        std::fs::remove_dir_all(folder).unwrap();
+        r
+    }
+
+    #[test]
+    fn widgets() {
+        let m = read_with(serde_json::json!([{ "id": "a", "title": "A", "icon": "x", "entry": "a.html" }])).unwrap();
+        assert_eq!(m.contributes.widgets[0].span, 4);
+        assert!(read_with(serde_json::json!([{ "id": "b", "title": "B", "icon": "x", "entry": "b.html", "span": 5 }])).is_err());
+    }
 }

@@ -53,6 +53,7 @@ pub struct PluginEntry {
     pub source: Option<SourceInfo>,
     pub pages: Vec<PageSpec>,
     pub instance_tabs: Vec<PageSpec>,
+    pub widgets: Vec<WidgetSpec>,
     pub settings: Vec<SettingSpec>,
     /// Sign-in form fields when the plugin provides accounts.
     pub account: Option<AccountSpec>,
@@ -82,6 +83,7 @@ pub fn list(state: &AppState) -> Vec<PluginEntry> {
             source: m.contributes.source.as_ref().map(|s| SourceInfo { id: m.id.clone(), name: m.name.clone(), sorts: s.sorts.clone(), categories: s.categories.clone() }),
             pages: m.contributes.pages.clone(),
             instance_tabs: m.contributes.instance_tabs.clone(),
+            widgets: m.contributes.widgets.clone(),
             settings: m.contributes.settings.clone(),
             account: m.contributes.account.clone(),
             runtime: m.contributes.runtime.clone(),
@@ -100,6 +102,7 @@ pub fn list(state: &AppState) -> Vec<PluginEntry> {
         source: None,
         pages: vec![],
         instance_tabs: vec![],
+        widgets: vec![],
         settings: vec![],
         account: None,
         runtime: None,
