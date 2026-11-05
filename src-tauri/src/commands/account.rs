@@ -32,10 +32,11 @@ pub async fn microsoft_login(app: AppHandle, state: State<'_, AppState>, on_code
     .await
 }
 
-/// Signs in through an account provider plugin; `fields` are its form's values. Resolves with the player name.
+/// Signs in through an account provider plugin; `fields` are its form's values. With `account`, that account is
+/// signed in again in place. Resolves with the player name.
 #[tauri::command]
-pub async fn plugin_login(state: State<'_, AppState>, plugin: String, fields: Value) -> Result<String> {
-    account::login_plugin(&state, &plugin, fields).await
+pub async fn plugin_login(state: State<'_, AppState>, plugin: String, fields: Value, account: Option<String>) -> Result<String> {
+    account::login_plugin(&state, &plugin, fields, account).await
 }
 
 /// The account's skin as a data URL; None when it has none.

@@ -149,12 +149,29 @@ pub async fn login_microsoft(state: &AppState, on_code: impl FnOnce(DeviceCode))
     add(state, Account { id: new_id(), provider: MICROSOFT.into(), name: ms.name.clone(), uuid: ms.uuid.clone(), microsoft: Some(ms), data: Value::Null })
 }
 
-/// Signs in through an account provider plugin with its form's values.
-pub async fn login_plugin(state: &AppState, plugin: &str, fields: Value) -> Result<String> {
+/// Puts `acc` in place of the account with its id, keeping its spot in the list and whether it is selected.
+fn replace(state: &AppState, acc: Account) -> Result<String> {
+    let name = acc.name.clone();
+    update(state, |all| {
+        let i = all.accounts.iter().position(|a| a.id == acc.id && a.provider == acc.provider).ok_or_else(|| AppError::NotFound("Account not found".into()))?;
+        all.accounts[i] = acc.clone();
+        // The new identity may already be another account of this provider.
+        all.accounts.retain(|a| a.id == acc.id || a.provider != acc.provider || a.uuid != acc.uuid);
+        Ok(name)
+    })
+}
+
+/// Signs in through an account provider plugin with its form's values; with `account`, that account of the plugin is
+/// signed in again in place (an offline profile renamed, a password changed).
+pub async fn login_plugin(state: &AppState, plugin: &str, fields: Value, account: Option<String>) -> Result<String> {
     let p = plugins::enabled(state, plugin)?;
+    if let Some(id) = &account {
+        find(state, id).ok().filter(|a| a.provider == plugin).ok_or_else(|| AppError::NotFound("Account not found".into()))?;
+    }
     let login = p.account()?.login(fields).await?;
     let (name, uuid) = (check_name(&login.name)?, check_uuid(&login.uuid)?);
-    add(state, Account { id: new_id(), provider: plugin.into(), name, uuid, microsoft: None, data: login.data })
+    let acc = Account { id: account.clone().unwrap_or_else(new_id), provider: plugin.into(), name, uuid, microsoft: None, data: login.data };
+    if account.is_some() { replace(state, acc) } else { add(state, acc) }
 }
 
 /// Plugin answers become game arguments: keep them to what Minecraft accepts.
@@ -254,6 +271,23 @@ mod tests {
         remove(&state, &view.id).unwrap();
         assert!(list(&state).is_empty() && selected(&state).is_none());
         assert!(select(&state, "nope").is_err());
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn replaces_in_place() {
+        let root = std::env::temp_dir().join(format!("tn-accounts-replace-{}", std::process::id()));
+        let state = AppState::new(root.clone()).unwrap();
+        let acc = |id: &str, name: &str| Account { id: id.into(), provider: "offline".into(), name: name.into(), uuid: format!("u-{name}"), microsoft: None, data: Value::Null };
+        for (id, name) in [("a", "Alex"), ("b", "Bob"), ("c", "Cat")] {
+            add(&state, acc(id, name)).unwrap();
+        }
+        select(&state, "c").unwrap();
+        // Renaming "a" to Bob's identity keeps a's spot, drops the duplicate, and leaves the selection alone.
+        replace(&state, acc("a", "Bob")).unwrap();
+        let names: Vec<_> = list(&state).into_iter().map(|a| (a.id, a.name, a.selected)).collect();
+        assert_eq!(names, [("a".into(), "Bob".into(), false), ("c".into(), "Cat".into(), true)]);
+        assert!(replace(&state, acc("nope", "X")).is_err());
         std::fs::remove_dir_all(root).unwrap();
     }
 
