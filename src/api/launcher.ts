@@ -19,8 +19,10 @@ export const launcher = {
   removeAccount: (id: string) => call<void>("remove_account", { id }),
   /** null = the account has no skin. */
   accountSkin: (id: string) => call<Skin | null>("account_skin", { id }),
-  /** Signs in through an account provider plugin; `fields` are its form's values. Resolves with the player name. */
-  pluginLogin: (plugin: string, fields: Record<string, string>) => call<string>("plugin_login", { plugin, fields }),
+  /** Signs in through an account provider plugin; `fields` are its form's values. With `account`, that account is
+   *  signed in again in place (e.g. an offline profile renamed). Resolves with the player name. */
+  pluginLogin: (plugin: string, fields: Record<string, string>, account?: string) =>
+    call<string>("plugin_login", { plugin, fields, account: account ?? null }),
 
   /** `loaderVersion: null` = the loader's newest stable build. */
   createInstance: (name: string, version: string, loader: Loader, loaderVersion: string | null) =>

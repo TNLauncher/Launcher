@@ -1,8 +1,8 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { View } from "@/components/layout/View";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { Button, ConfirmDialog, Dot, Icon, IconButton, Input, Pill, PillGroup, Skeleton } from "@/components/ui";
+import { Button, ConfirmDialog, Dot, Icon, IconButton, Input, Menu, Skeleton } from "@/components/ui";
 import { launcher } from "@/api/launcher";
 import { type PluginEntry } from "@/api/sources";
 import { usePlugins } from "@/hooks/useSource";
@@ -64,7 +64,7 @@ export function ProfilesView() {
         ) : accounts.data?.length ? (
           <ul className={s.list} aria-label="Profiles">
             {accounts.data.map((a) => (
-              <ProfileRow key={a.id} account={a} selected={a.selected} onUse={() => act(launcher.selectAccount(a.id))} onRemove={() => setRemoving(a)} />
+              <ProfileRow key={a.id} account={a} selected={a.selected} onUse={() => act(launcher.selectAccount(a.id))} onRemove={() => setRemoving(a)} onEdited={done} />
             ))}
           </ul>
         ) : (
@@ -135,7 +135,7 @@ function Stage({ account }: { account: Account | null }) {
         <h2 className={cx(s.name, "selectable")}>{name}</h2>
         <div className={s.status}>
           <Dot tone={account ? "green" : "neutral"} />
-          {account ? `Signed in with ${account.providerName} · used for every launch` : "Not signed in · add a profile on the right to play"}
+          {account ? `Signed in with ${account.providerName} · used for every launch` : "Not signed in · add a profile to play"}
         </div>
         {account && <Uuid uuid={account.uuid} />}
       </div>
@@ -158,48 +158,85 @@ function Uuid({ uuid }: { uuid: string }) {
   );
 }
 
-function ProfileRow(p: { account: Account; selected: boolean; onUse(): void; onRemove(): void }) {
+function ProfileRow(p: { account: Account; selected: boolean; onUse(): void; onRemove(): void; onEdited(): Promise<unknown> }) {
   const { account, selected } = p;
   const skin = useSkin(account);
+  // Plugin accounts edit through their provider's own sign-in form; Microsoft names live with Microsoft.
+  const plugin = usePlugins().data?.find((x) => x.id === account.provider && x.enabled && x.account);
+  const [editing, setEditing] = useState(false);
   return (
-    <li className={s.row}>
-      <button type="button" className={cx(s.pick, "sheen")} aria-pressed={selected} onClick={selected ? undefined : p.onUse}>
-        <SkinHead skin={skin} name={account.name} size={36} />
-        <span className={s.rowText}>
-          <span className={s.rowName}>{account.name}</span>
-          <span className={s.rowSub}>{account.providerName}</span>
-        </span>
-        {selected ? (
-          <span className={s.current}><Icon name="check_circle" fill />Active</span>
-        ) : (
-          <span className={s.use}>Use</span>
-        )}
-      </button>
-      <IconButton className={s.remove} icon="delete" label={`Remove ${account.name}`} variant="danger" onClick={p.onRemove} />
+    <li>
+      <div className={s.row}>
+        <button type="button" className={cx(s.pick, "sheen")} aria-pressed={selected} onClick={selected ? undefined : p.onUse}>
+          <SkinHead skin={skin} name={account.name} size={36} />
+          <span className={s.rowText}>
+            <span className={s.rowName}>{account.name}</span>
+            <span className={s.rowSub}>{account.providerName}</span>
+          </span>
+          {selected ? (
+            <span className={s.current}><Icon name="check_circle" fill />Active</span>
+          ) : (
+            <span className={s.use}>Use</span>
+          )}
+        </button>
+        <div className={s.rowMenu}>
+          <Menu
+            label={`${account.name} actions`}
+            items={[
+              ...(plugin ? [{ icon: "edit", label: "Edit", onSelect: () => setEditing(true) }] : []),
+              { icon: "delete", label: "Remove", danger: true, divide: !!plugin, onSelect: p.onRemove },
+            ]}
+          />
+        </div>
+      </div>
+      {editing && plugin && (
+        <div className={s.edit}>
+          <PluginSignIn plugin={plugin} account={account.id} onSignedIn={() => p.onEdited().then(() => setEditing(false))} onCancel={() => setEditing(false)} />
+        </div>
+      )}
     </li>
   );
 }
 
-/** Microsoft sign-in and the forms of account provider plugins, one at a time. */
+/** Every way to sign in, right under the list: Microsoft starts on one click, a provider plugin opens its form in place. */
 function AddProfile({ onSignedIn }: { onSignedIn(): Promise<unknown> }) {
   const providers = (usePlugins().data ?? []).filter((p) => p.enabled && p.account);
-  const [tab, setTab] = useState("microsoft");
-  const plugin = providers.find((p) => p.id === tab);
+  const [open, setOpen] = useState<string | null>(null);
   return (
     <section className={s.add} aria-labelledby="add-profile">
-      <div className={s.addHead}>
-        <h2 id="add-profile">Add a profile</h2>
-        {providers.length > 0 && (
-          <PillGroup label="Sign in with">
-            <Pill pressed={!plugin} onClick={() => setTab("microsoft")}>Microsoft</Pill>
-            {providers.map((p) => (
-              <Pill key={p.id} pressed={plugin?.id === p.id} onClick={() => setTab(p.id)}>{p.name}</Pill>
-            ))}
-          </PillGroup>
-        )}
-      </div>
-      {plugin ? <PluginSignIn key={plugin.id} plugin={plugin} onSignedIn={onSignedIn} /> : <MicrosoftSignIn onSignedIn={onSignedIn} />}
+      <h2 id="add-profile" className={s.addTitle}>Add a profile</h2>
+      <ul className={s.list}>
+        <MicrosoftSignIn onSignedIn={onSignedIn} />
+        {providers.map((p) => (
+          <ProviderRow
+            key={p.id}
+            name={p.name}
+            hint={p.permissions.jvm ? `${p.description} Loads a Java agent into the game.` : p.description}
+            icon="expand_more"
+            open={open === p.id}
+            onClick={() => setOpen(open === p.id ? null : p.id)}
+          >
+            {open === p.id && <PluginSignIn plugin={p} onSignedIn={() => onSignedIn().then(() => setOpen(null))} />}
+          </ProviderRow>
+        ))}
+      </ul>
     </section>
+  );
+}
+
+/** One sign-in method; `open` marks a row that discloses a form, rather than one that acts directly. */
+function ProviderRow(p: { name: string; hint: string; icon: string; busy?: boolean; open?: boolean; onClick(): void; children?: ReactNode }) {
+  return (
+    <li className={s.provider}>
+      <button type="button" className={cx(s.providerHead, "sheen")} aria-expanded={p.open} disabled={p.busy} onClick={p.onClick}>
+        <span className={s.rowText}>
+          <span className={s.rowName}>{p.name}</span>
+          <span className={s.rowSub}>{p.hint}</span>
+        </span>
+        <Icon name={p.busy ? "progress_activity" : p.icon} spin={p.busy} />
+      </button>
+      {p.children && <div className={s.providerBody}>{p.children}</div>}
+    </li>
   );
 }
 
@@ -216,9 +253,14 @@ function MicrosoftSignIn({ onSignedIn }: { onSignedIn(): Promise<unknown> }) {
   }
 
   return (
-    <div className={s.form}>
-      <p className={s.formHint}>Your licensed Minecraft: Java Edition, for online servers and Realms.</p>
-      {ms?.code ? (
+    <ProviderRow
+      name="Microsoft"
+      hint={ms?.code ? "Waiting for you to finish in the browser…" : "Your licensed Minecraft: Java Edition, for online servers and Realms."}
+      icon="arrow_forward"
+      busy={!!ms}
+      onClick={signIn}
+    >
+      {ms?.code && (
         <div className={s.code} role="status">
           <span className="subtle">Enter this code on the Microsoft page that opened in your browser. Didn’t open? Use the link below.</span>
           <div className={s.codeRow}>
@@ -233,34 +275,32 @@ function MicrosoftSignIn({ onSignedIn }: { onSignedIn(): Promise<unknown> }) {
             {ms.code.verificationUri.replace(/^https?:\/\//, "")}
           </Button>
         </div>
-      ) : (
-        <Button variant="primary" loading={!!ms} onClick={signIn}>{ms ? "Requesting code…" : "Sign in with Microsoft"}</Button>
       )}
       {error && <p className={s.error} role="alert">{error}</p>}
-    </div>
+    </ProviderRow>
   );
 }
 
-/** The sign-in form an account provider plugin declares. */
-function PluginSignIn({ plugin, onSignedIn }: { plugin: PluginEntry; onSignedIn(): Promise<unknown> }) {
+/** The sign-in form an account provider plugin declares; with `account`, it signs that account in again in place. */
+function PluginSignIn({ plugin, account, onSignedIn, onCancel }: { plugin: PluginEntry; account?: string; onSignedIn(): Promise<unknown>; onCancel?(): void }) {
   const [fields, setFields] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const submit = () => {
     setBusy(true);
     launcher
-      .pluginLogin(plugin.id, fields)
+      .pluginLogin(plugin.id, fields, account)
       .then(() => (setFields({}), setError(""), onSignedIn()), (e) => setError(errorMessage(e)))
       .finally(() => setBusy(false));
   };
   return (
-    <form className={s.form} onSubmit={(e) => (e.preventDefault(), submit())}>
-      <p className={s.formHint}>{plugin.permissions.jvm ? `${plugin.description} Loads a Java agent into the game.` : plugin.description}</p>
-      {plugin.account!.fields.map((f) => (
+    <form className={s.form} onSubmit={(e) => (e.preventDefault(), submit())} onKeyDown={(e) => e.key === "Escape" && onCancel?.()}>
+      {plugin.account!.fields.map((f, i) => (
         <label key={f.key} className={s.field}>
           <span>{f.label}</span>
           <Input
             type={f.type === "secret" ? "password" : "text"}
+            autoFocus={i === 0}
             spellCheck={false}
             autoComplete="off"
             value={fields[f.key] ?? ""}
@@ -269,8 +309,15 @@ function PluginSignIn({ plugin, onSignedIn }: { plugin: PluginEntry; onSignedIn(
           {f.hint && <span className={s.fieldHint}>{f.hint}</span>}
         </label>
       ))}
-      <Button type="submit" variant="primary" loading={busy}>Sign in with {plugin.name}</Button>
       {error && <p className={s.error} role="alert">{error}</p>}
+      {onCancel ? (
+        <div className={s.formActions}>
+          <Button onClick={onCancel}>Cancel</Button>
+          <Button type="submit" variant="primary" loading={busy}>Save</Button>
+        </div>
+      ) : (
+        <Button type="submit" variant="primary" loading={busy}>Sign in with {plugin.name}</Button>
+      )}
     </form>
   );
 }

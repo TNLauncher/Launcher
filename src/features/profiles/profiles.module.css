@@ -42,13 +42,11 @@
 .list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-sibling); }
 .row { position: relative; }
 .pick {
-  width: 100%; display: flex; align-items: center; gap: var(--space-content); padding: var(--pad-card); border-radius: 16px; text-align: left;
+  width: 100%; display: flex; align-items: center; gap: var(--space-content); padding: var(--pad-card); padding-right: 48px; border-radius: 16px; text-align: left;
   background: rgb(99 99 102 / 0.1); border: 1px solid var(--card-border); box-shadow: var(--highlight);
-  transition: background var(--quick) var(--butter), border-color var(--quick) var(--butter), padding var(--quick) var(--butter), transform var(--soft) var(--spring);
+  transition: background var(--quick) var(--butter), border-color var(--quick) var(--butter), transform var(--soft) var(--spring);
 }
 .pick:not([aria-pressed="true"]):active { transform: scale(0.98); transition: transform var(--press) var(--butter); }
-/* Room for the delete button only while it shows. */
-.row:has(.remove):is(:hover, :focus-within) .pick { padding-right: 48px; }
 .pick:hover { background: var(--panel); border-color: rgb(255 255 255 / 0.15); }
 .pick[aria-pressed="true"] { background: rgb(0 113 227 / 0.1); border-color: var(--accent-fill); cursor: default; }
 .row-text { flex: 1; min-width: 0; }
@@ -58,20 +56,29 @@
 .current :global(.icon) { font-size: 16px; }
 .use { font-size: 12px; color: var(--muted); padding: var(--pad-chip); border-radius: 999px; background: var(--btn); transition: background var(--quick) var(--butter), color var(--quick) var(--butter); }
 .pick:hover .use { background: var(--accent-fill); color: #fff; }
-/* Out of the way until the row is pointed at or tabbed to. */
-.remove { position: absolute; right: var(--space-sibling); top: 50%; translate: 0 -50%; opacity: 0; transition: opacity 120ms var(--ease); }
-.row:hover .remove, .row:focus-within .remove { opacity: 1; }
+.row-menu { position: absolute; right: var(--space-sibling); top: 50%; translate: 0 -50%; }
+.edit { margin-top: var(--space-glyph); padding: var(--pad-card); border-radius: 16px; background: rgb(99 99 102 / 0.06); border: 1px solid var(--card-border); }
 
-/* Pinned to the bottom of the sidebar as its own surface card, leaving the profile list room above. */
-.add {
-  margin-top: auto; padding: var(--pad-panel); border-radius: var(--r-md);
-  background: var(--window); border: 1px solid var(--card-border); box-shadow: var(--highlight);
-  display: flex; flex-direction: column; gap: var(--space-group);
+/* Sign-in methods follow the list directly, in the same row family, so adding sits where you look for profiles. */
+.add { display: flex; flex-direction: column; gap: var(--space-content); }
+.add-title { margin: 0; font-size: 14px; line-height: 1.3; font-weight: 600; }
+.provider { border-radius: 16px; border: 1px solid var(--card-border); transition: background var(--quick) var(--butter), border-color var(--quick) var(--butter); }
+.provider:has([aria-expanded="true"]), .provider:has(.provider-body) { background: rgb(99 99 102 / 0.06); }
+.provider-head {
+  width: 100%; display: flex; align-items: center; gap: var(--space-content); padding: var(--pad-card); border-radius: 15px; text-align: left; color: var(--muted);
+  transition: background var(--quick) var(--butter), color var(--quick) var(--butter);
 }
-.add-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-sibling) var(--space-content); flex-wrap: wrap; }
+.provider-head:hover:not(:disabled) { background: var(--panel); color: var(--fg); }
+.provider-head:disabled { cursor: progress; }
+.provider-head .row-sub { line-height: 15px; color: var(--subtle); }
+.provider-head .row-name { color: var(--fg); }
+.provider-head > :global(.icon) { flex: none; transition: rotate var(--soft) var(--spring); }
+.provider-head[aria-expanded="true"] > :global(.icon) { rotate: 180deg; }
+.provider-body { padding: 0 var(--pad-card) var(--pad-card); display: flex; flex-direction: column; gap: var(--space-sibling); }
+
 .form { display: flex; flex-direction: column; gap: var(--space-content); }
 .form > button { width: 100%; }
-.form-hint { margin: 0; font-size: 12px; line-height: 17px; color: var(--subtle); }
+.form-actions { display: flex; justify-content: flex-end; gap: var(--space-sibling); }
 .field { display: flex; flex-direction: column; gap: var(--space-label); font-size: 12px; color: var(--muted); }
 .field-hint { font-size: 11px; color: var(--subtle); }
 
@@ -88,5 +95,4 @@
   .turntable { margin-top: 0; }
   .identity { position: static; align-self: stretch; margin-top: var(--space-group); }
   .side { border-left: 0; border-top: 1px solid var(--card-border); overflow: visible; }
-  .add { margin-top: 0; }
 }
