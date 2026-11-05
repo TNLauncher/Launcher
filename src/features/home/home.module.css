@@ -10,13 +10,15 @@
   background: rgb(99 99 102 / 0.08); border: 1px solid var(--card-border); box-shadow: var(--highlight);
 }
 .pane { padding: var(--pad-panel); display: flex; flex-direction: column; }
-.stage { grid-column: span 8; min-height: clamp(240px, 32vh, 340px); background: var(--lowest); }
-.player { grid-column: span 4; }
-.worlds-pane { grid-column: span 5; }
-.spec-pane { grid-column: span 4; }
-.news-pane { grid-column: span 3; }
-/* Without an instance only the patch notes follow the stage: give them the row. */
-.stage + .player + .news-pane { grid-column: span 12; }
+/* .cell: .stage also names the launch dialog rows below, whose min-height would win. */
+.cell.stage { min-height: clamp(240px, 32vh, 340px); background: var(--lowest); }
+
+/* Each widget sits in a slot as wide as the user set; the slot stretches its cell to the row's height. */
+.slot { position: relative; display: grid; min-width: 0; grid-column: span 12; }
+.slot[data-span="3"] { grid-column: span 3; }
+.slot[data-span="4"] { grid-column: span 4; }
+.slot[data-span="6"] { grid-column: span 6; }
+.slot[data-span="8"] { grid-column: span 8; }
 
 /* Stage: the newest screenshot, held back by graphite so the name stays legible. */
 .stage-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: saturate(0.75); animation: stage-in var(--slow) var(--butter); }
@@ -87,25 +89,23 @@ button.player-name:hover { background: var(--card); }
 .restage .stage-body > * { animation: rise var(--slow) var(--butter) backwards; }
 .restage .stage-body > :nth-child(2) { animation-delay: 40ms; }
 .restage .stage-body > :nth-child(3) { animation-delay: 80ms; }
-.restage > .worlds-pane { animation: rise var(--slow) var(--butter) 80ms backwards; }
-.restage > .spec-pane { animation: rise var(--slow) var(--butter) 120ms backwards; }
+.restage .worlds-pane { animation: rise var(--slow) var(--butter) 80ms backwards; }
+.restage .spec-pane { animation: rise var(--slow) var(--butter) 120ms backwards; }
 @keyframes rise { from { opacity: 0; transform: translateY(10px); } }
 @media (prefers-reduced-motion: reduce) {
-  .stage-bg, .restage .stage-bg, .restage .stage-body > *, .restage > .pane { animation: none; }
+  .stage-bg, .restage .stage-bg, .restage .stage-body > *, .restage .pane { animation: none; }
 }
 
 @media (max-width: 1100px) {
-  .stage { grid-column: span 7; }
-  .player { grid-column: span 5; }
-  .worlds-pane, .spec-pane { grid-column: span 6; }
-  .news-pane { grid-column: span 12; }
+  .slot[data-span="3"], .slot[data-span="4"] { grid-column: span 6; }
 }
 @media (max-width: 760px) {
-  .stage, .player, .worlds-pane, .spec-pane, .news-pane { grid-column: span 12; }
+  .slot[data-span] { grid-column: span 12; }
 }
 
-.section { padding: var(--space-group) var(--page-x) var(--space-sibling); }
-.tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-content); }
+.section { min-width: 0; padding-top: var(--space-sibling); }
+/* Fills whatever width the slot has: four across at full width, fewer as it narrows. */
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-content); }
 .tile {
   display: flex; align-items: center; gap: var(--space-content); padding: var(--pad-card); border-radius: 16px; text-align: left;
   background: rgb(99 99 102 / 0.1); border: 1px solid var(--card-border); box-shadow: var(--highlight);
@@ -211,6 +211,38 @@ button.player-name:hover { background: var(--card); }
 @keyframes stage-spin { to { rotate: 360deg; } }
 @media (prefers-reduced-motion: reduce) { .stage-current .stage-ring { animation: none; } }
 
-@media (max-width: 1100px) {
-  .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+/* Plugin widget: a sandboxed page in a cell of fixed height. */
+.plugin-widget { display: flex; min-height: 240px; }
+.plugin-widget-frame { flex: 1; display: block; width: 100%; border: 0; background: transparent; }
+
+/* Layout editing: every slot gets a veil with its name and controls; the veil also catches drags over frames. */
+.customize { display: flex; justify-content: flex-end; padding: var(--space-sibling) var(--page-x) 0; }
+.edit-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-group);
+  margin: var(--page-top) var(--page-x) 0; padding: var(--space-sibling) var(--pad-panel);
+  border-radius: var(--r-md); background: var(--card); border: 1px solid var(--card-border);
 }
+.edit-bar + .bento { padding-top: var(--space-content); }
+.edit-bar p { margin: 0; font-size: 12px; color: var(--muted); }
+.edit-actions { display: flex; align-items: center; gap: var(--space-sibling); flex-shrink: 0; }
+.slot-tools {
+  position: absolute; inset: 0; z-index: 5; display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-sibling);
+  padding: var(--space-sibling); border-radius: var(--r-md); cursor: grab;
+  background: rgb(18 18 20 / 0.82); outline: 1px dashed rgb(255 255 255 / 0.22); outline-offset: -1px;
+  transition: outline-color var(--soft) var(--butter), background var(--soft) var(--butter);
+}
+.slot[data-over] > .slot-tools { outline: 2px solid var(--accent); background: rgb(18 18 20 / 0.7); }
+.slot[data-dragging] { opacity: 0.4; }
+.slot-title { display: flex; align-items: center; gap: var(--space-label); min-width: 0; padding: var(--space-unit) var(--space-label); font-size: 12px; font-weight: 500; }
+.slot-title :global(.icon) { font-size: 18px; color: var(--muted); }
+.slot-actions { display: flex; align-items: center; gap: var(--space-unit); flex-shrink: 0; }
+.placeholder { align-items: center; justify-content: center; gap: var(--space-label); min-height: 160px; text-align: center; font-size: 12px; color: var(--muted); }
+.placeholder :global(.icon) { font-size: 22px; }
+.widget-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-unit); }
+.widget-option {
+  display: flex; align-items: center; gap: var(--space-content); width: 100%; padding: var(--pad-list) var(--pad-item);
+  border-radius: var(--r-sm); text-align: left; transition: background var(--soft) var(--butter);
+}
+.widget-option:hover, .widget-option:focus-visible { background: var(--card); }
+.widget-option :global(.icon) { color: var(--muted); }
+.widget-empty { margin: 0; font-size: 12px; color: var(--muted); }

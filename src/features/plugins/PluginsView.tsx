@@ -153,7 +153,7 @@ function PluginRow({ plugin: p, failure, update, onUpdate, onToggle, onRemove, o
   onRemove(): void;
   onError(message: string): void;
 }) {
-  const icon = p.pages[0]?.icon ?? p.instanceTabs[0]?.icon ?? "extension";
+  const icon = p.pages[0]?.icon ?? p.instanceTabs[0]?.icon ?? p.widgets[0]?.icon ?? "extension";
   return (
     <li className={cx(s.plugin, !p.enabled && s.off)}>
       <span className={s.tile}><Icon name={icon} fill={p.enabled} /></span>
@@ -214,7 +214,7 @@ function PluginStore({ installed, onInstalled, onError }: {
         {store.data.map((e) => {
           const m = e.manifest;
           const have = installed.find((p) => p.id === m.id);
-          const icon = m.contributes.pages[0]?.icon ?? m.contributes.instanceTabs[0]?.icon ?? m.contributes.runtime?.icon ?? "extension";
+          const icon = m.contributes.pages[0]?.icon ?? m.contributes.instanceTabs[0]?.icon ?? m.contributes.widgets[0]?.icon ?? m.contributes.runtime?.icon ?? "extension";
           return (
             <li key={m.id} className={s.plugin}>
               <span className={s.tile}><Icon name={icon} /></span>

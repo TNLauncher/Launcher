@@ -16,6 +16,21 @@ export interface Settings {
   height: number;
   fullscreen: boolean;
   afterLaunch: AfterLaunch;
+  /** Owned by the frontend (src/store/layout.ts); the backend stores it as is. null = defaults. */
+  layout: unknown;
+}
+
+/** Columns a Home widget takes in the 12-column grid. */
+export type Span = 3 | 4 | 6 | 8 | 12;
+export interface Slot {
+  id: string;
+  span: Span;
+}
+export interface Layout {
+  /** Home widgets in grid order; a widget not listed is hidden. null = the default set. */
+  home: Slot[] | null;
+  /** Sidebar views in the user's order (missing ones follow in default order), and the ones turned off. */
+  sidebar: { order: string[]; hidden: string[] };
 }
 
 export interface Instance {

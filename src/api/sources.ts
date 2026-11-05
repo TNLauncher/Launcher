@@ -1,7 +1,7 @@
 // Content sources (Modrinth...) behind the plugin API. Mirrors src-tauri/src/plugins/api.rs.
 import { Channel } from "@tauri-apps/api/core";
 import { call } from "./ipc";
-import type { ContentKind, ImportProgress, Instance } from "@/types";
+import type { ContentKind, ImportProgress, Instance, Span } from "@/types";
 
 export type ProjectKind = ContentKind | "modpack";
 
@@ -32,6 +32,7 @@ export interface PluginEntry {
   source: SourceInfo | null;
   pages: PluginView[];
   instanceTabs: PluginView[];
+  widgets: PluginWidget[];
   settings: PluginSetting[];
   /** Sign-in form when the plugin provides accounts. */
   account: { fields: PluginSetting[] } | null;
@@ -44,7 +45,7 @@ export interface PluginEntry {
 /** A plugin the store offers. Mirrors `StoreEntry` in src-tauri/src/plugins/store.rs. */
 export interface StoreEntry {
   manifest: Pick<PluginEntry, "id" | "name" | "version" | "description" | "permissions"> & {
-    contributes: { pages: PluginView[]; instanceTabs: PluginView[]; runtime: { icon: string } | null };
+    contributes: { pages: PluginView[]; instanceTabs: PluginView[]; widgets: PluginWidget[]; runtime: { icon: string } | null };
   };
   url: string;
   sha256: string;
@@ -61,6 +62,16 @@ export interface PluginView {
   header?: boolean;
   /** Instance tabs: offered next to a crash or launch error. */
   crash?: boolean;
+}
+
+/** A Home widget a plugin contributes. */
+export interface PluginWidget {
+  id: string;
+  title: string;
+  icon: string;
+  entry: string;
+  /** Default width in Home's 12-column grid. */
+  span: Span;
 }
 
 export interface PluginSetting {

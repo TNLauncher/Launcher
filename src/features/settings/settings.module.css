@@ -45,4 +45,16 @@
 @keyframes save-pop { 0% { transform: scale(0.3); opacity: 0; } 60% { transform: scale(1.2); } }
 @keyframes save-text { from { opacity: 0; transform: translateX(-4px); } }
 @keyframes spin { to { transform: rotate(360deg); } }
+/* Sidebar sections: one row each, dragged by the whole row. */
+.nav-editor { display: flex; flex-direction: column; gap: var(--space-sibling); padding: var(--space-group) 0; border-bottom: 1px solid var(--card-border); }
+.nav-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-unit); }
+.nav-item {
+  display: flex; align-items: center; gap: var(--space-content); padding: var(--pad-list) var(--pad-item); border-radius: var(--r-sm);
+  cursor: grab; transition: background var(--soft) var(--butter), box-shadow var(--soft) var(--butter);
+}
+.nav-item:hover { background: var(--card); }
+.nav-item :global(.icon) { color: var(--muted); }
+.nav-item .grip { font-size: 18px; color: var(--subtle); }
+.nav-item[data-dragging] { opacity: 0.4; }
+.nav-item[data-over] { box-shadow: inset 0 0 0 2px var(--accent); }
 .instance-pane { display: flex; flex-direction: column; gap: var(--space-region); padding: var(--space-group) 0 var(--page-bottom); }

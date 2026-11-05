@@ -2,19 +2,21 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { getVersion } from "@tauri-apps/api/app";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { View } from "@/components/layout/View";
-import { Button, ConfirmDialog, Icon, Input, Select, Switch, Textarea } from "@/components/ui";
+import { useNavItems } from "@/components/layout/Sidebar";
+import { Button, ConfirmDialog, Icon, IconButton, Input, Select, Switch, Textarea } from "@/components/ui";
 import { useChanged } from "@/hooks/useChanged";
 import { useLauncherUpdate, useLauncherUpdateQuery } from "@/hooks/useUpdates";
 import { cx } from "@/lib/cx";
 import { errorMessage } from "@/lib/format";
 import { useLauncher } from "@/store/LauncherContext";
-import type { Settings } from "@/types";
+import { move, PINNED_VIEWS, saveLayout, useDragSort, useLayout } from "@/store/layout";
+import type { Layout, Settings } from "@/types";
 import s from "./settings.module.css";
 
 // Keep in sync with Settings::default() in src-tauri/src/models/settings.rs.
 export const DEFAULT_JVM_ARGS =
   "-XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UnlockExperimentalVMOptions -XX:+DisableExplicitGC";
-const DEFAULTS: Settings = {
+const DEFAULTS: Omit<Settings, "layout"> = {
   javaPath: "",
   ramMb: 4096,
   jvmArgs: DEFAULT_JVM_ARGS,
@@ -50,7 +52,8 @@ export function SettingsView() {
     setStatus("Saving…");
     clearTimeout(timer.current);
     timer.current = setTimeout(() => {
-      saveSettings(next).then(
+      // The layout is edited elsewhere (Home, the sidebar group): save the latest one, not this form's copy.
+      saveSettings({ ...next, layout: useLauncher.getState().snapshot?.settings.layout ?? null }).then(
         () => setStatus("All changes saved"),
         (e) => setStatus(`Could not save: ${errorMessage(e)}`)
       );
@@ -115,6 +118,10 @@ export function SettingsView() {
           </Row>
         </Group>
 
+        <Group icon="view_sidebar" title="Sidebar">
+          <SidebarItems />
+        </Group>
+
         {!updateWaiting && <UpdatesGroup />}
 
         <div className={s.settingsFoot}>
@@ -140,6 +147,37 @@ export function SettingsView() {
         Memory, Java, window and launcher options go back to defaults.
       </ConfirmDialog>
     </View>
+  );
+}
+
+/** Sidebar sections to reorder (drag or arrows) and turn off; saved at once, apart from the form. */
+function SidebarItems() {
+  const layout = useLayout();
+  const items = useNavItems();
+  const { hidden } = layout.sidebar;
+  const save = (sidebar: Layout["sidebar"]) => saveLayout({ ...layout, sidebar });
+  const reorder = (from: number, to: number) => save({ ...layout.sidebar, order: move(items, from, to).map((n) => n.view) });
+  const drag = useDragSort(reorder);
+  return (
+    <div className={s.navEditor}>
+      <ul className={s.navList}>
+        {items.map((n, i) => {
+          const pinned = PINNED_VIEWS.includes(n.view);
+          return (
+            <li key={n.view} className={s.navItem} {...drag(i)}>
+              <Icon name="drag_indicator" className={s.grip} />
+              <Icon name={n.icon} />
+              <span className={s.grow}>{n.label}</span>
+              <IconButton icon="arrow_upward" label={`Move ${n.label} up`} disabled={i === 0} onClick={() => reorder(i, i - 1)} />
+              <IconButton icon="arrow_downward" label={`Move ${n.label} down`} disabled={i === items.length - 1} onClick={() => reorder(i, i + 1)} />
+              <Switch label={pinned ? `${n.label} is always shown` : `Show ${n.label}`} checked={pinned || !hidden.includes(n.view)} disabled={pinned}
+                onChange={(on) => save({ ...layout.sidebar, hidden: on ? hidden.filter((v) => v !== n.view) : [...hidden, n.view] })} />
+            </li>
+          );
+        })}
+      </ul>
+      <Button variant="link" className={s.alignEnd} onClick={() => save({ order: [], hidden: [] })}>Reset sidebar</Button>
+    </div>
   );
 }
 

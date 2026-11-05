@@ -4,6 +4,7 @@ import { SkinHead, useSkin } from "@/features/profiles/Skin";
 import { usePlugins } from "@/hooks/useSource";
 import { useLauncherUpdate, usePluginUpdateCount } from "@/hooks/useUpdates";
 import { useLauncher } from "@/store/LauncherContext";
+import { arrange, PINNED_VIEWS, useLayout } from "@/store/layout";
 import { useUi, type Route, type View } from "@/store/UiContext";
 import { preloadView } from "@/views";
 import s from "./Sidebar.module.css";
@@ -17,18 +18,25 @@ const NAV: { view: View; icon: string; label: string }[] = [
   { view: "settings", icon: "tune", label: "Settings" },
 ];
 
-/** Sidebar sections, plugin pages included. */
-function useNav(): typeof NAV {
+/** Every sidebar section, plugin pages included, in the user's order; hidden ones too (Settings lists them). */
+export function useNavItems(): typeof NAV {
+  const order = useLayout().sidebar.order;
   const pages: typeof NAV = (usePlugins().data ?? [])
     .filter((p) => p.enabled)
     .flatMap((p) => p.pages.map((pg) => ({ view: `plugin:${p.id}:${pg.id}` as View, icon: pg.icon, label: pg.title })));
-  // Plugin pages sit above Plugins and Settings, which stay last.
-  return [...NAV.slice(0, -2), ...pages, ...NAV.slice(-2)];
+  // By default plugin pages sit above Plugins and Settings, which stay last.
+  return arrange([...NAV.slice(0, -2), ...pages, ...NAV.slice(-2)], order);
+}
+
+/** The sections the sidebar shows. */
+function useNav(): typeof NAV {
+  const hidden = useLayout().sidebar.hidden;
+  return useNavItems().filter((n) => PINNED_VIEWS.includes(n.view) || !hidden.includes(n.view));
 }
 
 /** Names a screen: its section, and its detail page (or nested sub-detail) if one is open. */
 export function useRouteLabel(): (r: Route) => { section: string; detail?: string; subdetail?: string } {
-  const nav = useNav();
+  const nav = useNavItems(); // Hidden sections still open from links (an instance from Home), and keep their names.
   const instances = useLauncher((st) => st.snapshot?.instances);
   return (r) => {
     const instName = r.instance ? (instances?.find((i) => i.id === r.instance)?.name ?? "Instance") : undefined;
