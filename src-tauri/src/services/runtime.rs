@@ -70,7 +70,7 @@ pub async fn prepare(state: &AppState, inst: &Instance, r: &RuntimeRef, session:
     install::install(&state.http, root, &base, &game_dir.join(".natives"), Check::Size, progress).await?;
     let launch = runtime
         .launch(json!({
-            "version": r.version, "os": os, "arch": arch,
+            "version": r.version, "os": os, "arch": arch, "instance": inst.id,
             "width": settings.width, "height": settings.height, "fullscreen": settings.fullscreen, "world": world,
         }))
         .await?;
@@ -79,6 +79,7 @@ pub async fn prepare(state: &AppState, inst: &Instance, r: &RuntimeRef, session:
     let java_home = java.parent().and_then(Path::parent).unwrap_or(&java).to_path_buf();
     let mut vars: Vec<(&str, PathBuf)> = vec![
         ("runtime", dir.clone()),
+        ("plugin", plugin.dir.clone()),
         ("instance", game_dir.clone()),
         ("java", java),
         ("javaHome", java_home),
@@ -96,8 +97,13 @@ pub async fn prepare(state: &AppState, inst: &Instance, r: &RuntimeRef, session:
         vars.push(("mc.serverJar", path));
     }
 
+    let cargo = match launch.steps.iter().any(|s| s.tool.is_some()) {
+        true if !plugin.manifest.permissions.rust => return Err(AppError::Plugin(format!("{} may not use your Rust toolchain", r.name))),
+        true => Some(cargo()?),
+        false => None,
+    };
     for step in &launch.steps {
-        run_step(&dir, step, &vars, progress).await?;
+        run_step(&dir, &game_dir, step, &vars, cargo.as_deref(), progress).await?;
     }
 
     let program = build_file(&dir, &launch.game.program)?;
@@ -146,14 +152,20 @@ async fn install_build(c: &reqwest::Client, plugin: &Plugin, dir: &Path, files: 
     Ok(())
 }
 
-/// Unpacks a `.zip` or `.tar.gz` into `dest`; both readers refuse entries that point outside it.
+/// Unpacks a `.zip` or `.tar.gz` into `dest`; both readers refuse entries that point outside it. A tarball's links are
+/// left out, as Horizon's launcher does with its source (horizon-mixins refuses them).
 fn extract(archive: &Path, dest: &Path) -> Result<()> {
     let name = archive.file_name().unwrap_or_default().to_string_lossy();
     let file = std::fs::File::open(archive)?;
     if name.ends_with(".zip") {
         zip::ZipArchive::new(file)?.extract(dest)?;
     } else if name.ends_with(".tar.gz") || name.ends_with(".tgz") {
-        tar::Archive::new(flate2::read::GzDecoder::new(file)).unpack(dest)?;
+        for entry in tar::Archive::new(flate2::read::GzDecoder::new(file)).entries()? {
+            let mut entry = entry?;
+            if !entry.header().entry_type().is_symlink() && !entry.header().entry_type().is_hard_link() {
+                entry.unpack_in(dest)?;
+            }
+        }
     } else {
         return Err(AppError::Unsupported(format!("Can't unpack {name}: only .zip and .tar.gz")));
     }
@@ -189,14 +201,84 @@ fn substitute(args: &[String], vars: &[(&str, PathBuf)]) -> Result<Vec<String>> 
         .collect()
 }
 
-/// Runs one step unless its check passes; JSON progress lines drive the bar, and an `error` line becomes the failure.
-async fn run_step(dir: &Path, step: &RuntimeStep, vars: &[(&str, PathBuf)], progress: Progress<'_>) -> Result<()> {
+/// The user's `cargo`: on `PATH`, else in `$CARGO_HOME/bin` or `~/.cargo/bin`, where rustup puts it.
+fn cargo() -> Result<PathBuf> {
+    let exe = format!("cargo{}", std::env::consts::EXE_SUFFIX);
+    let home = std::env::var_os("CARGO_HOME").map(PathBuf::from).or_else(|| std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" }).map(|h| PathBuf::from(h).join(".cargo")));
+    std::env::var_os("PATH")
+        .map(|p| std::env::split_paths(&p).collect::<Vec<_>>())
+        .unwrap_or_default()
+        .into_iter()
+        .chain(home.map(|h| h.join("bin")))
+        .map(|d| d.join(&exe))
+        .find(|p| p.is_file())
+        .ok_or_else(|| AppError::Unsupported("This needs Rust: install it from rustup.rs".into()))
+}
+
+/// Empties `into`, unpacks each zip there, then applies `drop`.
+fn unpack(game_dir: &Path, files: &[String], into: &Path, drop: Option<&DropLines>) -> Result<()> {
+    if into.exists() {
+        std::fs::remove_dir_all(into)?;
+    }
+    std::fs::create_dir_all(into)?;
+    for f in files {
+        zip::ZipArchive::new(std::fs::File::open(game_dir.join(safe_rel(f)?))?)?.extract(into)?;
+    }
+    if let Some(d) = drop {
+        drop_lines(into, d)?;
+    }
+    Ok(())
+}
+
+/// Removes the lines starting with `d.prefix` from every file named `d.file` under `dir`.
+fn drop_lines(dir: &Path, d: &DropLines) -> Result<()> {
+    for e in std::fs::read_dir(dir)? {
+        let e = e?;
+        let path = e.path();
+        let kind = e.file_type()?;
+        if kind.is_dir() {
+            drop_lines(&path, d)?;
+        } else if kind.is_file() && e.file_name() == d.file.as_str() {
+            let text = std::fs::read_to_string(&path)?;
+            let kept: Vec<&str> = text.lines().filter(|l| !l.trim_start().starts_with(&d.prefix)).collect();
+            std::fs::write(&path, kept.join("\n") + "\n")?;
+        }
+    }
+    Ok(())
+}
+
+/// Runs one step unless `creates` exists or its check passes; JSON progress lines drive the bar, and an `error` line
+/// becomes the failure. With `cargo`, its folder leads the step's `PATH` (tools a step builds may call cargo too).
+async fn run_step(dir: &Path, game_dir: &Path, step: &RuntimeStep, vars: &[(&str, PathBuf)], cargo: Option<&Path>, progress: Progress<'_>) -> Result<()> {
     use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
-    let program = build_file(dir, &step.program)?;
-    let spawn_err = |e: std::io::Error| AppError::Unsupported(format!("{}: could not start {}: {e}", step.title, step.program));
+    if let Some(rel) = &step.creates {
+        if dir.join(safe_rel(rel)?).exists() {
+            return Ok(());
+        }
+    }
+    if let Some(u) = &step.unpack {
+        progress(Stage::Preparing, 0, 0);
+        let (game_dir, files, into, drop) = (game_dir.to_path_buf(), u.files.clone(), dir.join(safe_rel(&u.into)?), u.drop_lines.clone());
+        return tokio::task::spawn_blocking(move || unpack(&game_dir, &files, &into, drop.as_ref()))
+            .await
+            .map_err(|e| AppError::Unsupported(e.to_string()))?
+            .map_err(|e| AppError::Unsupported(format!("{}: {e}", step.title)));
+    }
+    let program = match step.tool {
+        Some(Tool::Cargo) => cargo.ok_or_else(|| AppError::Plugin("cargo steps need the rust permission".into()))?.to_path_buf(),
+        None => build_file(dir, &step.program)?,
+    };
+    let path = cargo.and_then(Path::parent).map(|bin| {
+        let rest = std::env::var_os("PATH").map(|p| std::env::split_paths(&p).collect::<Vec<_>>()).unwrap_or_default();
+        std::env::join_paths(std::iter::once(bin.to_path_buf()).chain(rest)).unwrap_or_default()
+    });
+    let spawn_err = |e: std::io::Error| AppError::Unsupported(format!("{}: could not start {}: {e}", step.title, program.display()));
     let command = |args: Vec<String>| {
         let mut c = tokio::process::Command::new(&program);
         c.current_dir(dir).args(args).stdin(Stdio::null()).kill_on_drop(true);
+        if let Some(p) = &path {
+            c.env("PATH", p);
+        }
         #[cfg(windows)]
         c.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
         c
@@ -232,8 +314,16 @@ async fn run_step(dir: &Path, step: &RuntimeStep, vars: &[(&str, PathBuf)], prog
     if status.success() {
         return Ok(());
     }
-    let why = error.or_else(|| stderr.lines().rev().find(|l| !l.trim().is_empty()).map(String::from)).unwrap_or_else(|| status.to_string());
+    let why = error.or_else(|| failure(&stderr)).unwrap_or_else(|| status.to_string());
     Err(AppError::Unsupported(format!("{}: {why}", step.title)))
+}
+
+/// The reason in a failed step's stderr: a JSON diagnostic's `message` (horizon-mixins), else the first `error` line
+/// (cargo's first compiler error, not its summary), else the last line.
+fn failure(stderr: &str) -> Option<String> {
+    let json = serde_json::from_str::<serde_json::Value>(stderr.trim()).ok().and_then(|v| v["message"].as_str().map(String::from));
+    let lines = || stderr.lines().map(str::trim).filter(|l| !l.is_empty());
+    json.or_else(|| lines().find(|l| l.starts_with("error")).or_else(|| lines().last()).map(String::from))
 }
 
 #[cfg(test)]
@@ -247,6 +337,14 @@ mod tests {
         assert_eq!(substitute(&args, &vars).unwrap(), ["--out", "/r/prepared", "x=/a"]);
         assert!(substitute(&["${mc.serverJar}".into()], &vars).unwrap_err().to_string().contains("Unknown placeholder ${mc.serverJar}"));
         assert!(substitute(&["${runtime".into()], &vars).is_err());
+    }
+
+    #[test]
+    fn finds_the_reason_a_step_failed() {
+        assert_eq!(failure("{\n  \"code\": \"E_REVISION\",\n  \"message\": \"wrong revision\"\n}\n").unwrap(), "wrong revision");
+        assert_eq!(failure("   Compiling a\nerror[E0425]: cannot find x\nerror: could not compile `a`\n").unwrap(), "error[E0425]: cannot find x");
+        assert_eq!(failure("one\ntwo\n\n").unwrap(), "two");
+        assert_eq!(failure(""), None);
     }
 
     #[test]
@@ -283,15 +381,54 @@ exit 1
         let step = |check: &str| RuntimeStep {
             title: "Prep".into(),
             program: "prep".into(),
+            tool: None,
+            creates: None,
+            unpack: None,
             args: vec![],
             check: Some(vec!["check".into(), check.into()]),
             progress: Some(ProgressFormat::Json),
         };
-        run_step(&dir, &step("0"), &[], &progress).await.unwrap();
+        run_step(&dir, &dir, &step("0"), &[], None, &progress).await.unwrap();
         assert!(seen.lock().unwrap().is_empty(), "a passing check skips the step");
-        let err = run_step(&dir, &step("1"), &[], &progress).await.unwrap_err().to_string();
+        run_step(&dir, &dir, &RuntimeStep { creates: Some("prep".into()), ..step("1") }, &[], None, &progress).await.unwrap();
+        assert!(seen.lock().unwrap().is_empty(), "an existing `creates` skips the step");
+        let cargo = RuntimeStep { tool: Some(Tool::Cargo), ..step("1") };
+        assert!(run_step(&dir, &dir, &cargo, &[], None, &progress).await.unwrap_err().to_string().contains("rust permission"));
+        let err = run_step(&dir, &dir, &step("1"), &[], None, &progress).await.unwrap_err().to_string();
         assert_eq!(err, "Prep: no server jar");
         assert_eq!(*seen.lock().unwrap(), [(Stage::Preparing, 0, 0), (Stage::Preparing, 500, 1000)]);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[tokio::test]
+    async fn unpack_steps_empty_the_folder_first() {
+        use std::io::Write;
+        let dir = std::env::temp_dir().join(format!("tn-runtime-unpack-{}", std::process::id()));
+        std::fs::create_dir_all(dir.join("mods")).unwrap();
+        std::fs::create_dir_all(dir.join("out")).unwrap();
+        std::fs::write(dir.join("out/stale"), "").unwrap();
+        let mut z = zip::ZipWriter::new(std::fs::File::create(dir.join("mods/a.hnmod")).unwrap());
+        z.start_file("mixins/a/horizon-mixin.toml", zip::write::SimpleFileOptions::default()).unwrap();
+        z.write_all(b"[mod]\n  horizon_revision = \"abc\"\nid = \"a\"").unwrap();
+        z.finish().unwrap();
+        let step = |into: &str| RuntimeStep {
+            title: "Unpack".into(),
+            program: String::new(),
+            tool: None,
+            creates: None,
+            unpack: Some(Unpack {
+                files: vec!["mods/a.hnmod".into()],
+                into: into.into(),
+                drop_lines: Some(DropLines { file: "horizon-mixin.toml".into(), prefix: "horizon_revision".into() }),
+            }),
+            args: vec![],
+            check: None,
+            progress: None,
+        };
+        run_step(&dir, &dir, &step("out"), &[], None, &|_, _, _| {}).await.unwrap();
+        assert!(!dir.join("out/stale").exists());
+        assert_eq!(std::fs::read_to_string(dir.join("out/mixins/a/horizon-mixin.toml")).unwrap(), "[mod]\nid = \"a\"\n");
+        assert!(run_step(&dir, &dir, &step("../out"), &[], None, &|_, _, _| {}).await.is_err());
         std::fs::remove_dir_all(dir).unwrap();
     }
 
@@ -306,9 +443,14 @@ exit 1
         h.set_mode(0o755);
         h.set_cksum();
         b.append_data(&mut h, "top/game", &b"hi"[..]).unwrap();
+        let mut link = tar::Header::new_gnu();
+        link.set_entry_type(tar::EntryType::Symlink);
+        link.set_size(0);
+        b.append_link(&mut link, "top/link", "game").unwrap();
         b.into_inner().unwrap().finish().unwrap();
         extract(&archive, &dir).unwrap();
         assert_eq!(std::fs::read(dir.join("top/game")).unwrap(), b"hi");
+        assert!(std::fs::symlink_metadata(dir.join("top/link")).is_err(), "links are left out");
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;

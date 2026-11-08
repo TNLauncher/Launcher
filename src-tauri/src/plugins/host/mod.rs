@@ -47,7 +47,7 @@ enum Need {
 
 fn need(method: &str) -> Need {
     match method {
-        "instances.list" | "instances.get" | "instances.readLog" | "instances.crashReports" | "instances.mods" | "instances.missingFiles"
+        "instances.list" | "instances.get" | "instances.files" | "instances.readLog" | "instances.crashReports" | "instances.mods" | "instances.missingFiles"
         | "instances.launchSettings" | "instances.export" | "content.hashes" | "content.identify" => Need::Instances,
         "instances.repair" | "instances.restoreFiles" | "instances.change" | "content.install" | "content.setEnabled" | "content.delete" => Need::Content,
         "presence.set" | "presence.clear" => Need::Presence,

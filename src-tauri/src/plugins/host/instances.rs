@@ -15,6 +15,12 @@ struct Export {
 }
 
 #[derive(Deserialize)]
+struct Files {
+    id: String,
+    dir: String,
+}
+
+#[derive(Deserialize)]
 struct Change {
     id: String,
     change: instances::Change,
@@ -30,6 +36,10 @@ pub async fn handle(cx: &Cx<'_>, method: &str, p: Value) -> Result<Value> {
         }
         "instances.readLog" => Ok(Value::String(logs::read_log(state, &params::<Id>(p)?.id)?)),
         "instances.crashReports" => Ok(Value::String(logs::crash_reports(state, &params::<Id>(p)?.id)?)),
+        "instances.files" => {
+            let Files { id, dir } = params(p)?;
+            Ok(serde_json::to_value(file_names(&cx.state.paths.instance_dir(&id)?.join(crate::paths::safe_rel(&dir)?))?)?)
+        }
         "instances.mods" => Ok(serde_json::to_value(content::scan_mods(state, &params::<Id>(p)?.id)?)?),
         "instances.missingFiles" => Ok(serde_json::to_value(repair::missing_files(state, &params::<Id>(p)?.id).await?)?),
         "instances.launchSettings" => Ok(serde_json::to_value(instances::launch_facts(state, &params::<Id>(p)?.id)?)?),
@@ -79,4 +89,18 @@ async fn export_to_file(cx: &Cx<'_>, Export { id, spec }: Export) -> Result<Valu
     let (handle, out) = (cx.app.clone(), dest.clone());
     tauri::async_runtime::spawn_blocking(move || export::write(&handle.state::<AppState>(), &id, &spec, &out)).await??;
     Ok(Value::String(dest.to_string_lossy().into()))
+}
+
+/// Names of the files in `dir`, sorted; none when it doesn't exist.
+fn file_names(dir: &std::path::Path) -> Result<Vec<String>> {
+    let Ok(read) = std::fs::read_dir(dir) else { return Ok(vec![]) };
+    let mut names = vec![];
+    for e in read {
+        let e = e?;
+        if e.file_type()?.is_file() {
+            names.push(e.file_name().to_string_lossy().into_owned());
+        }
+    }
+    names.sort();
+    Ok(names)
 }

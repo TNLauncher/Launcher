@@ -196,6 +196,9 @@ pub struct Permissions {
     /// Run programs the plugin downloads (game runtimes). Runs code on the computer.
     #[serde(default)]
     pub programs: bool,
+    /// Compile and run code with the user's Rust toolchain (runtime steps with `tool: "cargo"`). Needs `programs`.
+    #[serde(default)]
+    pub rust: bool,
 }
 
 /// Reads and checks a plugin folder's manifest.
@@ -222,6 +225,9 @@ pub(super) fn read(folder: &Path) -> Result<Manifest> {
     }
     if m.contributes.runtime.is_some() && !m.permissions.programs {
         return Err(AppError::Plugin("A game runtime needs the programs permission".into()));
+    }
+    if m.permissions.rust && !m.permissions.programs {
+        return Err(AppError::Plugin("The rust permission needs the programs permission".into()));
     }
     if !folder.join(&m.main).is_file() {
         return Err(AppError::Plugin(format!("{} is missing", m.main)));

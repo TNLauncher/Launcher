@@ -323,8 +323,15 @@ pub struct RuntimeLaunch {
 pub struct RuntimeStep {
     /// Shown while it runs.
     pub title: String,
-    /// Relative to the build's folder.
+    /// Relative to the build's folder. Empty with `tool` or `unpack`.
+    #[serde(default)]
     pub program: String,
+    /// Run a program of the user's instead of one from the build; needs `permissions.rust`.
+    pub tool: Option<Tool>,
+    /// Relative to the build's folder: the step is skipped when it exists.
+    pub creates: Option<String>,
+    /// Unpack zips instead of running a program.
+    pub unpack: Option<Unpack>,
     #[serde(default)]
     pub args: Vec<String>,
     /// Arguments of a quick run of `program`: exit code 0 skips the step.
@@ -332,6 +339,31 @@ pub struct RuntimeStep {
     /// Stdout is JSON lines: `{"fraction"}`, `{"message"}`, `{"error"}`.
     #[serde(default)]
     pub progress: Option<ProgressFormat>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Tool {
+    /// The user's Rust toolchain (`PATH`, else `~/.cargo/bin`).
+    Cargo,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Unpack {
+    /// Zips, relative to the instance's folder.
+    pub files: Vec<String>,
+    /// Relative to the build's folder; emptied first.
+    pub into: String,
+    /// Then remove these lines from the unpacked files of this name, e.g. a version pin the step builds past.
+    pub drop_lines: Option<DropLines>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct DropLines {
+    pub file: String,
+    /// Lines starting with it, after leading spaces.
+    pub prefix: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]

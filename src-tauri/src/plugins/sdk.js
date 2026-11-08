@@ -68,6 +68,7 @@
       get: (id) => request("instances.get", { id }),
       readLog: (id) => request("instances.readLog", { id }),
       mods: (id) => request("instances.mods", { id }),
+      files: (id, dir) => request("instances.files", { id, dir }),
       crashReports: (id) => request("instances.crashReports", { id }),
       missingFiles: (id) => request("instances.missingFiles", { id }),
       launchSettings: (id) => request("instances.launchSettings", { id }),
