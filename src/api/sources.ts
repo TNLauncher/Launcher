@@ -28,7 +28,7 @@ export interface PluginEntry {
   enabled: boolean;
   /** Shipped with the launcher. */
   bundled: boolean;
-  permissions: { hosts: string[]; downloads: string[]; instances: boolean; jvm: boolean; presence: boolean; programs: boolean };
+  permissions: { hosts: string[]; downloads: string[]; instances: boolean; jvm: boolean; presence: boolean; programs: boolean; rust: boolean };
   source: SourceInfo | null;
   pages: PluginView[];
   instanceTabs: PluginView[];

@@ -131,7 +131,7 @@ export function PluginsView() {
 
 /** What a plugin may touch, in plain words. */
 function permissions(perms: PluginEntry["permissions"]): { icon: string; text: string; title?: string }[] {
-  const { hosts, instances, presence, jvm, programs } = perms;
+  const { hosts, instances, presence, jvm, programs, rust } = perms;
   return [
     hosts.length
       ? { icon: "public", text: hosts.length === 1 ? hosts[0] : `${hosts.length} sites`, title: `Connects to ${hosts.join(", ")}` }
@@ -140,6 +140,7 @@ function permissions(perms: PluginEntry["permissions"]): { icon: string; text: s
     presence ? { icon: "forum", text: "Discord status" } : null,
     jvm ? { icon: "memory", text: "Java agent in game" } : null,
     programs ? { icon: "terminal", text: "Runs programs it downloads" } : null,
+    rust ? { icon: "build", text: "Compiles code with your Rust" } : null,
   ].filter((x) => x !== null);
 }
 
