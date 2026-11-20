@@ -35,7 +35,7 @@ export function LaunchProgressDialog({ open, onClose, inst, progress }: { open: 
           const done = i < progress.step || starting;
           const current = !done && i === progress.step && progress.stage === stage;
           return (
-            <li key={stage} className={cx(s.stage, current && s.stageCurrent)} aria-current={current ? "step" : undefined}>
+            <li key={stage} className={cx(s.stageRow, current && s.stageCurrent)} aria-current={current ? "step" : undefined}>
               <span className={s.stageMark}>{done ? <Icon name="check_circle" fill /> : <span className={s.stageRing} />}</span>
               <span className={s.stageName}>{STAGE_LABEL[stage]}</span>
               {current && progress.total > 0 && <span className={s.stageCount}>{progress.done} / {progress.total}</span>}
